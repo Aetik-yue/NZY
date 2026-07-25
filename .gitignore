@@ -1,0 +1,74 @@
+# ============================================================
+# Flutter / Dart
+# ============================================================
+**/doc/api/
+**/ios/Flutter/.last_build_id
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+/build/
+
+# Symbolication related
+app.*.symbols
+
+# Obfuscation related
+app.*.map.json
+
+# Android Studio will place build artifacts here
+/android/app/debug
+/android/app/profile
+/android/app/release
+
+# ============================================================
+# IDE - IntelliJ / Android Studio / VS Code
+# ============================================================
+*.iml
+*.ipr
+*.iws
+.idea/
+.vscode/
+
+# ============================================================
+# IDE - VS Code
+# ============================================================
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# ============================================================
+# OS generated files
+# ============================================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# ============================================================
+# Logs and backups
+# ============================================================
+*.log
+*.pyc
+*.swp
+*.bak
+*.tmp
+*.temp
+.history
+.svn/
+migrate_working_dir/
+*.class
+
+# ============================================================
+# Local configuration (API keys, personal paths, etc.)
+# ============================================================
+local.properties
+*.local
+.env
+.env.local
