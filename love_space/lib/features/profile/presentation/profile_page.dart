@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_text_styles.dart';
+import '../../../data/providers/data_providers.dart';
 
 /// 我的页
 /// 还原设计稿：渐变头部 → 统计行 → 音乐卡 → 功能卡（小说/备忘录/设置）
@@ -28,68 +29,87 @@ class ProfilePage extends ConsumerWidget {
 }
 
 /// 渐变粉头部（情侣头像 + 名称）
-class _ProfileHeader extends StatelessWidget {
+class _ProfileHeader extends ConsumerWidget {
   const _ProfileHeader();
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        gradient: AppColors.headerGradient,
-        borderRadius: BorderRadius.circular(28),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x33FF6B8F),
-            blurRadius: 24,
-            offset: Offset(0, 8),
-            spreadRadius: -4,
+  Widget build(BuildContext context, WidgetRef ref) {
+    final settingsAsync = ref.watch(appSettingsProvider);
+    final days = ref.watch(daysTogetherProvider);
+    return settingsAsync.when(
+      data: (settings) {
+        final names = settings != null
+            ? '${settings.partner1Name} & ${settings.partner2Name}'
+            : '小桃 & 阿树';
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            gradient: AppColors.headerGradient,
+            borderRadius: BorderRadius.circular(28),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x33FF6B8F),
+                blurRadius: 24,
+                offset: Offset(0, 8),
+                spreadRadius: -4,
+              ),
+            ],
           ),
-        ],
+          child: Column(
+            children: [
+              // 情侣头像 + 心形
+              SizedBox(
+                width: 130,
+                height: 64,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    // 女友头像（左）
+                    Positioned(
+                      left: 0,
+                      child: _Avatar(const LinearGradient(
+                        colors: [Color(0xFFFFB5CC), Color(0xFFFF8FB1)],
+                      )),
+                    ),
+                    // 我的头像（右）
+                    Positioned(
+                      left: 56,
+                      child: _Avatar(const LinearGradient(
+                        colors: [Color(0xFFFFD1BF), Color(0xFFFFA1A1)],
+                      )),
+                    ),
+                    // 中间心形
+                    Positioned(
+                      left: 45,
+                      top: 21,
+                      child: Icon(Icons.favorite, color: Colors.white, size: 24),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(names, style: AppTextStyles.titleLarge.copyWith(
+                color: AppColors.textOnPink, fontSize: 20,
+              )),
+              const SizedBox(height: 4),
+              Text('在一起 $days 天 · 这是我们的空间',
+                style: AppTextStyles.caption.copyWith(
+                  color: Colors.white.withOpacity(0.85),
+                )),
+            ],
+          ),
+        );
+      },
+      loading: () => const Center(
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: 24),
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
       ),
-      child: Column(
-        children: [
-          // 情侣头像 + 心形
-          SizedBox(
-            width: 130,
-            height: 64,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                // 女友头像（左）
-                Positioned(
-                  left: 0,
-                  child: _Avatar(const LinearGradient(
-                    colors: [Color(0xFFFFB5CC), Color(0xFFFF8FB1)],
-                  )),
-                ),
-                // 我的头像（右）
-                Positioned(
-                  left: 56,
-                  child: _Avatar(const LinearGradient(
-                    colors: [Color(0xFFFFD1BF), Color(0xFFFFA1A1)],
-                  )),
-                ),
-                // 中间心形
-                Positioned(
-                  left: 45,
-                  top: 21,
-                  child: Icon(Icons.favorite, color: Colors.white, size: 24),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text('小桃 & 阿树', style: AppTextStyles.titleLarge.copyWith(
-            color: AppColors.textOnPink, fontSize: 20,
-          )),
-          const SizedBox(height: 4),
-          Text('在一起 365 天 · 这是我们的空间',
-            style: AppTextStyles.caption.copyWith(
-              color: Colors.white.withOpacity(0.85),
-            )),
-        ],
+      error: (_, __) => const Padding(
+        padding: EdgeInsets.symmetric(vertical: 24),
+        child: Text('加载失败'),
       ),
     );
   }
@@ -114,16 +134,22 @@ class _Avatar extends StatelessWidget {
 }
 
 /// 统计行（相伴天数 / 相册 / 愿望 / 备忘录）
-class _StatsRow extends StatelessWidget {
+class _StatsRow extends ConsumerWidget {
   const _StatsRow();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final days = ref.watch(daysTogetherProvider);
+    final photoCount = ref.watch(photoCountProvider);
+    final wishStats = ref.watch(wishStatsProvider);
+    final settings = ref.watch(appSettingsProvider).valueOrNull;
+    final memoCount = settings?.memoCount ?? 0;
+
     final stats = [
-      ('365', '相伴天数', AppColors.textPrimary),
-      ('128', '相册照片', AppColors.accentRose),
-      ('32', '愿望', AppColors.accentRose),
-      ('86', '备忘录', AppColors.accentRose),
+      ('$days', '相伴天数', AppColors.textPrimary),
+      ('$photoCount', '相册照片', AppColors.accentRose),
+      ('${wishStats.total}', '愿望', AppColors.accentRose),
+      ('$memoCount', '备忘录', AppColors.accentRose),
     ];
     return Container(
       padding: const EdgeInsets.all(16),

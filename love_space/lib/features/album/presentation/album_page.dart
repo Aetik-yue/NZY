@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_text_styles.dart';
+import '../../../data/providers/data_providers.dart';
 
 /// 相册页
 /// 还原设计稿：标题+统计+添加 → 筛选 chip → 九宫格照片
@@ -10,6 +11,7 @@ class AlbumPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final photoCount = ref.watch(photoCountProvider);
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(20, 4, 20, 100),
       child: Column(
@@ -24,7 +26,7 @@ class AlbumPage extends ConsumerWidget {
                 children: [
                   Text('我们的相册', style: AppTextStyles.titleLarge),
                   const SizedBox(height: 2),
-                  Text('共记录了 128 张照片', style: AppTextStyles.label),
+                  Text('共记录了 $photoCount 张照片', style: AppTextStyles.label),
                 ],
               ),
               _AddButton(),
@@ -41,6 +43,16 @@ class AlbumPage extends ConsumerWidget {
     );
   }
 }
+
+/// 预设渐变色（与原来保持一致的 6 组）
+const _photoGradients = [
+  [Color(0xFFFFBFD0), Color(0xFFFF8FB1)],
+  [Color(0xFFFFD1BF), Color(0xFFFFB5A1)],
+  [Color(0xFFFFB5CC), Color(0xFFFFD4E0)],
+  [Color(0xFFFFBFCC), Color(0xFFFFA1B5)],
+  [Color(0xFFFFE0D4), Color(0xFFFFB5CC)],
+  [Color(0xFFFF8FB1), Color(0xFFFF6B9D)],
+];
 
 class _AddButton extends StatelessWidget {
   @override
@@ -104,61 +116,77 @@ class _FilterChips extends StatelessWidget {
   }
 }
 
-class _PhotoGrid extends StatelessWidget {
+class _PhotoGrid extends ConsumerWidget {
   const _PhotoGrid();
 
-  static const _gradients = [
-    [Color(0xFFFFBFD0), Color(0xFFFF8FB1)],
-    [Color(0xFFFFD1BF), Color(0xFFFFB5A1)],
-    [Color(0xFFFFB5CC), Color(0xFFFFD4E0)],
-    [Color(0xFFFFBFCC), Color(0xFFFFA1B5)],
-    [Color(0xFFFFE0D4), Color(0xFFFFB5CC)],
-    [Color(0xFFFF8FB1), Color(0xFFFF6B9D)],
-  ];
-
-  static const _dates = ['7月25', '7月22', '7月20', '7月18', '7月15', '7月12'];
-
   @override
-  Widget build(BuildContext context) {
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3,
-        mainAxisSpacing: 6,
-        crossAxisSpacing: 6,
-        childAspectRatio: 110 / 130,
-      ),
-      itemCount: 6,
-      itemBuilder: (context, index) {
-        return Container(
-          padding: const EdgeInsets.only(bottom: 8, left: 8),
-          alignment: Alignment.bottomLeft,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: _gradients[index],
-            ),
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: const [
-              BoxShadow(
-                color: AppColors.shadowCard,
-                blurRadius: 12,
-                offset: Offset(0, 4),
-                spreadRadius: -2,
+  Widget build(BuildContext context, WidgetRef ref) {
+    final photosAsync = ref.watch(albumPhotosProvider);
+    return photosAsync.when(
+      data: (photos) {
+        if (photos.isEmpty) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 24),
+            child: Text('还没有照片，快去添加第一张吧'),
+          );
+        }
+        return GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 3,
+            mainAxisSpacing: 6,
+            crossAxisSpacing: 6,
+            childAspectRatio: 110 / 130,
+          ),
+          itemCount: photos.length,
+          itemBuilder: (context, index) {
+            final photo = photos[index];
+            final gradient = _photoGradients[photo.gradientIndex % _photoGradients.length];
+            return Container(
+              padding: const EdgeInsets.only(bottom: 8, left: 8),
+              alignment: Alignment.bottomLeft,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: gradient,
+                ),
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: const [
+                  BoxShadow(
+                    color: AppColors.shadowCard,
+                    blurRadius: 12,
+                    offset: Offset(0, 4),
+                    spreadRadius: -2,
+                  ),
+                ],
               ),
-            ],
-          ),
-          child: Text(
-            _dates[index],
-            style: AppTextStyles.caption.copyWith(
-              color: Colors.white,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
+              child: Text(
+                _formatPhotoDate(photo.date),
+                style: AppTextStyles.caption.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            );
+          },
         );
       },
+      loading: () => const Center(
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: 24),
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+      ),
+      error: (_, __) => const Padding(
+        padding: EdgeInsets.symmetric(vertical: 24),
+        child: Text('加载失败'),
+      ),
     );
+  }
+
+  String _formatPhotoDate(DateTime date) {
+    return '${date.month}月${date.day}日';
   }
 }

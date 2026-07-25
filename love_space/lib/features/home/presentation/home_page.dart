@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_text_styles.dart';
 import '../../../shared/widgets/section_header.dart';
+import '../../../data/providers/data_providers.dart';
 
 /// 首页 · 时光
 /// 还原设计稿：问候区 → 纪念日主卡片 → 今日打卡 → 快捷入口 → 时间轴
@@ -32,11 +33,13 @@ class HomePage extends ConsumerWidget {
 }
 
 /// 顶部问候区
-class _GreetingHeader extends StatelessWidget {
+class _GreetingHeader extends ConsumerWidget {
   const _GreetingHeader();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final greeting = ref.watch(greetingProvider);
+    final days = ref.watch(daysTogetherProvider);
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -44,9 +47,9 @@ class _GreetingHeader extends StatelessWidget {
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('早上好，亲爱的', style: AppTextStyles.titleLarge),
+            Text(greeting, style: AppTextStyles.titleLarge),
             const SizedBox(height: 4),
-            Text('今天是你们相伴的第 365 天', style: AppTextStyles.caption),
+            Text('今天是你们相伴的第 $days 天', style: AppTextStyles.caption),
           ],
         ),
         const _CoupleAvatars(),
@@ -106,11 +109,12 @@ class _Avatar extends StatelessWidget {
 }
 
 /// 纪念日主卡片（渐变粉 + 装饰爱心）
-class _AnniversaryHeroCard extends StatelessWidget {
+class _AnniversaryHeroCard extends ConsumerWidget {
   const _AnniversaryHeroCard();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final days = ref.watch(daysTogetherProvider);
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(24),
@@ -147,7 +151,7 @@ class _AnniversaryHeroCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.baseline,
                 textBaseline: TextBaseline.alphabetic,
                 children: [
-                  Text('365', style: AppTextStyles.heroNumber),
+                  Text('$days', style: AppTextStyles.heroNumber),
                   const SizedBox(width: 4),
                   Text('天', style: AppTextStyles.onPink.copyWith(
                     fontSize: 20, fontWeight: FontWeight.w700,
@@ -168,11 +172,12 @@ class _AnniversaryHeroCard extends StatelessWidget {
 }
 
 /// 今日打卡卡
-class _CheckinCard extends StatelessWidget {
+class _CheckinCard extends ConsumerWidget {
   const _CheckinCard();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final streak = ref.watch(checkinStreakProvider);
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -195,7 +200,7 @@ class _CheckinCard extends StatelessWidget {
             children: [
               Text('今日说爱你', style: AppTextStyles.titleSmall),
               const SizedBox(height: 4),
-              Text('连续打卡 128 天，继续加油', style: AppTextStyles.caption),
+              Text('连续打卡 $streak 天，继续加油', style: AppTextStyles.caption),
             ],
           ),
           // 心形打卡按钮
@@ -268,11 +273,12 @@ class _QuickAction {
 }
 
 /// 恋爱时间轴区块
-class _TimelineSection extends StatelessWidget {
+class _TimelineSection extends ConsumerWidget {
   const _TimelineSection();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final eventsAsync = ref.watch(timelineEventsProvider);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -292,28 +298,47 @@ class _TimelineSection extends StatelessWidget {
               ),
             ],
           ),
-          child: Column(
-            children: const [
-              _TimelineItem(
-                date: '2024.05.20',
-                title: '表白纪念日',
-                desc: '那天下着小雨，你说了"我愿意"',
-                dotColor: AppColors.accentRose,
-                showLine: true,
+          child: eventsAsync.when(
+            data: (events) {
+              if (events.isEmpty) {
+                return const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 12),
+                  child: Text('还没有时光记录，快去添加第一个吧'),
+                );
+              }
+              return Column(
+                children: [
+                  for (var i = 0; i < events.length; i++) ...[
+                    if (i > 0) const SizedBox(height: 18),
+                    _TimelineItem(
+                      date: _formatDate(events[i].date),
+                      title: events[i].title,
+                      desc: events[i].description,
+                      dotColor: Color(events[i].dotColorValue),
+                      showLine: i < events.length - 1,
+                    ),
+                  ],
+                ],
+              );
+            },
+            loading: () => const Center(
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 12),
+                child: CircularProgressIndicator(strokeWidth: 2),
               ),
-              SizedBox(height: 18),
-              _TimelineItem(
-                date: '2024.08.08',
-                title: '第一次旅行',
-                desc: '去了海边，一起看了日落与星空',
-                dotColor: AppColors.accentPink,
-                showLine: false,
-              ),
-            ],
+            ),
+            error: (_, __) => const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: Text('加载失败'),
+            ),
           ),
         ),
       ],
     );
+  }
+
+  String _formatDate(DateTime date) {
+    return '${date.year}.${date.month.toString().padLeft(2, '0')}.${date.day.toString().padLeft(2, '0')}';
   }
 }
 

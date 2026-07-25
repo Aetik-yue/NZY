@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_text_styles.dart';
 import '../../../shared/widgets/section_header.dart';
+import '../../../data/providers/data_providers.dart';
+import '../../../data/models/wish.dart';
 
 /// 愿望清单页
 /// 设计稿未绘制此页，此处提供与整体风格一致的骨架
@@ -11,6 +13,7 @@ class WishesPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final stats = ref.watch(wishStatsProvider);
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(20, 4, 20, 100),
       child: Column(
@@ -25,7 +28,8 @@ class WishesPage extends ConsumerWidget {
                 children: [
                   Text('愿望清单', style: AppTextStyles.titleLarge),
                   const SizedBox(height: 2),
-                  Text('一起完成 8 / 32 个愿望', style: AppTextStyles.label),
+                  Text('一起完成 ${stats.done} / ${stats.total} 个愿望',
+                      style: AppTextStyles.label),
                 ],
               ),
               Container(
@@ -75,7 +79,7 @@ class WishesPage extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.baseline,
                   textBaseline: TextBaseline.alphabetic,
                   children: [
-                    Text('25%', style: AppTextStyles.heroNumber.copyWith(fontSize: 40)),
+                    Text('${stats.percentInt}%', style: AppTextStyles.heroNumber.copyWith(fontSize: 40)),
                     const SizedBox(width: 6),
                     Text('已完成', style: AppTextStyles.onPink.copyWith(fontSize: 14).copyWith(
                       color: Colors.white.withOpacity(0.85),
@@ -86,7 +90,7 @@ class WishesPage extends ConsumerWidget {
                 ClipRRect(
                   borderRadius: BorderRadius.circular(4),
                   child: LinearProgressIndicator(
-                    value: 0.25,
+                    value: stats.percent,
                     minHeight: 6,
                     backgroundColor: Colors.white.withOpacity(0.3),
                     valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
@@ -98,81 +102,118 @@ class WishesPage extends ConsumerWidget {
           const SizedBox(height: 20),
           const SectionHeader(title: '待实现', actionText: '全部'),
           const SizedBox(height: 14),
-          // 愿望列表
-          const _WishItem(
-            icon: Icons.flight_rounded,
-            title: '一起去北海道看雪',
-            desc: '冬天的时候，住进温泉旅馆',
-          ),
-          const SizedBox(height: 12),
-          const _WishItem(
-            icon: Icons.cake_rounded,
-            title: '一起做一顿烛光晚餐',
-            desc: '学一道对方最爱的菜',
-          ),
-          const SizedBox(height: 12),
-          const _WishItem(
-            icon: Icons.pets_rounded,
-            title: '养一只小猫咪',
-            desc: '给它起个可爱的名字',
-          ),
+          // 愿望列表（动态渲染前 3 条未完成的愿望）
+          const _WishList(),
         ],
       ),
     );
   }
 }
 
+/// 愿望列表（动态渲染前 3 条未完成的愿望）
+class _WishList extends ConsumerWidget {
+  const _WishList();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final wishesAsync = ref.watch(wishesProvider);
+    return wishesAsync.when(
+      data: (wishes) {
+        final undone = wishes.where((w) => !w.done).take(3).toList();
+        if (undone.isEmpty) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 12),
+            child: Text('太棒了！所有愿望都已完成 🎉'),
+          );
+        }
+        return Column(
+          children: [
+            for (var i = 0; i < undone.length; i++) ...[
+              if (i > 0) const SizedBox(height: 12),
+              _WishItem(
+                wish: undone[i],
+                onToggle: () => ref
+                    .read(wishRepositoryProvider)
+                    .toggleDone(undone[i].id),
+              ),
+            ],
+          ],
+        );
+      },
+      loading: () => const Center(
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: 12),
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+      ),
+      error: (_, __) => const Padding(
+        padding: EdgeInsets.symmetric(vertical: 12),
+        child: Text('加载失败'),
+      ),
+    );
+  }
+}
+
 class _WishItem extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String desc;
+  final Wish wish;
+  final VoidCallback onToggle;
 
   const _WishItem({
-    required this.icon,
-    required this.title,
-    required this.desc,
+    required this.wish,
+    required this.onToggle,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.bgCard,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: const [
-          BoxShadow(
-            color: AppColors.shadowCard,
-            blurRadius: 16,
-            offset: Offset(0, 4),
-            spreadRadius: -4,
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: AppColors.accentPinkSoft,
-              borderRadius: BorderRadius.circular(14),
+    return GestureDetector(
+      onTap: onToggle,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.bgCard,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: const [
+            BoxShadow(
+              color: AppColors.shadowCard,
+              blurRadius: 16,
+              offset: Offset(0, 4),
+              spreadRadius: -4,
             ),
-            child: Icon(icon, color: AppColors.accentRose, size: 22),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: AppTextStyles.titleSmall.copyWith(fontSize: 15)),
-                const SizedBox(height: 3),
-                Text(desc, style: AppTextStyles.caption),
-              ],
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: AppColors.accentPinkSoft,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Icon(
+                IconData(wish.iconCodePoint, fontFamily: 'MaterialIcons'),
+                color: AppColors.accentRose,
+                size: 22,
+              ),
             ),
-          ),
-          Icon(Icons.radio_button_unchecked, color: AppColors.textTertiary, size: 22),
-        ],
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(wish.title, style: AppTextStyles.titleSmall.copyWith(fontSize: 15)),
+                  const SizedBox(height: 3),
+                  Text(wish.description, style: AppTextStyles.caption),
+                ],
+              ),
+            ),
+            Icon(
+              wish.done ? Icons.check_circle : Icons.radio_button_unchecked,
+              color: wish.done ? AppColors.accentRose : AppColors.textTertiary,
+              size: 22,
+            ),
+          ],
+        ),
       ),
     );
   }

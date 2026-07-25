@@ -27,7 +27,7 @@ class AppTheme {
             statusBarBrightness: Brightness.light,
           ),
         ),
-        cardTheme: const CardThemeData(
+        cardTheme: CardTheme(
           color: AppColors.bgCard,
           elevation: 0,
           shape: RoundedRectangleBorder(
