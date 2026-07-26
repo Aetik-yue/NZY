@@ -27,6 +27,10 @@ class WishRepository {
         }
       });
 
+  /// 编辑愿望
+  Future<void> update(Wish wish) =>
+      _isar.writeTxn(() async => _isar.wishs.put(wish));
+
   /// 删除愿望
   Future<void> delete(Id id) =>
       _isar.writeTxn(() async => _isar.wishs.delete(id));

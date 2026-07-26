@@ -22,19 +22,24 @@ dependencies:
   shared_preferences: ^2.3.0
 
   # 字体
-  google_fonts: ^6.2.1
-
   # 图片
   cached_network_image: ^3.4.1
 
   # 工具
-  intl: ^0.19.0
+  intl: ^0.20.2
   uuid: ^4.4.2
 
   # 本地数据库
   isar: ^3.1.0
   isar_flutter_libs: ^3.1.0
   path_provider: ^2.1.0
+
+  # 图片选择
+  image_picker: ^1.1.2
+
+  # 本地化（中文日期选择器）
+  flutter_localizations:
+    sdk: flutter
 
 dev_dependencies:
   flutter_test:

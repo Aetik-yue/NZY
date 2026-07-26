@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_text_styles.dart';
 import '../../../data/providers/data_providers.dart';
+import '../../../data/models/album_photo.dart';
+import '../../../features/album/presentation/widgets/add_photo_sheet.dart';
 
 /// 相册页
 /// 还原设计稿：标题+统计+添加 → 筛选 chip → 九宫格照片
@@ -57,56 +59,70 @@ const _photoGradients = [
 class _AddButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 44,
-      height: 44,
-      decoration: BoxDecoration(
-        gradient: AppColors.pinkButtonGradient,
-        shape: BoxShape.circle,
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x59FF6B9D),
-            blurRadius: 16,
-            offset: Offset(0, 6),
-            spreadRadius: -2,
-          ),
-        ],
+    return GestureDetector(
+      onTap: () => AddPhotoSheet.show(context),
+      child: Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          gradient: AppColors.pinkButtonGradient,
+          shape: BoxShape.circle,
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x59FF6B9D),
+              blurRadius: 16,
+              offset: Offset(0, 6),
+              spreadRadius: -2,
+            ),
+          ],
+        ),
+        child: const Icon(Icons.add, color: Colors.white, size: 22),
       ),
-      child: const Icon(Icons.add, color: Colors.white, size: 22),
     );
   }
 }
 
-class _FilterChips extends StatelessWidget {
+class _FilterChips extends ConsumerWidget {
   const _FilterChips();
 
+  static const _filters = [
+    ('全部', null),
+    ('旅行', PhotoCategory.travel),
+    ('美食', PhotoCategory.food),
+    ('日常', PhotoCategory.daily),
+  ];
+
   @override
-  Widget build(BuildContext context) {
-    final filters = ['全部', '旅行', '美食', '日常'];
+  Widget build(BuildContext context, WidgetRef ref) {
+    final selected = ref.watch(albumFilterProvider);
     return SizedBox(
       height: 32,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        itemCount: filters.length,
+        itemCount: _filters.length,
         separatorBuilder: (_, __) => const SizedBox(width: 8),
         itemBuilder: (context, index) {
-          final isActive = index == 0;
-          return Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14),
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              gradient: isActive ? AppColors.pinkButtonGradient : null,
-              color: isActive ? null : AppColors.bgCard,
-              borderRadius: BorderRadius.circular(16),
-              border: isActive
-                  ? null
-                  : Border.all(color: AppColors.borderSoft),
-            ),
-            child: Text(
-              filters[index],
-              style: AppTextStyles.caption.copyWith(
-                color: isActive ? Colors.white : AppColors.textSecondary,
-                fontWeight: isActive ? FontWeight.w700 : FontWeight.w400,
+          final (label, category) = _filters[index];
+          final isActive = selected == category;
+          return GestureDetector(
+            onTap: () => ref.read(albumFilterProvider.notifier).state = category,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                gradient: isActive ? AppColors.pinkButtonGradient : null,
+                color: isActive ? null : AppColors.bgCard,
+                borderRadius: BorderRadius.circular(16),
+                border: isActive
+                    ? null
+                    : Border.all(color: AppColors.borderSoft),
+              ),
+              child: Text(
+                label,
+                style: AppTextStyles.caption.copyWith(
+                  color: isActive ? Colors.white : AppColors.textSecondary,
+                  fontWeight: isActive ? FontWeight.w700 : FontWeight.w400,
+                ),
               ),
             ),
           );
@@ -121,7 +137,7 @@ class _PhotoGrid extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final photosAsync = ref.watch(albumPhotosProvider);
+    final photosAsync = ref.watch(filteredAlbumPhotosProvider);
     return photosAsync.when(
       data: (photos) {
         if (photos.isEmpty) {

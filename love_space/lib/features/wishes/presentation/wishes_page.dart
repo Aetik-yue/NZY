@@ -3,8 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_text_styles.dart';
 import '../../../shared/widgets/section_header.dart';
+import '../../../shared/widgets/app_snackbar.dart';
+import '../../../shared/widgets/confirm_dialog.dart';
 import '../../../data/providers/data_providers.dart';
 import '../../../data/models/wish.dart';
+import '../../../features/wishes/presentation/widgets/add_wish_sheet.dart';
 
 /// 愿望清单页
 /// 设计稿未绘制此页，此处提供与整体风格一致的骨架
@@ -32,22 +35,25 @@ class WishesPage extends ConsumerWidget {
                       style: AppTextStyles.label),
                 ],
               ),
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  gradient: AppColors.pinkButtonGradient,
-                  shape: BoxShape.circle,
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Color(0x59FF6B9D),
-                      blurRadius: 16,
-                      offset: Offset(0, 6),
-                      spreadRadius: -2,
-                    ),
-                  ],
+              GestureDetector(
+                onTap: () => AddWishSheet.show(context),
+                child: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    gradient: AppColors.pinkButtonGradient,
+                    shape: BoxShape.circle,
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x59FF6B9D),
+                        blurRadius: 16,
+                        offset: Offset(0, 6),
+                        spreadRadius: -2,
+                      ),
+                    ],
+                  ),
+                  child: const Icon(Icons.add, color: Colors.white, size: 22),
                 ),
-                child: const Icon(Icons.add, color: Colors.white, size: 22),
               ),
             ],
           ),
@@ -100,7 +106,11 @@ class WishesPage extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 20),
-          const SectionHeader(title: '待实现', actionText: '全部'),
+          SectionHeader(
+            title: '待实现',
+            actionText: '全部',
+            onAction: () => AppSnackbar.show(context, '即将上线 ⭐'),
+          ),
           const SizedBox(height: 14),
           // 愿望列表（动态渲染前 3 条未完成的愿望）
           const _WishList(),
@@ -135,6 +145,21 @@ class _WishList extends ConsumerWidget {
                 onToggle: () => ref
                     .read(wishRepositoryProvider)
                     .toggleDone(undone[i].id),
+                onDelete: () async {
+                  final confirmed = await showConfirmDeleteDialog(
+                    context,
+                    content: '确定要删除这个愿望吗？',
+                  );
+                  if (confirmed && context.mounted) {
+                    final wishToDelete = undone[i];
+                    await ref.read(wishRepositoryProvider).delete(undone[i].id);
+                    if (context.mounted) {
+                      AppSnackbar.showUndo(context, '愿望已删除', () async {
+                        await ref.read(wishRepositoryProvider).add(wishToDelete);
+                      });
+                    }
+                  }
+                },
               ),
             ],
           ],
@@ -157,16 +182,19 @@ class _WishList extends ConsumerWidget {
 class _WishItem extends StatelessWidget {
   final Wish wish;
   final VoidCallback onToggle;
+  final VoidCallback onDelete;
 
   const _WishItem({
     required this.wish,
     required this.onToggle,
+    required this.onDelete,
   });
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onToggle,
+      onLongPress: onDelete,
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(

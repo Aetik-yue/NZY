@@ -3,7 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_text_styles.dart';
 import '../../../shared/widgets/section_header.dart';
+import '../../../shared/widgets/app_snackbar.dart';
+import '../../../shared/widgets/confirm_dialog.dart';
 import '../../../data/providers/data_providers.dart';
+import '../../../shared/widgets/pill_nav_bar.dart';
 
 /// 首页 · 时光
 /// 还原设计稿：问候区 → 纪念日主卡片 → 今日打卡 → 快捷入口 → 时间轴
@@ -175,6 +178,22 @@ class _AnniversaryHeroCard extends ConsumerWidget {
 class _CheckinCard extends ConsumerWidget {
   const _CheckinCard();
 
+  Future<void> _handleCheckin(BuildContext context, WidgetRef ref) async {
+    final repository = ref.read(checkinRepositoryProvider);
+    final hasChecked = await repository.hasCheckedInToday();
+    if (!context.mounted) return;
+
+    if (hasChecked) {
+      AppSnackbar.show(context, '今天已经打卡过了哦 💕');
+      return;
+    }
+
+    await repository.checkInToday();
+    if (context.mounted) {
+      AppSnackbar.show(context, '打卡成功！连续加油 💪');
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final streak = ref.watch(checkinStreakProvider);
@@ -204,22 +223,25 @@ class _CheckinCard extends ConsumerWidget {
             ],
           ),
           // 心形打卡按钮
-          Container(
-            width: 64,
-            height: 64,
-            decoration: BoxDecoration(
-              gradient: AppColors.pinkButtonGradient,
-              shape: BoxShape.circle,
-              boxShadow: const [
-                BoxShadow(
-                  color: Color(0x66FF6B9D),
-                  blurRadius: 16,
-                  offset: Offset(0, 6),
-                  spreadRadius: -2,
-                ),
-              ],
+          GestureDetector(
+            onTap: () => _handleCheckin(context, ref),
+            child: Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                gradient: AppColors.pinkButtonGradient,
+                shape: BoxShape.circle,
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x66FF6B9D),
+                    blurRadius: 16,
+                    offset: Offset(0, 6),
+                    spreadRadius: -2,
+                  ),
+                ],
+              ),
+              child: const Icon(Icons.favorite, color: Colors.white, size: 28),
             ),
-            child: const Icon(Icons.favorite, color: Colors.white, size: 28),
           ),
         ],
       ),
@@ -228,36 +250,60 @@ class _CheckinCard extends ConsumerWidget {
 }
 
 /// 快捷功能入口（相册/愿望/音乐/小说）
-class _QuickActions extends StatelessWidget {
+class _QuickActions extends ConsumerWidget {
   const _QuickActions();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final actions = [
-      _QuickAction(icon: Icons.photo_library_rounded, label: '相册', bg: AppColors.accentPinkSoft),
-      _QuickAction(icon: Icons.star_rounded, label: '愿望清单', bg: AppColors.accentPeach),
-      _QuickAction(icon: Icons.music_note_rounded, label: '音乐', bg: AppColors.accentPinkSoft),
-      _QuickAction(icon: Icons.menu_book_rounded, label: '小说', bg: AppColors.accentPinkSoft),
+      _QuickAction(
+        icon: Icons.photo_library_rounded,
+        label: '相册',
+        bg: AppColors.accentPinkSoft,
+        onTap: () => ref.read(currentTabProvider.notifier).state = NavTab.album,
+      ),
+      _QuickAction(
+        icon: Icons.star_rounded,
+        label: '愿望清单',
+        bg: AppColors.accentPeach,
+        onTap: () => ref.read(currentTabProvider.notifier).state = NavTab.wishes,
+      ),
+      _QuickAction(
+        icon: Icons.music_note_rounded,
+        label: '音乐',
+        bg: AppColors.accentPinkSoft,
+        onTap: () => AppSnackbar.show(context, '即将上线 🎵'),
+      ),
+      _QuickAction(
+        icon: Icons.menu_book_rounded,
+        label: '小说',
+        bg: AppColors.accentPinkSoft,
+        onTap: () => AppSnackbar.show(context, '即将上线 📖'),
+      ),
     ];
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: actions
           .map((a) => SizedBox(
                 width: 76,
-                child: Column(
-                  children: [
-                    Container(
-                      width: 56,
-                      height: 56,
-                      decoration: BoxDecoration(
-                        color: a.bg,
-                        borderRadius: BorderRadius.circular(18),
+                child: GestureDetector(
+                  onTap: a.onTap,
+                  behavior: HitTestBehavior.opaque,
+                  child: Column(
+                    children: [
+                      Container(
+                        width: 56,
+                        height: 56,
+                        decoration: BoxDecoration(
+                          color: a.bg,
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                        child: Icon(a.icon, color: AppColors.accentRose, size: 26),
                       ),
-                      child: Icon(a.icon, color: AppColors.accentRose, size: 26),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(a.label, style: AppTextStyles.caption),
-                  ],
+                      const SizedBox(height: 8),
+                      Text(a.label, style: AppTextStyles.caption),
+                    ],
+                  ),
                 ),
               ))
           .toList(),
@@ -269,7 +315,14 @@ class _QuickAction {
   final IconData icon;
   final String label;
   final Color bg;
-  const _QuickAction({required this.icon, required this.label, required this.bg});
+  final VoidCallback onTap;
+
+  const _QuickAction({
+    required this.icon,
+    required this.label,
+    required this.bg,
+    required this.onTap,
+  });
 }
 
 /// 恋爱时间轴区块
@@ -282,7 +335,11 @@ class _TimelineSection extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SectionHeader(title: '我们的时光', actionText: '全部'),
+        SectionHeader(
+          title: '我们的时光',
+          actionText: '全部',
+          onAction: () => AppSnackbar.show(context, '即将上线 📅'),
+        ),
         const SizedBox(height: 14),
         Container(
           padding: const EdgeInsets.all(20),
@@ -316,6 +373,21 @@ class _TimelineSection extends ConsumerWidget {
                       desc: events[i].description,
                       dotColor: Color(events[i].dotColorValue),
                       showLine: i < events.length - 1,
+                      onDelete: () async {
+                        final confirmed = await showConfirmDeleteDialog(
+                          context,
+                          content: '确定要删除这条时光记录吗？',
+                        );
+                        if (confirmed && context.mounted) {
+                          final eventToDelete = events[i];
+                          await ref.read(timelineRepositoryProvider).delete(events[i].id);
+                          if (context.mounted) {
+                            AppSnackbar.showUndo(context, '时光已删除', () async {
+                              await ref.read(timelineRepositoryProvider).add(eventToDelete);
+                            });
+                          }
+                        }
+                      },
                     ),
                   ],
                 ],
@@ -348,6 +420,7 @@ class _TimelineItem extends StatelessWidget {
   final String desc;
   final Color dotColor;
   final bool showLine;
+  final VoidCallback? onDelete;
 
   const _TimelineItem({
     required this.date,
@@ -355,11 +428,14 @@ class _TimelineItem extends StatelessWidget {
     required this.desc,
     required this.dotColor,
     required this.showLine,
+    this.onDelete,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    return GestureDetector(
+      onLongPress: onDelete,
+      child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // 标记列（圆点 + 连线）
@@ -391,6 +467,7 @@ class _TimelineItem extends StatelessWidget {
           ),
         ),
       ],
+    ),
     );
   }
 }

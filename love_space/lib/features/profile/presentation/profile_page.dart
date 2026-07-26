@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_text_styles.dart';
 import '../../../data/providers/data_providers.dart';
+import '../../../shared/widgets/app_snackbar.dart';
 
 /// 我的页
 /// 还原设计稿：渐变头部 → 统计行 → 音乐卡 → 功能卡（小说/备忘录/设置）
@@ -226,14 +227,17 @@ class _MusicCard extends StatelessWidget {
               ],
             ),
           ),
-          Container(
-            width: 40,
-            height: 40,
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              shape: BoxShape.circle,
+          GestureDetector(
+            onTap: () => AppSnackbar.show(context, '即将上线 🎵'),
+            child: Container(
+              width: 40,
+              height: 40,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.play_arrow, color: AppColors.accentRose, size: 20),
             ),
-            child: const Icon(Icons.play_arrow, color: AppColors.accentRose, size: 20),
           ),
         ],
       ),
@@ -248,9 +252,30 @@ class _FunctionCards extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cards = [
-      _FuncCard(icon: Icons.menu_book_rounded, title: '小说', sub: '共读 12 本', bg: AppColors.accentPinkSoft, iconColor: AppColors.accentRose),
-      _FuncCard(icon: Icons.sticky_note_2_rounded, title: '备忘录', sub: '86 条记录', bg: AppColors.accentPeach, iconColor: AppColors.accentCoral),
-      _FuncCard(icon: Icons.settings_rounded, title: '设置', sub: '纪念日 & 隐私', bg: AppColors.bgBlush, iconColor: AppColors.textTertiary),
+      _FuncCard(
+        icon: Icons.menu_book_rounded,
+        title: '小说',
+        sub: '共读 12 本',
+        bg: AppColors.accentPinkSoft,
+        iconColor: AppColors.accentRose,
+        onTap: () => AppSnackbar.show(context, '即将上线 📖'),
+      ),
+      _FuncCard(
+        icon: Icons.sticky_note_2_rounded,
+        title: '备忘录',
+        sub: '86 条记录',
+        bg: AppColors.accentPeach,
+        iconColor: AppColors.accentCoral,
+        onTap: () => AppSnackbar.show(context, '即将上线 📝'),
+      ),
+      _FuncCard(
+        icon: Icons.settings_rounded,
+        title: '设置',
+        sub: '纪念日 & 隐私',
+        bg: AppColors.bgBlush,
+        iconColor: AppColors.textTertiary,
+        onTap: () => AppSnackbar.show(context, '即将上线 ⚙️'),
+      ),
     ];
     return Row(
       children: cards
@@ -271,6 +296,7 @@ class _FuncCard extends StatelessWidget {
   final String sub;
   final Color bg;
   final Color iconColor;
+  final VoidCallback? onTap;
 
   const _FuncCard({
     required this.icon,
@@ -278,41 +304,45 @@ class _FuncCard extends StatelessWidget {
     required this.sub,
     required this.bg,
     required this.iconColor,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.bgCard,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: const [
-          BoxShadow(
-            color: AppColors.shadowCard,
-            blurRadius: 14,
-            offset: Offset(0, 4),
-            spreadRadius: -4,
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: bg,
-              borderRadius: BorderRadius.circular(12),
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: AppColors.bgCard,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: const [
+            BoxShadow(
+              color: AppColors.shadowCard,
+              blurRadius: 14,
+              offset: Offset(0, 4),
+              spreadRadius: -4,
             ),
-            child: Icon(icon, color: iconColor, size: 20),
-          ),
-          const SizedBox(height: 8),
-          Text(title, style: AppTextStyles.titleSmall.copyWith(fontSize: 13)),
-          const SizedBox(height: 2),
-          Text(sub, style: AppTextStyles.label),
-        ],
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: bg,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: iconColor, size: 20),
+            ),
+            const SizedBox(height: 8),
+            Text(title, style: AppTextStyles.titleSmall.copyWith(fontSize: 13)),
+            const SizedBox(height: 2),
+            Text(sub, style: AppTextStyles.label),
+          ],
+        ),
       ),
     );
   }

@@ -32,6 +32,10 @@ class AlbumRepository {
           .categoryEqualTo(category)
           .watch(fireImmediately: true);
 
+  /// 编辑照片
+  Future<void> update(AlbumPhoto photo) =>
+      _isar.writeTxn(() async => _isar.albumPhotos.put(photo));
+
   /// 新增照片
   Future<void> add(AlbumPhoto photo) =>
       _isar.writeTxn(() async => _isar.albumPhotos.put(photo));

@@ -20,6 +20,10 @@ class TimelineRepository {
   Future<void> add(TimelineEvent event) =>
       _isar.writeTxn(() async => _isar.timelineEvents.put(event));
 
+  /// 编辑事件
+  Future<void> update(TimelineEvent event) =>
+      _isar.writeTxn(() async => _isar.timelineEvents.put(event));
+
   /// 删除事件
   Future<void> delete(Id id) =>
       _isar.writeTxn(() async => _isar.timelineEvents.delete(id));

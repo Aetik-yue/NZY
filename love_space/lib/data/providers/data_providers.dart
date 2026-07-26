@@ -11,6 +11,7 @@ import '../../core/utils/streak.dart';
 import '../models/wish.dart';
 import '../models/app_settings.dart';
 import '../models/check_in.dart';
+import '../models/album_photo.dart';
 
 // ═══════════════════════════════════════════════════════════════
 // Repository providers（依赖 isarProvider）
@@ -100,4 +101,17 @@ final wishStatsProvider = Provider<WishStats>((ref) {
 final checkinStreakProvider = Provider<int>((ref) {
   final checkins = ref.watch(checkinsProvider).valueOrNull ?? [];
   return computeStreak(checkins.map((c) => c.date).toList());
+});
+
+/// 相册筛选分类（null = 全部）
+final albumFilterProvider = StateProvider<PhotoCategory?>((ref) => null);
+
+/// 根据筛选条件过滤后的照片
+final filteredAlbumPhotosProvider = StreamProvider<List<AlbumPhoto>>((ref) {
+  final filter = ref.watch(albumFilterProvider);
+  final repo = ref.watch(albumRepositoryProvider);
+  if (filter == null) {
+    return repo.watchRecent(6);
+  }
+  return repo.watchByCategory(filter);
 });

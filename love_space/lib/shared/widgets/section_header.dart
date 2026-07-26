@@ -6,11 +6,13 @@ import '../../app/theme/app_text_styles.dart';
 class SectionHeader extends StatelessWidget {
   final String title;
   final String actionText;
+  final VoidCallback? onAction;
 
   const SectionHeader({
     super.key,
     required this.title,
     this.actionText = '全部',
+    this.onAction,
   });
 
   @override
@@ -19,14 +21,31 @@ class SectionHeader extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(title, style: AppTextStyles.titleMedium),
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(actionText, style: AppTextStyles.label),
-            const SizedBox(width: 2),
-            Icon(Icons.chevron_right, size: 16, color: AppColors.textTertiary),
-          ],
-        ),
+        if (onAction != null)
+          GestureDetector(
+            onTap: onAction,
+            behavior: HitTestBehavior.opaque,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(actionText, style: AppTextStyles.label),
+                  const SizedBox(width: 2),
+                  Icon(Icons.chevron_right, size: 16, color: AppColors.textTertiary),
+                ],
+              ),
+            ),
+          )
+        else
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(actionText, style: AppTextStyles.label),
+              const SizedBox(width: 2),
+              Icon(Icons.chevron_right, size: 16, color: AppColors.textTertiary),
+            ],
+          ),
       ],
     );
   }

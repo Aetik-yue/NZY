@@ -31,4 +31,8 @@ class CheckinRepository {
           ..date = DateUtilsX.today()
           ..note = note);
       });
+
+  /// 删除打卡（用于撤销）
+  Future<void> delete(Id id) =>
+      _isar.writeTxn(() async => _isar.checkIns.delete(id));
 }
