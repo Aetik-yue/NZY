@@ -4,6 +4,9 @@ import '../../data/models/timeline_event.dart';
 import '../../data/models/album_photo.dart';
 import '../../data/models/check_in.dart';
 import '../../data/models/app_settings.dart';
+import '../../data/models/novel.dart';
+import '../../data/models/novel_chapter.dart';
+import '../../app/theme/app_colors.dart';
 import '../utils/date_utils.dart';
 
 /// 首次启动的种子数据（对应现有 UI 中的硬编码假数据）
@@ -125,4 +128,106 @@ class Seed {
       return CheckIn()..date = now.subtract(Duration(days: i));
     });
   }
+
+  // ──────── 小说（预置示例）────────
+
+  /// 种子小说（1~2 本，isBuiltin=true）
+  static List<Novel> novels() => [
+        Novel()
+          ..title = '我们的故事'
+          ..author = '小桃 & 阿树'
+          ..intro = '从初遇到相守，那些只属于我们的瞬间，被一一写进这本小书里。'
+          ..coverColorValue = AppColors.headerGradient.colors.first.value
+          ..tags = ['原创', '情侣', '暖心']
+          ..chapterCount = 3
+          ..isBuiltin = true
+          ..lastChapterIndex = -1
+          ..lastPosition = 0.0
+          ..createdAt = togetherSince.add(const Duration(days: 5)),
+        Novel()
+          ..title = '情书集'
+          ..author = '阿树'
+          ..intro = '写给你的信，落笔时窗外有风，信里全都是你。'
+          ..coverColorValue = AppColors.pinkButtonGradient.colors.last.value
+          ..tags = ['情书', '文字', '告白']
+          ..chapterCount = 4
+          ..isBuiltin = true
+          ..lastChapterIndex = -1
+          ..lastPosition = 0.0
+          ..createdAt = togetherSince.add(const Duration(days: 6)),
+      ];
+
+  /// 种子章节（按已写入的小说 id 归属生成，chapterIndex 从 0 递增）
+  static List<NovelChapter> novelChapters(List<Novel> seeded) {
+    final list = <NovelChapter>[];
+    for (final novel in seeded) {
+      final templates = novel.title == '我们的故事'
+          ? _storyChapters()
+          : _letterChapters();
+      for (var i = 0; i < templates.length; i++) {
+        list.add(NovelChapter()
+          ..novelId = novel.id
+          ..chapterIndex = i
+          ..title = templates[i].$1
+          ..content = templates[i].$2);
+      }
+    }
+    return list;
+  }
+
+  /// 小说《我们的故事》章节模板
+  static List<(String, String)> _storyChapters() => [
+        (
+          '初遇',
+          '那天的风很轻，你穿着一件米白色的毛衣，在书架前微微踮脚。\n\n'
+              '我假装挑选书本，余光却一直落在你身上。当你回头对我笑了一下，'
+              '世界忽然安静，只剩心跳的声音。\n\n'
+              '后来我才明白，有些相遇，是早已写好的开头。'
+        ),
+        (
+          '那些小习惯',
+          '你总喜欢在奶茶里加双份珍珠，看书时习惯咬笔帽。\n\n'
+              '我渐渐记住了这些琐碎的小习惯，并在每一个平常的日子里，'
+              '把它们悄悄收进心里，像收藏一颗颗温热的糖。\n\n'
+              '原来爱，是把对方的琐碎，都看成值得珍藏的风景。'
+        ),
+        (
+          '一起走的路',
+          '我们从一条小巷走到整座城市的尽头，看过晨光，也吹过晚风。\n\n'
+              '路还很长，但只要有你在身侧，每一步都走得踏实又轻快。\n\n'
+              '往后余生，也请继续，做我并肩同路的人。'
+        ),
+      ];
+
+  /// 小说《情书集》章节模板
+  static List<(String, String)> _letterChapters() => [
+        (
+          '早安',
+          '亲爱的小桃：\n\n'
+              '今天醒得很早，窗外的天刚泛起鱼肚白。第一件想做的事，'
+              '就是给你写一封早安的信。\n\n'
+              '新的一天，愿你被温柔以待，而这份温柔，由我先给。'
+        ),
+        (
+          '雨天',
+          '下雨了，你发来一张玻璃上雨珠的照片。\n\n'
+              '我盯着那张图看了很久，想象你就坐在窗边，而我就在你身旁，'
+              '一起听雨，什么都不用说。\n\n'
+              '若是能为你撑伞，再大的雨，我也愿意走出去。'
+        ),
+        (
+          '晚安',
+          '夜深了，你大概已经睡着。\n\n'
+              '我把今天的想念折成一只纸船，放进梦的河流，'
+              '让它漂到你的枕边，替我说一声：晚安，好梦。\n\n'
+              '明天见，我的小桃。'
+        ),
+        (
+          '余生',
+          '这最后一封，写给很久很久以后的我们。\n\n'
+              '那时我们或许已满头白发，却依然会在清晨互相道早安，'
+              '在雨天共撑一把伞。\n\n'
+              '余生很长，我准备好了，与你慢慢走完。'
+        ),
+      ];
 }

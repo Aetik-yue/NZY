@@ -5,6 +5,9 @@ import '../repositories/timeline_repository.dart';
 import '../repositories/album_repository.dart';
 import '../repositories/checkin_repository.dart';
 import '../repositories/settings_repository.dart';
+import '../repositories/novel_repository.dart';
+import '../repositories/novel_chapter_repository.dart';
+import '../repositories/reader_settings_repository.dart';
 import '../../core/utils/greeting.dart';
 import '../../core/utils/date_utils.dart';
 import '../../core/utils/streak.dart';
@@ -12,6 +15,9 @@ import '../models/wish.dart';
 import '../models/app_settings.dart';
 import '../models/check_in.dart';
 import '../models/album_photo.dart';
+import '../models/novel.dart';
+import '../models/novel_chapter.dart';
+import '../models/reader_settings.dart';
 
 // ═══════════════════════════════════════════════════════════════
 // Repository providers（依赖 isarProvider）
@@ -178,4 +184,33 @@ final groupedAlbumPhotosProvider =
     return groups;
   });
 });
+
+// ═══════════════════════════════════════════════════════════════
+// 小说模块 providers（书架 / 章节 / 阅读设置）
+// ═══════════════════════════════════════════════════════════════
+
+/// 小说书架数据仓库
+final novelRepositoryProvider = Provider((ref) =>
+    NovelRepository(ref.watch(isarProvider)));
+
+/// 小说章节数据仓库
+final novelChapterRepositoryProvider = Provider((ref) =>
+    NovelChapterRepository(ref.watch(isarProvider)));
+
+/// 阅读设置数据仓库（单例行）
+final readerSettingsRepositoryProvider = Provider((ref) =>
+    ReaderSettingsRepository(ref.watch(isarProvider)));
+
+/// 所有书架小说
+final novelsProvider = StreamProvider<List<Novel>>((ref) =>
+    ref.watch(novelRepositoryProvider).watchAll());
+
+/// 某本小说的章节列表（按小说 id 过滤）
+final chaptersProvider =
+    StreamProvider.family<List<NovelChapter>, int>((ref, novelId) =>
+        ref.watch(novelChapterRepositoryProvider).watchByNovel(novelId));
+
+/// 阅读器设置
+final readerSettingsProvider = StreamProvider<ReaderSettings?>((ref) =>
+    ref.watch(readerSettingsRepositoryProvider).watch());
 

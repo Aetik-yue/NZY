@@ -4,7 +4,7 @@ import '../../app/theme/app_colors.dart';
 import '../../app/theme/app_text_styles.dart';
 
 /// 底部导航 Tab 定义
-enum NavTab { home, album, wishes, profile }
+enum NavTab { home, album, wishes, novel, profile }
 
 extension NavTabX on NavTab {
   String get label {
@@ -12,6 +12,7 @@ extension NavTabX on NavTab {
       case NavTab.home: return '时光';
       case NavTab.album: return '相册';
       case NavTab.wishes: return '愿望';
+      case NavTab.novel: return '小说';
       case NavTab.profile: return '我的';
     }
   }
@@ -21,6 +22,7 @@ extension NavTabX on NavTab {
       case NavTab.home: return Icons.access_time_filled_rounded;
       case NavTab.album: return Icons.photo_library_rounded;
       case NavTab.wishes: return Icons.star_rounded;
+      case NavTab.novel: return Icons.menu_book_rounded;
       case NavTab.profile: return Icons.person_rounded;
     }
   }

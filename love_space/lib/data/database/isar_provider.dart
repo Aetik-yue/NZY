@@ -5,6 +5,9 @@ import '../models/timeline_event.dart';
 import '../models/album_photo.dart';
 import '../models/check_in.dart';
 import '../models/app_settings.dart';
+import '../models/novel.dart';
+import '../models/novel_chapter.dart';
+import '../models/reader_settings.dart';
 
 /// Isar 数据库实例 provider。
 ///
@@ -21,4 +24,7 @@ const isarSchemas = [
   AlbumPhotoSchema,
   CheckInSchema,
   AppSettingsSchema,
+  NovelSchema,
+  NovelChapterSchema,
+  ReaderSettingsSchema,
 ];

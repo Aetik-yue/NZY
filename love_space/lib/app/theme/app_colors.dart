@@ -80,6 +80,51 @@ class AppColors {
   static const radiusPill = 26.0;
   static const radiusTab = 36.0;
 
+  // ──────── 阅读器背景主题 ────────
+  /// 阅读器背景·白 #FFFFFF
+  static const readerBgWhite = Color(0xFFFFFFFF);
+  /// 阅读器背景·米黄 #F5EFE0
+  static const readerBgCream = Color(0xFFF5EFE0);
+  /// 阅读器背景·粉 #FCE9EF
+  static const readerBgPink = Color(0xFFFCE9EF);
+  /// 阅读器背景·护眼绿 #E3EDD9
+  static const readerBgGreen = Color(0xFFE3EDD9);
+  /// 阅读器背景·夜间 #222226
+  static const readerBgDark = Color(0xFF222226);
+
+  /// 阅读器文字·白底 #33263B
+  static const readerTextOnWhite = Color(0xFF33263B);
+  /// 阅读器文字·米黄底 #5A5142
+  static const readerTextOnCream = Color(0xFF5A5142);
+  /// 阅读器文字·粉底 #6B4753
+  static const readerTextOnPink = Color(0xFF6B4753);
+  /// 阅读器文字·护眼绿底 #3F5135
+  static const readerTextOnGreen = Color(0xFF3F5135);
+  /// 阅读器文字·夜间底 #C8C8CC
+  static const readerTextOnDark = Color(0xFFC8C8CC);
+
+  /// 根据背景主题下标返回背景色（0白 1米黄 2粉 3护眼绿 4夜间）
+  static Color readerBg(int theme) {
+    switch (theme) {
+      case 1: return readerBgCream;
+      case 2: return readerBgPink;
+      case 3: return readerBgGreen;
+      case 4: return readerBgDark;
+      default: return readerBgWhite;
+    }
+  }
+
+  /// 根据背景主题下标返回对应文字色
+  static Color readerTextOn(int theme) {
+    switch (theme) {
+      case 1: return readerTextOnCream;
+      case 2: return readerTextOnPink;
+      case 3: return readerTextOnGreen;
+      case 4: return readerTextOnDark;
+      default: return readerTextOnWhite;
+    }
+  }
+
   // ──────── 间距（Primitives）────────
   static const spacing2xs = 4.0;
   static const spacingXs = 8.0;

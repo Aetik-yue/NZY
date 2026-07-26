@@ -4,6 +4,7 @@ import '../../app/theme/app_colors.dart';
 import '../../features/home/presentation/home_page.dart';
 import '../../features/album/presentation/album_page.dart';
 import '../../features/wishes/presentation/wishes_page.dart';
+import '../../features/novel/presentation/novel_page.dart';
 import '../../features/profile/presentation/profile_page.dart';
 import '../widgets/pill_nav_bar.dart';
 
@@ -26,6 +27,7 @@ class MainShell extends ConsumerWidget {
             HomePage(),
             AlbumPage(),
             WishesPage(),
+            NovelPage(),
             ProfilePage(),
           ],
         ),
