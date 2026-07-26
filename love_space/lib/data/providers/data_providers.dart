@@ -115,3 +115,67 @@ final filteredAlbumPhotosProvider = StreamProvider<List<AlbumPhoto>>((ref) {
   }
   return repo.watchByCategory(filter);
 });
+
+// ═══════════════════════════════════════════════════════════════
+// 时间轴相关（按年月分组）
+// ═══════════════════════════════════════════════════════════════
+
+/// 所有照片（强类型，供时间轴分组使用）
+final allPhotosTypedProvider = StreamProvider<List<AlbumPhoto>>((ref) =>
+    ref.watch(albumRepositoryProvider).watchAll());
+
+/// 照片按年月分组
+class PhotoGroup {
+  final int year;
+  final int month;
+  final List<AlbumPhoto> photos;
+
+  PhotoGroup({
+    required this.year,
+    required this.month,
+    required List<AlbumPhoto> photos,
+  }) : photos = List.unmodifiable(photos);
+
+  /// 分组标题，如 "2024年8月"
+  String get label => '$year年$month月';
+
+  /// 短标题，如 "8月"
+  String get shortLabel => '$month月';
+
+  /// 该分组的排序键（用于跳转定位）
+  int get key => year * 100 + month;
+
+  /// 是否为纪念日所在月
+  bool isHighlight(int? annivMonth) {
+    if (annivMonth == null) return false;
+    return month == annivMonth;
+  }
+}
+
+/// 照片按年月分组（降序，最新在前）
+final groupedAlbumPhotosProvider =
+    Provider<AsyncValue<List<PhotoGroup>>>((ref) {
+  final photosAsync = ref.watch(allPhotosTypedProvider);
+
+  return photosAsync.whenData((photos) {
+    final sorted = List<AlbumPhoto>.from(photos)
+      ..sort((a, b) => b.date.compareTo(a.date));
+
+    final groups = <PhotoGroup>[];
+    for (final p in sorted) {
+      if (groups.isEmpty ||
+          groups.last.year != p.date.year ||
+          groups.last.month != p.date.month) {
+        groups.add(PhotoGroup(
+          year: p.date.year,
+          month: p.date.month,
+          photos: [p],
+        ));
+      } else {
+        groups.last.photos.add(p);
+      }
+    }
+    return groups;
+  });
+});
+
