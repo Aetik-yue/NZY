@@ -9,8 +9,46 @@ rootProject.buildDir = "../build"
 subprojects {
     project.buildDir = "${rootProject.buildDir}/${project.name}"
 }
+
+// AGP 8.9+ 不再为插件子项目自动注入 flutter ext 属性
+subprojects {
+    if (project.name != "app") {
+        project.ext {
+            flutter = [
+                compileSdkVersion: 36,
+                minSdkVersion    : 21,
+                targetSdkVersion : 35,
+            ]
+        }
+    }
+}
+
 subprojects {
     project.evaluationDependsOn(":app")
+}
+
+// 强制所有子项目 compileSdk >= 34（isar_flutter_libs 需要 android:attr/lStar）
+subprojects {
+    def applyCompileSdkFix = { proj ->
+        def android = proj.extensions.findByName("android")
+        if (android != null) {
+            if (android.compileSdk == null || android.compileSdk < 34) {
+                android.compileSdk = 34
+            }
+            if (android.namespace == null) {
+                def manifestFile = file("${proj.projectDir}/src/main/AndroidManifest.xml")
+                if (manifestFile.exists()) {
+                    def manifest = new XmlParser().parse(manifestFile)
+                    android.namespace = manifest.@package
+                }
+            }
+        }
+    }
+    if (project.state.executed) {
+        applyCompileSdkFix(project)
+    } else {
+        afterEvaluate { applyCompileSdkFix(project) }
+    }
 }
 
 tasks.register("clean", Delete) {

@@ -5,6 +5,7 @@ import '../../../app/theme/app_text_styles.dart';
 import '../../../data/providers/data_providers.dart';
 import '../../../data/models/album_photo.dart';
 import '../../../features/album/presentation/widgets/add_photo_sheet.dart';
+import '../../../features/album/presentation/photo_timeline_page.dart';
 
 /// 相册页
 /// 还原设计稿：标题+统计+添加 → 筛选 chip → 九宫格照片
@@ -31,7 +32,14 @@ class AlbumPage extends ConsumerWidget {
                   Text('共记录了 $photoCount 张照片', style: AppTextStyles.label),
                 ],
               ),
-              _AddButton(),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _TimelineButton(),
+                  const SizedBox(width: 10),
+                  _AddButton(),
+                ],
+              ),
             ],
           ),
           const SizedBox(height: 16),
@@ -77,6 +85,44 @@ class _AddButton extends StatelessWidget {
           ],
         ),
         child: const Icon(Icons.add, color: Colors.white, size: 22),
+      ),
+    );
+  }
+}
+
+/// 时间轴入口按钮
+class _TimelineButton extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => const PhotoTimelinePage(),
+          ),
+        );
+      },
+      child: Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          color: AppColors.bgCard,
+          shape: BoxShape.circle,
+          border: Border.all(color: AppColors.borderSoft),
+          boxShadow: const [
+            BoxShadow(
+              color: AppColors.shadowCard,
+              blurRadius: 12,
+              offset: Offset(0, 3),
+              spreadRadius: -2,
+            ),
+          ],
+        ),
+        child: const Icon(
+          Icons.timeline_rounded,
+          color: AppColors.accentRose,
+          size: 22,
+        ),
       ),
     );
   }

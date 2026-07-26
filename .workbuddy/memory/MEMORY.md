@@ -21,16 +21,18 @@
 - 备忘录
 
 ## 技术决策
-- **跨平台框架**：推荐 Flutter（双端 UI 像素级一致、自绘引擎适合统一视觉、媒体能力成熟）
+- **跨平台框架**：Flutter（双端 UI 像素级一致、自绘引擎适合统一视觉、媒体能力成熟）
 - **状态管理**：Riverpod
-- **本地存储**：Drift (SQLite) + shared_preferences
-- **路由**：go_router
-- **音乐播放**：just_audio
-- **图片选择**：image_picker
-- **云同步**：Supabase（轻量后端，支持实时同步）
+- **本地存储**：Isar（已落地，含代码生成 .g.dart）+ shared_preferences
+- **路由**：IndexedStack（主 Tab）+ Navigator.push（子页面）
+- **音乐播放**：just_audio（计划）
+- **图片选择**：image_picker（已落地）
+- **云同步**：Supabase（计划）
 
 ## 当前阶段
 - [x] UI 设计稿完成（首页/相册/我的）
 - [x] 跨平台技术方案设计
-- [ ] 项目脚手架搭建
-- [ ] 核心功能开发
+- [x] 项目脚手架搭建（Flutter + Riverpod + Isar）
+- [x] 数据层完成（Isar 模型 + 仓库 + provider）
+- [x] 相册时间轴功能（按年月分组 + 节点跳转 + 关键节点标记）
+- [ ] 其他核心功能开发（打卡/音乐/小说/备忘录）
