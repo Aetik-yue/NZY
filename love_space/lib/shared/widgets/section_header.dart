@@ -36,15 +36,6 @@ class SectionHeader extends StatelessWidget {
                 ],
               ),
             ),
-          )
-        else
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(actionText, style: AppTextStyles.label),
-              const SizedBox(width: 2),
-              Icon(Icons.chevron_right, size: 16, color: AppColors.textTertiary),
-            ],
           ),
       ],
     );

@@ -40,6 +40,13 @@ class _NovelReaderPageState extends ConsumerState<NovelReaderPage> {
   ReaderSettings? _settings;
   Timer? _saveTimer;
 
+  // 分页缓存（避免每次 rebuild 重复计算 TextPainter 布局）
+  String? _paginateContent;
+  double? _paginateWidth;
+  double? _paginateHeight;
+  double? _paginateFontSize;
+  double? _paginateLineHeight;
+
   @override
   void initState() {
     super.initState();
@@ -83,7 +90,8 @@ class _NovelReaderPageState extends ConsumerState<NovelReaderPage> {
     if (_settings?.pageMode == 1) {
       if (_pages.isEmpty) return 0.0;
       final page = _pageController.page ?? 0;
-      return _pages.length <= 1 ? 0.0 : (page / _pages.length).clamp(0.0, 1.0);
+      final denom = _pages.length - 1;
+      return denom <= 0 ? 0.0 : (page / denom).clamp(0.0, 1.0);
     }
     if (_scrollController.hasClients &&
         _scrollController.position.maxScrollExtent > 0) {
@@ -115,16 +123,18 @@ class _NovelReaderPageState extends ConsumerState<NovelReaderPage> {
 
   void _onPageChanged(int page) {
     if (_pages.isEmpty) return;
-    final ratio =
-        _pages.length <= 1 ? 0.0 : (page / _pages.length).clamp(0.0, 1.0);
+    final denom = _pages.length - 1;
+    final ratio = denom <= 0 ? 0.0 : (page / denom).clamp(0.0, 1.0);
     _saveProgress(ratio);
   }
 
   // ──────── 章节切换 ────────
 
   void _goToChapter(int index, List<NovelChapter> chapters) {
-    if (chapters.isEmpty) return;
-    final clamped = index.clamp(0, chapters.length - 1);
+    // 如果传入了 chapters 列表则校验范围，否则直接跳转（由调用方保证范围）
+    final clamped = chapters.isEmpty
+        ? index.clamp(0, 0)
+        : index.clamp(0, chapters.length - 1);
     setState(() {
       _currentChapterIndex = clamped;
       _restored = true;
@@ -243,11 +253,11 @@ class _NovelReaderPageState extends ConsumerState<NovelReaderPage> {
 
   // ──────── 进度恢复（仅进入时一次）────────
 
-  void _maybeRestore(ReaderSettings settings) {
+  void _maybeRestore(ReaderSettings settings, int effectiveIndex) {
     if (_restored) return;
     if (_novel == null) return; // 等小说进度就绪后再恢复
     final restoreRatio =
-        _currentChapterIndex == _novel!.lastChapterIndex
+        effectiveIndex == _novel!.lastChapterIndex
             ? _novel!.lastPosition
             : 0.0;
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -279,12 +289,10 @@ class _NovelReaderPageState extends ConsumerState<NovelReaderPage> {
       data: (chapters) {
         final sorted = [...chapters]
           ..sort((a, b) => a.chapterIndex.compareTo(b.chapterIndex));
-        if (sorted.isNotEmpty) {
-          if (_currentChapterIndex > sorted.length - 1) {
-            _currentChapterIndex = sorted.length - 1;
-          }
-          if (_currentChapterIndex < 0) _currentChapterIndex = 0;
-        }
+        // 使用局部变量保存 clamp 后的索引，避免在 build 中修改状态
+        final effectiveIndex = sorted.isEmpty
+            ? 0
+            : _currentChapterIndex.clamp(0, sorted.length - 1);
         return settingsAsync.when(
           data: (settings) {
             if (settings == null) {
@@ -293,7 +301,7 @@ class _NovelReaderPageState extends ConsumerState<NovelReaderPage> {
               );
             }
             _settings = settings;
-            return _buildReader(context, settings, sorted);
+            return _buildReader(context, settings, sorted, effectiveIndex);
           },
           loading: () => const Scaffold(
             body: Center(child: CircularProgressIndicator(strokeWidth: 2)),
@@ -316,11 +324,12 @@ class _NovelReaderPageState extends ConsumerState<NovelReaderPage> {
     BuildContext context,
     ReaderSettings settings,
     List<NovelChapter> chapters,
+    int effectiveIndex,
   ) {
     final theme = settings.bgTheme;
     final bg = AppColors.readerBg(theme);
     final textColor = AppColors.readerTextOn(theme);
-    final chapter = chapters.isEmpty ? null : chapters[_currentChapterIndex];
+    final chapter = chapters.isEmpty ? null : chapters[effectiveIndex];
     final content = chapter?.content ?? '';
     final chapterTitle = chapter?.title ?? '';
 
@@ -328,17 +337,32 @@ class _NovelReaderPageState extends ConsumerState<NovelReaderPage> {
     final paddingTop = MediaQuery.of(context).padding.top;
     final paddingBottom = MediaQuery.of(context).padding.bottom;
 
+    // 仅在翻页模式且分页输入变化时重算，避免每次 rebuild 重复计算
     if (settings.pageMode == 1) {
-      _pages = _paginate(
-        content,
-        size.width - 48,
-        size.height - paddingTop - paddingBottom - 52 - 60 - 48,
-        settings.fontSize,
-        settings.lineHeight,
-      );
+      final availWidth = size.width - 48;
+      final availHeight =
+          size.height - paddingTop - paddingBottom - 52 - 60 - 48;
+      if (_pages.isEmpty ||
+          _paginateContent != content ||
+          _paginateWidth != availWidth ||
+          _paginateHeight != availHeight ||
+          _paginateFontSize != settings.fontSize ||
+          _paginateLineHeight != settings.lineHeight) {
+        _pages = _paginate(
+          content, availWidth, availHeight,
+          settings.fontSize, settings.lineHeight,
+        );
+        _paginateContent = content;
+        _paginateWidth = availWidth;
+        _paginateHeight = availHeight;
+        _paginateFontSize = settings.fontSize;
+        _paginateLineHeight = settings.lineHeight;
+      }
+    } else {
+      _pages = [];
     }
 
-    _maybeRestore(settings);
+    _maybeRestore(settings, effectiveIndex);
 
     final readingArea = settings.pageMode == 0
         ? SingleChildScrollView(
@@ -407,7 +431,7 @@ class _NovelReaderPageState extends ConsumerState<NovelReaderPage> {
           ),
           if (_showToolbars) _buildTopBar(context, theme, chapterTitle),
           if (_showToolbars)
-            _buildBottomBar(context, theme, chapters),
+            _buildBottomBar(context, theme, chapters, effectiveIndex),
         ],
       ),
     );
@@ -431,7 +455,7 @@ class _NovelReaderPageState extends ConsumerState<NovelReaderPage> {
           left: 8,
           right: 8,
         ),
-        color: AppColors.readerBg(theme).withOpacity(0.95),
+        color: AppColors.readerBg(theme).withValues(alpha: 0.95),
         child: Row(
           children: [
             IconButton(
@@ -466,6 +490,7 @@ class _NovelReaderPageState extends ConsumerState<NovelReaderPage> {
     BuildContext context,
     int theme,
     List<NovelChapter> chapters,
+    int effectiveIndex,
   ) {
     final textColor = AppColors.readerTextOn(theme);
     final paddingBottom = MediaQuery.of(context).padding.bottom;
@@ -481,7 +506,7 @@ class _NovelReaderPageState extends ConsumerState<NovelReaderPage> {
           left: 12,
           right: 12,
         ),
-        color: AppColors.readerBg(theme).withOpacity(0.95),
+        color: AppColors.readerBg(theme).withValues(alpha: 0.95),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
@@ -489,12 +514,12 @@ class _NovelReaderPageState extends ConsumerState<NovelReaderPage> {
               Icons.chevron_left_rounded,
               '上一章',
               textColor,
-              (chapters.isEmpty || _currentChapterIndex <= 0)
+              (chapters.isEmpty || effectiveIndex <= 0)
                   ? null
-                  : () => _goToChapter(_currentChapterIndex - 1, chapters),
+                  : () => _goToChapter(effectiveIndex - 1, chapters),
             ),
             Text(
-              '第 ${chapters.isEmpty ? 0 : _currentChapterIndex + 1}/${chapters.length} 章 · $percent%',
+              '第 ${chapters.isEmpty ? 0 : effectiveIndex + 1}/${chapters.length} 章 · $percent%',
               style: AppTextStyles.label.copyWith(color: textColor),
             ),
             Row(
@@ -511,9 +536,9 @@ class _NovelReaderPageState extends ConsumerState<NovelReaderPage> {
                   '下一章',
                   textColor,
                   (chapters.isEmpty ||
-                          _currentChapterIndex >= chapters.length - 1)
+                          effectiveIndex >= chapters.length - 1)
                       ? null
-                      : () => _goToChapter(_currentChapterIndex + 1, chapters),
+                      : () => _goToChapter(effectiveIndex + 1, chapters),
                 ),
               ],
             ),
@@ -538,11 +563,11 @@ class _NovelReaderPageState extends ConsumerState<NovelReaderPage> {
         child: Row(
           children: [
             Icon(icon,
-                color: active ? color : color.withOpacity(0.4), size: 18),
+                color: active ? color : color.withValues(alpha: 0.4), size: 18),
             const SizedBox(width: 2),
             Text(label,
                 style: AppTextStyles.label
-                    .copyWith(color: active ? color : color.withOpacity(0.4))),
+                    .copyWith(color: active ? color : color.withValues(alpha: 0.4))),
           ],
         ),
       ),

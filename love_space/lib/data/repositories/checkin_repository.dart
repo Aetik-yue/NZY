@@ -24,9 +24,10 @@ class CheckinRepository {
     return count > 0;
   }
 
-  /// 今日打卡
+  /// 今日打卡（幂等：已打卡则不重复插入）
   Future<void> checkInToday({String? note}) =>
       _isar.writeTxn(() async {
+        if (await hasCheckedInToday()) return;
         await _isar.checkIns.put(CheckIn()
           ..date = DateUtilsX.today()
           ..note = note);

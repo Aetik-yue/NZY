@@ -347,7 +347,7 @@ class _TimelineSection extends StatelessWidget {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
-                            color: AppColors.accentRose.withOpacity(0.12),
+                            color: AppColors.accentRose.withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Row(
@@ -418,7 +418,7 @@ class _TimelineTrack extends StatelessWidget {
               boxShadow: isHighlight
                   ? [
                       BoxShadow(
-                        color: AppColors.accentRose.withOpacity(0.4),
+                        color: AppColors.accentRose.withValues(alpha: 0.4),
                         blurRadius: 8,
                         offset: const Offset(0, 2),
                         spreadRadius: 0,
@@ -433,7 +433,7 @@ class _TimelineTrack extends StatelessWidget {
               child: Container(
                 width: 2,
                 decoration: BoxDecoration(
-                  color: AppColors.accentPinkSoft.withOpacity(0.5),
+                  color: AppColors.accentPinkSoft.withValues(alpha: 0.5),
                   borderRadius: BorderRadius.circular(1),
                 ),
               ),

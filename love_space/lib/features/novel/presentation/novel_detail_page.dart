@@ -33,8 +33,9 @@ class NovelDetailPage extends ConsumerWidget {
         final chaptersAsync = ref.watch(chaptersProvider(novelId));
         return chaptersAsync.when(
           data: (chapters) {
-            final resumeIndex =
-                novel.lastChapterIndex < 0 ? 0 : novel.lastChapterIndex;
+            final resumeIndex = novel.lastChapterIndex < 0 || chapters.isEmpty
+                ? 0
+                : novel.lastChapterIndex.clamp(0, chapters.length - 1);
             return _buildScaffold(
               context,
               body: _buildBody(context, ref, novel, chapters.length,

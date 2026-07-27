@@ -20,16 +20,17 @@ class AlbumRepository {
       .limit(limit)
       .watch(fireImmediately: true);
 
-  /// 监听所有照片（实时流，用于统计数量）
+  /// 监听所有照片（实时流，按时间倒序，用于统计数量）
   Stream<List<AlbumPhoto>> watchAll() =>
-      _isar.albumPhotos.where().watch(fireImmediately: true);
+      _isar.albumPhotos.where().sortByDateDesc().watch(fireImmediately: true);
 
-  /// 按分类监听照片
+  /// 按分类监听照片（按时间倒序）
   Stream<List<AlbumPhoto>> watchByCategory(PhotoCategory category) =>
       _isar.albumPhotos
           .where()
           .filter()
           .categoryEqualTo(category)
+          .sortByDateDesc()
           .watch(fireImmediately: true);
 
   /// 编辑照片

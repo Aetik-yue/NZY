@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../app/theme/app_colors.dart';
@@ -47,6 +48,10 @@ class _AddPhotoSheetState extends ConsumerState<AddPhotoSheet> {
   }
 
   Future<void> _submit() async {
+    if (_imagePath == null) {
+      AppSnackbar.show(context, '请先选择一张照片');
+      return;
+    }
     setState(() => _isSubmitting = true);
 
     try {
@@ -104,15 +109,15 @@ class _AddPhotoSheetState extends ConsumerState<AddPhotoSheet> {
                   width: double.infinity,
                   height: 180,
                   decoration: BoxDecoration(
-                    color: AppColors.accentPinkSoft.withOpacity(0.3),
+                    color: AppColors.accentPinkSoft.withValues(alpha: 0.3),
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(color: AppColors.borderSoft, style: BorderStyle.solid),
                   ),
                   child: _imagePath != null
                       ? ClipRRect(
                           borderRadius: BorderRadius.circular(16),
-                          child: Image.network(
-                            _imagePath!,
+                          child: Image.file(
+                            File(_imagePath!),
                             fit: BoxFit.cover,
                             errorBuilder: (_, __, ___) => const Center(
                               child: Icon(Icons.image, size: 48, color: AppColors.textTertiary),

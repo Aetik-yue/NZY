@@ -96,7 +96,7 @@ class _ProfileHeader extends ConsumerWidget {
               const SizedBox(height: 4),
               Text('在一起 $days 天 · 这是我们的空间',
                 style: AppTextStyles.caption.copyWith(
-                  color: Colors.white.withOpacity(0.85),
+                  color: Colors.white.withValues(alpha: 0.85),
                 )),
             ],
           ),

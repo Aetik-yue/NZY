@@ -7,7 +7,7 @@ import '../../../../data/providers/data_providers.dart';
 /// 章节目录底部面板
 ///
 /// 列出当前小说的全部章节，高亮当前章，点击回调 onSelect 关闭并触发跳章。
-class ChapterListSheet extends ConsumerStatefulWidget {
+class ChapterListSheet extends ConsumerWidget {
   final int novelId;
   final int currentIndex;
   final ValueChanged<int> onSelect;
@@ -41,13 +41,8 @@ class ChapterListSheet extends ConsumerStatefulWidget {
   }
 
   @override
-  ConsumerState<ChapterListSheet> createState() => _ChapterListSheetState();
-}
-
-class _ChapterListSheetState extends ConsumerState<ChapterListSheet> {
-  @override
-  Widget build(BuildContext context) {
-    final chaptersAsync = ref.watch(chaptersProvider(widget.novelId));
+  Widget build(BuildContext context, WidgetRef ref) {
+    final chaptersAsync = ref.watch(chaptersProvider(novelId));
 
     return Padding(
       padding: EdgeInsets.only(
@@ -85,10 +80,10 @@ class _ChapterListSheetState extends ConsumerState<ChapterListSheet> {
                     separatorBuilder: (_, __) => const SizedBox(height: 4),
                     itemBuilder: (_, i) {
                       final chapter = chapters[i];
-                      final isCurrent = chapter.chapterIndex == widget.currentIndex;
+                      final isCurrent = chapter.chapterIndex == currentIndex;
                       return ListTile(
                         onTap: () {
-                          widget.onSelect(chapter.chapterIndex);
+                          onSelect(chapter.chapterIndex);
                           Navigator.of(context).pop();
                         },
                         leading: Icon(
@@ -112,7 +107,7 @@ class _ChapterListSheetState extends ConsumerState<ChapterListSheet> {
                           ),
                         ),
                         tileColor: isCurrent
-                            ? AppColors.accentPinkSoft.withOpacity(0.4)
+                            ? AppColors.accentPinkSoft.withValues(alpha: 0.4)
                             : null,
                         shape: RoundedRectangleBorder(
                           borderRadius:

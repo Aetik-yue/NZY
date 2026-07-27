@@ -26,4 +26,7 @@ void main() async {
       child: const LoveSpaceApp(),
     ),
   );
+
+  // 注：Isar 实例会在进程退出时由 OS 回收。
+  // 如需精确控制关闭时机，可在自定义 Provider 中使用 ref.onDispose 关闭 Isar 实例。
 }

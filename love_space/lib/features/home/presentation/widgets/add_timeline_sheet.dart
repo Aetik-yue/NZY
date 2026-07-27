@@ -77,7 +77,7 @@ class _AddTimelineSheetState extends ConsumerState<AddTimelineSheet> {
         ..date = _selectedDate
         ..title = title
         ..description = _descController.text.trim()
-        ..dotColorValue = _presetColors[_selectedColorIndex].value;
+        ..dotColorValue = _presetColors[_selectedColorIndex].toARGB32();
 
       await ref.read(timelineRepositoryProvider).add(event);
 
@@ -198,7 +198,7 @@ class _AddTimelineSheetState extends ConsumerState<AddTimelineSheet> {
                             ? Border.all(color: Colors.white, width: 3)
                             : null,
                         boxShadow: isSelected
-                            ? [BoxShadow(color: _presetColors[i].withOpacity(0.4), blurRadius: 8)]
+                            ? [BoxShadow(color: _presetColors[i].withValues(alpha: 0.4), blurRadius: 8)]
                             : null,
                       ),
                       child: isSelected

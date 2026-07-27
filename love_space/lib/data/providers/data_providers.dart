@@ -12,6 +12,7 @@ import '../../core/utils/greeting.dart';
 import '../../core/utils/date_utils.dart';
 import '../../core/utils/streak.dart';
 import '../models/wish.dart';
+import '../models/timeline_event.dart';
 import '../models/app_settings.dart';
 import '../models/check_in.dart';
 import '../models/album_photo.dart';
@@ -47,16 +48,9 @@ final wishesProvider = StreamProvider<List<Wish>>((ref) =>
     ref.watch(wishRepositoryProvider).watchAll());
 
 /// 所有时间轴事件
-final timelineEventsProvider = StreamProvider<List<dynamic>>((ref) =>
+final timelineEventsProvider = StreamProvider<List<TimelineEvent>>((ref) =>
     ref.watch(timelineRepositoryProvider).watchAll());
 
-/// 相册照片（全部，用于统计数量）
-final allAlbumPhotosProvider = StreamProvider<List<dynamic>>((ref) =>
-    ref.watch(albumRepositoryProvider).watchAll());
-
-/// 最近的相册照片（用于网格展示）
-final albumPhotosProvider = StreamProvider<List<dynamic>>((ref) =>
-    ref.watch(albumRepositoryProvider).watchRecent(6));
 
 /// 应用设置
 final appSettingsProvider = StreamProvider<AppSettings?>((ref) =>
@@ -70,8 +64,15 @@ final checkinsProvider = StreamProvider<List<CheckIn>>((ref) =>
 // Derived / computed providers（跨页一致性的单一数据源）
 // ═══════════════════════════════════════════════════════════════
 
+/// 时钟（每分钟刷新），驱动问候语更新
+final clockProvider = StreamProvider<DateTime>((ref) =>
+    Stream.periodic(const Duration(minutes: 1), (_) => DateTime.now()));
+
 /// 问候语
-final greetingProvider = Provider<String>((ref) => Greeting.now());
+final greetingProvider = Provider<String>((ref) {
+  ref.watch(clockProvider);
+  return Greeting.now();
+});
 
 /// 在一起天数
 final daysTogetherProvider = Provider<int>((ref) {
@@ -82,7 +83,7 @@ final daysTogetherProvider = Provider<int>((ref) {
 
 /// 相册照片总数
 final photoCountProvider = Provider<int>((ref) =>
-    ref.watch(allAlbumPhotosProvider).valueOrNull?.length ?? 0);
+    ref.watch(allPhotosTypedProvider).valueOrNull?.length ?? 0);
 
 /// 愿望统计
 class WishStats {
@@ -117,7 +118,7 @@ final filteredAlbumPhotosProvider = StreamProvider<List<AlbumPhoto>>((ref) {
   final filter = ref.watch(albumFilterProvider);
   final repo = ref.watch(albumRepositoryProvider);
   if (filter == null) {
-    return repo.watchRecent(6);
+    return repo.watchAll();
   }
   return repo.watchByCategory(filter);
 });
@@ -167,21 +168,17 @@ final groupedAlbumPhotosProvider =
     final sorted = List<AlbumPhoto>.from(photos)
       ..sort((a, b) => b.date.compareTo(a.date));
 
-    final groups = <PhotoGroup>[];
+    // 先用 Map 按年月分组（可变列表），再构造不可变的 PhotoGroup
+    final map = <int, List<AlbumPhoto>>{};
     for (final p in sorted) {
-      if (groups.isEmpty ||
-          groups.last.year != p.date.year ||
-          groups.last.month != p.date.month) {
-        groups.add(PhotoGroup(
-          year: p.date.year,
-          month: p.date.month,
-          photos: [p],
-        ));
-      } else {
-        groups.last.photos.add(p);
-      }
+      final key = p.date.year * 100 + p.date.month;
+      map.putIfAbsent(key, () => []).add(p);
     }
-    return groups;
+    return map.entries.map((e) => PhotoGroup(
+      year: e.key ~/ 100,
+      month: e.key % 100,
+      photos: e.value,
+    )).toList();
   });
 });
 

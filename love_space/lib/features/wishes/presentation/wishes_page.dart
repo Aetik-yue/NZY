@@ -78,7 +78,7 @@ class WishesPage extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text('愿望完成进度', style: AppTextStyles.onPink.copyWith(fontSize: 13).copyWith(
-                  color: Colors.white.withOpacity(0.9),
+                  color: Colors.white.withValues(alpha: 0.9),
                 )),
                 const SizedBox(height: 8),
                 Row(
@@ -88,7 +88,7 @@ class WishesPage extends ConsumerWidget {
                     Text('${stats.percentInt}%', style: AppTextStyles.heroNumber.copyWith(fontSize: 40)),
                     const SizedBox(width: 6),
                     Text('已完成', style: AppTextStyles.onPink.copyWith(fontSize: 14).copyWith(
-                      color: Colors.white.withOpacity(0.85),
+                      color: Colors.white.withValues(alpha: 0.85),
                     )),
                   ],
                 ),
@@ -98,7 +98,7 @@ class WishesPage extends ConsumerWidget {
                   child: LinearProgressIndicator(
                     value: stats.percent,
                     minHeight: 6,
-                    backgroundColor: Colors.white.withOpacity(0.3),
+                    backgroundColor: Colors.white.withValues(alpha: 0.3),
                     valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
                   ),
                 ),

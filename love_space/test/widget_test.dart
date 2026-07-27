@@ -37,8 +37,7 @@ void main() {
           // 相册照片数量
           photoCountProvider.overrideWithValue(128),
           // 相册照片
-          albumPhotosProvider.overrideWith((ref) => Stream.value([])),
-          allAlbumPhotosProvider.overrideWith((ref) => Stream.value([])),
+          allPhotosTypedProvider.overrideWith((ref) => Stream.value([])),
           // 愿望列表
           wishesProvider.overrideWith((ref) => Stream.value([])),
           // 愿望统计

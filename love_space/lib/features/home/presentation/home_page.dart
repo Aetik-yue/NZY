@@ -111,6 +111,16 @@ class _Avatar extends StatelessWidget {
   }
 }
 
+/// 根据在一起天数生成 Hero 卡片副标题
+String _heroSubtitle(int days) {
+  if (days <= 0) return '记录我们的每一个瞬间';
+  if (days < 30) return '爱正在悄然生长';
+  if (days < 100) return '百日相伴，温暖如初';
+  if (days < 365) return '爱正在茁壮成长';
+  if (days == 365) return '满一周年的爱，未来继续同行';
+  return '超越一年的爱，历久弥新';
+}
+
 /// 纪念日主卡片（渐变粉 + 装饰爱心）
 class _AnniversaryHeroCard extends ConsumerWidget {
   const _AnniversaryHeroCard();
@@ -162,9 +172,9 @@ class _AnniversaryHeroCard extends ConsumerWidget {
                 ],
               ),
               const SizedBox(height: 6),
-              Text('满一周年的爱，未来继续同行',
+              Text(_heroSubtitle(days),
                 style: AppTextStyles.onPink.copyWith(fontSize: 13).copyWith(
-                  color: Colors.white.withOpacity(0.85),
+                  color: Colors.white.withValues(alpha: 0.85),
                 )),
             ],
           ),
@@ -278,7 +288,7 @@ class _QuickActions extends ConsumerWidget {
         icon: Icons.menu_book_rounded,
         label: '小说',
         bg: AppColors.accentPinkSoft,
-        onTap: () => AppSnackbar.show(context, '即将上线 📖'),
+        onTap: () => ref.read(currentTabProvider.notifier).state = NavTab.novel,
       ),
     ];
     return Row(

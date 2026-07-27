@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../app/theme/app_colors.dart';
@@ -36,9 +37,33 @@ class _ReaderSettingsSheetState extends ConsumerState<ReaderSettingsSheet> {
   int _bgTheme = 0;
   bool _keepScreenOn = true;
   bool _initialized = false;
+  ReaderSettings? _cachedSettings;
+  Timer? _debounceTimer;
+
+  @override
+  void dispose() {
+    _debounceTimer?.cancel();
+    _flushSave();
+    super.dispose();
+  }
+
+  /// 立即保存当前设置（用于 dispose 时刷入未提交的防抖写入）
+  Future<void> _flushSave() async {
+    final repo = ref.read(readerSettingsRepositoryProvider);
+    final current = _cachedSettings ?? await repo.getOrCreate();
+    current
+      ..fontSize = _fontSize
+      ..lineHeight = _lineHeight
+      ..pageMode = _pageMode
+      ..bgTheme = _bgTheme
+      ..keepScreenOn = _keepScreenOn;
+    _cachedSettings = current;
+    await repo.save(current);
+  }
 
   void _syncFrom(ReaderSettings? settings) {
     if (settings == null) return;
+    _cachedSettings = settings;
     _fontSize = settings.fontSize;
     _lineHeight = settings.lineHeight;
     _pageMode = settings.pageMode;
@@ -46,17 +71,21 @@ class _ReaderSettingsSheetState extends ConsumerState<ReaderSettingsSheet> {
     _keepScreenOn = settings.keepScreenOn;
   }
 
-  /// 保存当前设置到数据库
-  Future<void> _save() async {
-    final repo = ref.read(readerSettingsRepositoryProvider);
-    final current = await repo.getOrCreate();
-    current
-      ..fontSize = _fontSize
-      ..lineHeight = _lineHeight
-      ..pageMode = _pageMode
-      ..bgTheme = _bgTheme
-      ..keepScreenOn = _keepScreenOn;
-    await repo.save(current);
+  /// 保存当前设置到数据库（防抖 300ms，避免滑块拖动时频繁写 DB）
+  void _save() {
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(const Duration(milliseconds: 300), () async {
+      final repo = ref.read(readerSettingsRepositoryProvider);
+      final current = _cachedSettings ?? await repo.getOrCreate();
+      current
+        ..fontSize = _fontSize
+        ..lineHeight = _lineHeight
+        ..pageMode = _pageMode
+        ..bgTheme = _bgTheme
+        ..keepScreenOn = _keepScreenOn;
+      _cachedSettings = current;
+      await repo.save(current);
+    });
   }
 
   @override
