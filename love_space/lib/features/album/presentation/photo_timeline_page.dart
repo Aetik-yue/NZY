@@ -121,7 +121,8 @@ class _PhotoTimelinePageState extends ConsumerState<PhotoTimelinePage> {
                 height: 44,
                 child: Center(
                   child: SizedBox(
-                    width: 16, height: 16,
+                    width: 16,
+                    height: 16,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   ),
                 ),
@@ -266,20 +267,15 @@ class _TimelineNavStrip extends StatelessWidget {
                     Icon(
                       Icons.favorite,
                       size: 10,
-                      color: isActive
-                          ? Colors.white
-                          : AppColors.accentRose,
+                      color: isActive ? Colors.white : AppColors.accentRose,
                     ),
                     const SizedBox(width: 4),
                   ],
                   Text(
                     g.shortLabel,
                     style: AppTextStyles.caption.copyWith(
-                      color: isActive
-                          ? Colors.white
-                          : AppColors.textSecondary,
-                      fontWeight:
-                          isActive ? FontWeight.w700 : FontWeight.w500,
+                      color: isActive ? Colors.white : AppColors.textSecondary,
+                      fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
                     ),
                   ),
                 ],
@@ -355,7 +351,7 @@ class _TimelineSection extends StatelessWidget {
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(Icons.favorite,
+                              const Icon(Icons.favorite,
                                   size: 10, color: AppColors.accentRose),
                               const SizedBox(width: 3),
                               Text(
@@ -408,9 +404,7 @@ class _TimelineTrack extends StatelessWidget {
             width: isHighlight ? 16 : 12,
             height: isHighlight ? 16 : 12,
             decoration: BoxDecoration(
-              gradient: isHighlight
-                  ? AppColors.pinkButtonGradient
-                  : null,
+              gradient: isHighlight ? AppColors.pinkButtonGradient : null,
               color: isHighlight ? null : AppColors.accentPink,
               shape: BoxShape.circle,
               border: Border.all(
@@ -562,7 +556,7 @@ class _EmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
+            const Icon(
               Icons.photo_library_outlined,
               size: 64,
               color: AppColors.accentPinkSoft,

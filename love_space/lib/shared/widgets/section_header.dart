@@ -32,7 +32,8 @@ class SectionHeader extends StatelessWidget {
                 children: [
                   Text(actionText, style: AppTextStyles.label),
                   const SizedBox(width: 2),
-                  Icon(Icons.chevron_right, size: 16, color: AppColors.textTertiary),
+                  const Icon(Icons.chevron_right,
+                      size: 16, color: AppColors.textTertiary),
                 ],
               ),
             ),

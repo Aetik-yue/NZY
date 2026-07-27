@@ -23,8 +23,7 @@ class NovelDetailPage extends ConsumerWidget {
 
     return novelsAsync.when(
       data: (novels) {
-        final novel =
-            novels.where((n) => n.id == novelId).firstOrNull;
+        final novel = novels.where((n) => n.id == novelId).firstOrNull;
         if (novel == null) {
           return _buildScaffold(
             context,
@@ -40,13 +39,14 @@ class NovelDetailPage extends ConsumerWidget {
                 : novel.lastChapterIndex.clamp(0, chapters.length - 1);
             return _buildScaffold(
               context,
-              body: _buildBody(context, ref, novel, chapters.length,
-                  resumeIndex),
+              body:
+                  _buildBody(context, ref, novel, chapters.length, resumeIndex),
             );
           },
           loading: () => _buildScaffold(
             context,
-            body: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+            body:
+                const Center(child: CircularProgressIndicator(strokeWidth: 2)),
           ),
           error: (_, __) => _buildScaffold(
             context,
@@ -114,7 +114,7 @@ class NovelDetailPage extends ConsumerWidget {
                     ),
                   ],
                 ),
-                child: Center(
+                child: const Center(
                   child: Icon(
                     Icons.menu_book_rounded,
                     color: AppColors.textOnPink,
@@ -128,13 +128,11 @@ class NovelDetailPage extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const SizedBox(height: 6),
-                    Text(novel.title,
-                        style: AppTextStyles.titleMedium),
+                    Text(novel.title, style: AppTextStyles.titleMedium),
                     const SizedBox(height: 6),
                     Text(novel.author, style: AppTextStyles.caption),
                     const SizedBox(height: 10),
-                    Text('共 $chapterCount 章',
-                        style: AppTextStyles.label),
+                    Text('共 $chapterCount 章', style: AppTextStyles.label),
                   ],
                 ),
               ),
@@ -225,8 +223,7 @@ class NovelDetailPage extends ConsumerWidget {
               ),
               child: Text(
                 '目录',
-                style: AppTextStyles.body
-                    .copyWith(color: AppColors.accentRose),
+                style: AppTextStyles.body.copyWith(color: AppColors.accentRose),
               ),
             ),
           ),
@@ -245,7 +242,8 @@ class NovelDetailPage extends ConsumerWidget {
                 );
                 if (!confirmed) return;
                 if (!context.mounted) return;
-                await ref.read(novelChapterRepositoryProvider)
+                await ref
+                    .read(novelChapterRepositoryProvider)
                     .deleteByNovel(novel.id);
                 await ref.read(novelRepositoryProvider).delete(novel.id);
                 if (!context.mounted) return;
@@ -260,8 +258,7 @@ class NovelDetailPage extends ConsumerWidget {
               ),
               child: Text(
                 '删除小说',
-                style: AppTextStyles.body
-                    .copyWith(color: AppColors.accentRose),
+                style: AppTextStyles.body.copyWith(color: AppColors.accentRose),
               ),
             ),
           ),

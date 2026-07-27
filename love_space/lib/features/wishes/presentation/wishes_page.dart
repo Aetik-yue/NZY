@@ -40,10 +40,10 @@ class WishesPage extends ConsumerWidget {
                 child: Container(
                   width: 44,
                   height: 44,
-                  decoration: BoxDecoration(
+                  decoration: const BoxDecoration(
                     gradient: AppColors.pinkButtonGradient,
                     shape: BoxShape.circle,
-                    boxShadow: const [
+                    boxShadow: [
                       BoxShadow(
                         color: Color(0x59FF6B9D),
                         blurRadius: 16,
@@ -77,19 +77,24 @@ class WishesPage extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('愿望完成进度', style: AppTextStyles.onPink.copyWith(fontSize: 13).copyWith(
-                  color: Colors.white.withValues(alpha: 0.9),
-                )),
+                Text('愿望完成进度',
+                    style: AppTextStyles.onPink.copyWith(fontSize: 13).copyWith(
+                          color: Colors.white.withValues(alpha: 0.9),
+                        )),
                 const SizedBox(height: 8),
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.baseline,
                   textBaseline: TextBaseline.alphabetic,
                   children: [
-                    Text('${stats.percentInt}%', style: AppTextStyles.heroNumber.copyWith(fontSize: 40)),
+                    Text('${stats.percentInt}%',
+                        style: AppTextStyles.heroNumber.copyWith(fontSize: 40)),
                     const SizedBox(width: 6),
-                    Text('已完成', style: AppTextStyles.onPink.copyWith(fontSize: 14).copyWith(
-                      color: Colors.white.withValues(alpha: 0.85),
-                    )),
+                    Text('已完成',
+                        style: AppTextStyles.onPink
+                            .copyWith(fontSize: 14)
+                            .copyWith(
+                              color: Colors.white.withValues(alpha: 0.85),
+                            )),
                   ],
                 ),
                 const SizedBox(height: 12),
@@ -99,7 +104,8 @@ class WishesPage extends ConsumerWidget {
                     value: stats.percent,
                     minHeight: 6,
                     backgroundColor: Colors.white.withValues(alpha: 0.3),
-                    valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+                    valueColor:
+                        const AlwaysStoppedAnimation<Color>(Colors.white),
                   ),
                 ),
               ],
@@ -142,9 +148,8 @@ class _WishList extends ConsumerWidget {
               if (i > 0) const SizedBox(height: 12),
               _WishItem(
                 wish: undone[i],
-                onToggle: () => ref
-                    .read(wishRepositoryProvider)
-                    .toggleDone(undone[i].id),
+                onToggle: () =>
+                    ref.read(wishRepositoryProvider).toggleDone(undone[i].id),
                 onDelete: () async {
                   final confirmed = await showConfirmDeleteDialog(
                     context,
@@ -155,7 +160,9 @@ class _WishList extends ConsumerWidget {
                     await ref.read(wishRepositoryProvider).delete(undone[i].id);
                     if (context.mounted) {
                       AppSnackbar.showUndo(context, '愿望已删除', () async {
-                        await ref.read(wishRepositoryProvider).add(wishToDelete);
+                        await ref
+                            .read(wishRepositoryProvider)
+                            .add(wishToDelete);
                       });
                     }
                   }
@@ -229,7 +236,8 @@ class _WishItem extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(wish.title, style: AppTextStyles.titleSmall.copyWith(fontSize: 15)),
+                  Text(wish.title,
+                      style: AppTextStyles.titleSmall.copyWith(fontSize: 15)),
                   const SizedBox(height: 3),
                   Text(wish.description, style: AppTextStyles.caption),
                 ],

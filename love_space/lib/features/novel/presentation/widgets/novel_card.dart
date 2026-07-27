@@ -48,11 +48,11 @@ class NovelCard extends StatelessWidget {
               width: 96,
               decoration: BoxDecoration(
                 color: Color(novel.coverColorValue),
-                borderRadius: BorderRadius.horizontal(
+                borderRadius: const BorderRadius.horizontal(
                   left: Radius.circular(AppColors.radiusCard),
                 ),
               ),
-              child: Center(
+              child: const Center(
                 child: Icon(
                   Icons.menu_book_rounded,
                   color: AppColors.textOnPink,

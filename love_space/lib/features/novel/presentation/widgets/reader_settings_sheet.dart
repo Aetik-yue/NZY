@@ -155,16 +155,14 @@ class _ReaderSettingsSheetState extends ConsumerState<ReaderSettingsSheet> {
                   SegmentedButton<int>(
                     selected: {_pageMode},
                     style: ButtonStyle(
-                      backgroundColor: WidgetStateProperty.resolveWith((states) =>
-                          states.contains(WidgetState.selected)
+                      backgroundColor: WidgetStateProperty.resolveWith(
+                          (states) => states.contains(WidgetState.selected)
                               ? AppColors.accentRose
                               : AppColors.bgCard),
                     ),
                     segments: const [
-                      ButtonSegment(
-                          value: 0, label: Text('滚动')),
-                      ButtonSegment(
-                          value: 1, label: Text('翻页')),
+                      ButtonSegment(value: 0, label: Text('滚动')),
+                      ButtonSegment(value: 1, label: Text('翻页')),
                     ],
                     onSelectionChanged: (set) {
                       setState(() => _pageMode = set.first);
@@ -194,7 +192,7 @@ class _ReaderSettingsSheetState extends ConsumerState<ReaderSettingsSheet> {
                       Text('保持屏幕常亮', style: AppTextStyles.body),
                       Switch(
                         value: _keepScreenOn,
-                        activeColor: AppColors.accentRose,
+                        activeThumbColor: AppColors.accentRose,
                         onChanged: (v) {
                           setState(() => _keepScreenOn = v);
                           _save();
@@ -223,8 +221,7 @@ class _ReaderSettingsSheetState extends ConsumerState<ReaderSettingsSheet> {
     );
   }
 
-  Widget _buildLabel(String text) =>
-      Text(text, style: AppTextStyles.label);
+  Widget _buildLabel(String text) => Text(text, style: AppTextStyles.label);
 
   Widget _buildThemeSwatch(int index) {
     final color = AppColors.readerBg(index);
@@ -240,9 +237,7 @@ class _ReaderSettingsSheetState extends ConsumerState<ReaderSettingsSheet> {
         decoration: BoxDecoration(
           color: color,
           border: Border.all(
-            color: isSelected
-                ? AppColors.accentRose
-                : AppColors.borderSoft,
+            color: isSelected ? AppColors.accentRose : AppColors.borderSoft,
             width: isSelected ? 2 : 1,
           ),
           borderRadius: BorderRadius.circular(AppColors.radiusSm),

@@ -74,10 +74,10 @@ class _AddButton extends StatelessWidget {
       child: Container(
         width: 44,
         height: 44,
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           gradient: AppColors.pinkButtonGradient,
           shape: BoxShape.circle,
-          boxShadow: const [
+          boxShadow: [
             BoxShadow(
               color: Color(0x59FF6B9D),
               blurRadius: 16,
@@ -153,7 +153,8 @@ class _FilterChips extends ConsumerWidget {
           final (label, category) = _filters[index];
           final isActive = selected == category;
           return GestureDetector(
-            onTap: () => ref.read(albumFilterProvider.notifier).state = category,
+            onTap: () =>
+                ref.read(albumFilterProvider.notifier).state = category,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14),
               alignment: Alignment.center,
@@ -161,9 +162,8 @@ class _FilterChips extends ConsumerWidget {
                 gradient: isActive ? AppColors.pinkButtonGradient : null,
                 color: isActive ? null : AppColors.bgCard,
                 borderRadius: BorderRadius.circular(16),
-                border: isActive
-                    ? null
-                    : Border.all(color: AppColors.borderSoft),
+                border:
+                    isActive ? null : Border.all(color: AppColors.borderSoft),
               ),
               child: Text(
                 label,
@@ -206,7 +206,8 @@ class _PhotoGrid extends ConsumerWidget {
           itemCount: photos.length,
           itemBuilder: (context, index) {
             final photo = photos[index];
-            final gradient = _photoGradients[photo.gradientIndex % _photoGradients.length];
+            final gradient =
+                _photoGradients[photo.gradientIndex % _photoGradients.length];
             return ClipRRect(
               borderRadius: BorderRadius.circular(12),
               child: Stack(

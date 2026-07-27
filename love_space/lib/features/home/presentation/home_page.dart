@@ -15,11 +15,11 @@ class HomePage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(20, 4, 20, 100),
+    return const SingleChildScrollView(
+      padding: EdgeInsets.fromLTRB(20, 4, 20, 100),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: const [
+        children: [
           _GreetingHeader(),
           SizedBox(height: 20),
           _AnniversaryHeroCard(),
@@ -67,7 +67,7 @@ class _CoupleAvatars extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
+    return const SizedBox(
       width: 68,
       height: 48,
       child: Stack(
@@ -76,14 +76,14 @@ class _CoupleAvatars extends StatelessWidget {
           Positioned(
             left: 24,
             child: _Avatar(
-              gradient: const LinearGradient(
+              gradient: LinearGradient(
                 colors: [Color(0xFFFFB5CC), Color(0xFFFF8FB1)],
               ),
             ),
           ),
           // 我的头像（左）
           _Avatar(
-            gradient: const LinearGradient(
+            gradient: LinearGradient(
               colors: [Color(0xFFFFD1BF), Color(0xFFFFA1A1)],
             ),
           ),
@@ -146,7 +146,7 @@ class _AnniversaryHeroCard extends ConsumerWidget {
       child: Stack(
         children: [
           // 装饰爱心（右上角）
-          Positioned(
+          const Positioned(
             right: 0,
             top: 0,
             child: Opacity(
@@ -166,16 +166,18 @@ class _AnniversaryHeroCard extends ConsumerWidget {
                 children: [
                   Text('$days', style: AppTextStyles.heroNumber),
                   const SizedBox(width: 4),
-                  Text('天', style: AppTextStyles.onPink.copyWith(
-                    fontSize: 20, fontWeight: FontWeight.w700,
-                  )),
+                  Text('天',
+                      style: AppTextStyles.onPink.copyWith(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                      )),
                 ],
               ),
               const SizedBox(height: 6),
               Text(_heroSubtitle(days),
-                style: AppTextStyles.onPink.copyWith(fontSize: 13).copyWith(
-                  color: Colors.white.withValues(alpha: 0.85),
-                )),
+                  style: AppTextStyles.onPink.copyWith(fontSize: 13).copyWith(
+                        color: Colors.white.withValues(alpha: 0.85),
+                      )),
             ],
           ),
         ],
@@ -238,10 +240,10 @@ class _CheckinCard extends ConsumerWidget {
             child: Container(
               width: 64,
               height: 64,
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 gradient: AppColors.pinkButtonGradient,
                 shape: BoxShape.circle,
-                boxShadow: const [
+                boxShadow: [
                   BoxShadow(
                     color: Color(0x66FF6B9D),
                     blurRadius: 16,
@@ -276,7 +278,8 @@ class _QuickActions extends ConsumerWidget {
         icon: Icons.star_rounded,
         label: '愿望清单',
         bg: AppColors.accentPeach,
-        onTap: () => ref.read(currentTabProvider.notifier).state = NavTab.wishes,
+        onTap: () =>
+            ref.read(currentTabProvider.notifier).state = NavTab.wishes,
       ),
       _QuickAction(
         icon: Icons.music_note_rounded,
@@ -308,7 +311,8 @@ class _QuickActions extends ConsumerWidget {
                           color: a.bg,
                           borderRadius: BorderRadius.circular(18),
                         ),
-                        child: Icon(a.icon, color: AppColors.accentRose, size: 26),
+                        child:
+                            Icon(a.icon, color: AppColors.accentRose, size: 26),
                       ),
                       const SizedBox(height: 8),
                       Text(a.label, style: AppTextStyles.caption),
@@ -390,10 +394,14 @@ class _TimelineSection extends ConsumerWidget {
                         );
                         if (confirmed && context.mounted) {
                           final eventToDelete = events[i];
-                          await ref.read(timelineRepositoryProvider).delete(events[i].id);
+                          await ref
+                              .read(timelineRepositoryProvider)
+                              .delete(events[i].id);
                           if (context.mounted) {
                             AppSnackbar.showUndo(context, '时光已删除', () async {
-                              await ref.read(timelineRepositoryProvider).add(eventToDelete);
+                              await ref
+                                  .read(timelineRepositoryProvider)
+                                  .add(eventToDelete);
                             });
                           }
                         }
@@ -446,38 +454,41 @@ class _TimelineItem extends StatelessWidget {
     return GestureDetector(
       onLongPress: onDelete,
       child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // 标记列（圆点 + 连线）
-        SizedBox(
-          width: 16,
-          child: Column(
-            children: [
-              Container(
-                width: 12,
-                height: 12,
-                decoration: BoxDecoration(color: dotColor, shape: BoxShape.circle),
-              ),
-              if (showLine)
-                Container(width: 2, height: 36, color: AppColors.accentPinkSoft),
-            ],
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 标记列（圆点 + 连线）
+          SizedBox(
+            width: 16,
+            child: Column(
+              children: [
+                Container(
+                  width: 12,
+                  height: 12,
+                  decoration:
+                      BoxDecoration(color: dotColor, shape: BoxShape.circle),
+                ),
+                if (showLine)
+                  Container(
+                      width: 2, height: 36, color: AppColors.accentPinkSoft),
+              ],
+            ),
           ),
-        ),
-        const SizedBox(width: 14),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(date, style: AppTextStyles.dateLabel),
-              const SizedBox(height: 3),
-              Text(title, style: AppTextStyles.titleSmall.copyWith(fontSize: 15)),
-              const SizedBox(height: 3),
-              Text(desc, style: AppTextStyles.caption),
-            ],
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(date, style: AppTextStyles.dateLabel),
+                const SizedBox(height: 3),
+                Text(title,
+                    style: AppTextStyles.titleSmall.copyWith(fontSize: 15)),
+                const SizedBox(height: 3),
+                Text(desc, style: AppTextStyles.caption),
+              ],
+            ),
           ),
-        ),
-      ],
-    ),
+        ],
+      ),
     );
   }
 }

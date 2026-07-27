@@ -78,7 +78,7 @@ class _EmptyBookshelf extends StatelessWidget {
       child: Column(
         children: [
           const SizedBox(height: 48),
-          Icon(
+          const Icon(
             Icons.menu_book_rounded,
             size: 56,
             color: AppColors.textTertiary,

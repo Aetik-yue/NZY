@@ -12,10 +12,10 @@ class ProfilePage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(20, 4, 20, 100),
+    return const SingleChildScrollView(
+      padding: EdgeInsets.fromLTRB(20, 4, 20, 100),
       child: Column(
-        children: const [
+        children: [
           _ProfileHeader(),
           SizedBox(height: 16),
           _StatsRow(),
@@ -60,7 +60,7 @@ class _ProfileHeader extends ConsumerWidget {
           child: Column(
             children: [
               // 情侣头像 + 心形
-              SizedBox(
+              const SizedBox(
                 width: 130,
                 height: 64,
                 child: Stack(
@@ -69,14 +69,14 @@ class _ProfileHeader extends ConsumerWidget {
                     // 女友头像（左）
                     Positioned(
                       left: 0,
-                      child: _Avatar(const LinearGradient(
+                      child: _Avatar(LinearGradient(
                         colors: [Color(0xFFFFB5CC), Color(0xFFFF8FB1)],
                       )),
                     ),
                     // 我的头像（右）
                     Positioned(
                       left: 56,
-                      child: _Avatar(const LinearGradient(
+                      child: _Avatar(LinearGradient(
                         colors: [Color(0xFFFFD1BF), Color(0xFFFFA1A1)],
                       )),
                     ),
@@ -84,20 +84,23 @@ class _ProfileHeader extends ConsumerWidget {
                     Positioned(
                       left: 45,
                       top: 21,
-                      child: Icon(Icons.favorite, color: Colors.white, size: 24),
+                      child:
+                          Icon(Icons.favorite, color: Colors.white, size: 24),
                     ),
                   ],
                 ),
               ),
               const SizedBox(height: 16),
-              Text(names, style: AppTextStyles.titleLarge.copyWith(
-                color: AppColors.textOnPink, fontSize: 20,
-              )),
+              Text(names,
+                  style: AppTextStyles.titleLarge.copyWith(
+                    color: AppColors.textOnPink,
+                    fontSize: 20,
+                  )),
               const SizedBox(height: 4),
               Text('在一起 $days 天 · 这是我们的空间',
-                style: AppTextStyles.caption.copyWith(
-                  color: Colors.white.withValues(alpha: 0.85),
-                )),
+                  style: AppTextStyles.caption.copyWith(
+                    color: Colors.white.withValues(alpha: 0.85),
+                  )),
             ],
           ),
         );
@@ -171,7 +174,9 @@ class _StatsRow extends ConsumerWidget {
             .map((s) => Expanded(
                   child: Column(
                     children: [
-                      Text(s.$1, style: AppTextStyles.statNumber.copyWith(color: s.$3)),
+                      Text(s.$1,
+                          style:
+                              AppTextStyles.statNumber.copyWith(color: s.$3)),
                       const SizedBox(height: 4),
                       Text(s.$2, style: AppTextStyles.label),
                     ],
@@ -221,7 +226,8 @@ class _MusicCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('我们的歌单', style: AppTextStyles.titleSmall.copyWith(fontSize: 14)),
+                Text('我们的歌单',
+                    style: AppTextStyles.titleSmall.copyWith(fontSize: 14)),
                 const SizedBox(height: 4),
                 Text('32 首 · 正在播放"小幸运"', style: AppTextStyles.label),
               ],
@@ -236,7 +242,8 @@ class _MusicCard extends StatelessWidget {
                 color: Colors.white,
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.play_arrow, color: AppColors.accentRose, size: 20),
+              child: const Icon(Icons.play_arrow,
+                  color: AppColors.accentRose, size: 20),
             ),
           ),
         ],

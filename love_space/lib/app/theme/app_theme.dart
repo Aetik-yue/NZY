@@ -27,11 +27,12 @@ class AppTheme {
             statusBarBrightness: Brightness.light,
           ),
         ),
-        cardTheme: CardThemeData(
+        cardTheme: const CardThemeData(
           color: AppColors.bgCard,
           elevation: 0,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.all(Radius.circular(AppColors.radiusCard)),
+            borderRadius:
+                BorderRadius.all(Radius.circular(AppColors.radiusCard)),
           ),
         ),
         dividerTheme: const DividerThemeData(
