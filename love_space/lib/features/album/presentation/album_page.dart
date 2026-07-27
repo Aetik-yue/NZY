@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/theme/app_colors.dart';
@@ -205,31 +207,49 @@ class _PhotoGrid extends ConsumerWidget {
           itemBuilder: (context, index) {
             final photo = photos[index];
             final gradient = _photoGradients[photo.gradientIndex % _photoGradients.length];
-            return Container(
-              padding: const EdgeInsets.only(bottom: 8, left: 8),
-              alignment: Alignment.bottomLeft,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: gradient,
-                ),
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: const [
-                  BoxShadow(
-                    color: AppColors.shadowCard,
-                    blurRadius: 12,
-                    offset: Offset(0, 4),
-                    spreadRadius: -2,
+            return ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  // 兜底渐变背景
+                  Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: gradient,
+                      ),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: AppColors.shadowCard,
+                          blurRadius: 12,
+                          offset: Offset(0, 4),
+                          spreadRadius: -2,
+                        ),
+                      ],
+                    ),
+                  ),
+                  // 真实照片
+                  if (photo.filePath != null)
+                    Image.file(
+                      File(photo.filePath!),
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                    ),
+                  // 日期文字
+                  Positioned(
+                    left: 8,
+                    bottom: 8,
+                    child: Text(
+                      _formatPhotoDate(photo.date),
+                      style: AppTextStyles.caption.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                   ),
                 ],
-              ),
-              child: Text(
-                _formatPhotoDate(photo.date),
-                style: AppTextStyles.caption.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w700,
-                ),
               ),
             );
           },

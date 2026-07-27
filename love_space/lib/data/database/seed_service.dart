@@ -1,12 +1,8 @@
 import 'package:isar/isar.dart';
 import '../../core/constants/seed_data.dart';
-import '../../data/models/wish.dart';
 import '../../data/models/timeline_event.dart';
-import '../../data/models/album_photo.dart';
 import '../../data/models/check_in.dart';
 import '../../data/models/app_settings.dart';
-import '../../data/models/novel.dart';
-import '../../data/models/novel_chapter.dart';
 
 /// 首次启动种子数据服务
 class SeedService {
@@ -30,19 +26,8 @@ class SeedService {
       // 时间轴
       await _isar.timelineEvents.putAll(Seed.timelineEvents());
 
-      // 愿望
-      await _isar.wishs.putAll(Seed.wishes());
-
-      // 相册
-      await _isar.albumPhotos.putAll(Seed.photos());
-
       // 打卡
       await _isar.checkIns.putAll(Seed.checkIns());
-
-      // 小说（预置示例）+ 章节：先写入小说拿到 id，再归属章节
-      final seededNovels = Seed.novels();
-      await _isar.novels.putAll(seededNovels);
-      await _isar.novelChapters.putAll(Seed.novelChapters(seededNovels));
     });
   }
 }

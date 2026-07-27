@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_text_styles.dart';
 import '../../../data/providers/data_providers.dart';
-import '../../../data/models/novel.dart';
 import 'widgets/novel_card.dart';
 import 'novel_detail_page.dart';
 

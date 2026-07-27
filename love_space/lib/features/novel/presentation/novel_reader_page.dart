@@ -333,36 +333,8 @@ class _NovelReaderPageState extends ConsumerState<NovelReaderPage> {
     final content = chapter?.content ?? '';
     final chapterTitle = chapter?.title ?? '';
 
-    final size = MediaQuery.of(context).size;
     final paddingTop = MediaQuery.of(context).padding.top;
     final paddingBottom = MediaQuery.of(context).padding.bottom;
-
-    // 仅在翻页模式且分页输入变化时重算，避免每次 rebuild 重复计算
-    if (settings.pageMode == 1) {
-      final availWidth = size.width - 48;
-      final availHeight =
-          size.height - paddingTop - paddingBottom - 52 - 60 - 48;
-      if (_pages.isEmpty ||
-          _paginateContent != content ||
-          _paginateWidth != availWidth ||
-          _paginateHeight != availHeight ||
-          _paginateFontSize != settings.fontSize ||
-          _paginateLineHeight != settings.lineHeight) {
-        _pages = _paginate(
-          content, availWidth, availHeight,
-          settings.fontSize, settings.lineHeight,
-        );
-        _paginateContent = content;
-        _paginateWidth = availWidth;
-        _paginateHeight = availHeight;
-        _paginateFontSize = settings.fontSize;
-        _paginateLineHeight = settings.lineHeight;
-      }
-    } else {
-      _pages = [];
-    }
-
-    _maybeRestore(settings, effectiveIndex);
 
     final readingArea = settings.pageMode == 0
         ? SingleChildScrollView(
@@ -394,23 +366,46 @@ class _NovelReaderPageState extends ConsumerState<NovelReaderPage> {
               ],
             ),
           )
-        : PageView.builder(
-            controller: _pageController,
-            itemCount: _pages.length,
-            onPageChanged: _onPageChanged,
-            itemBuilder: (_, i) => Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-              child: Text(
-                _pages[i],
-                style: TextStyle(
-                  fontSize: settings.fontSize,
-                  height: settings.lineHeight,
-                  color: textColor,
-                  fontFamily: AppTextStyles.cjkFontFamily,
+        : LayoutBuilder(
+            builder: (context, constraints) {
+              final availWidth = constraints.maxWidth - 48;
+              final availHeight = constraints.maxHeight - 48;
+              if (_pages.isEmpty ||
+                  _paginateContent != content ||
+                  _paginateWidth != availWidth ||
+                  _paginateHeight != availHeight ||
+                  _paginateFontSize != settings.fontSize ||
+                  _paginateLineHeight != settings.lineHeight) {
+                _pages = _paginate(
+                  content, availWidth, availHeight,
+                  settings.fontSize, settings.lineHeight,
+                );
+                _paginateContent = content;
+                _paginateWidth = availWidth;
+                _paginateHeight = availHeight;
+                _paginateFontSize = settings.fontSize;
+                _paginateLineHeight = settings.lineHeight;
+              }
+              _maybeRestore(settings, effectiveIndex);
+              return PageView.builder(
+                controller: _pageController,
+                itemCount: _pages.length,
+                onPageChanged: _onPageChanged,
+                itemBuilder: (_, i) => Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+                  child: Text(
+                    _pages[i],
+                    style: TextStyle(
+                      fontSize: settings.fontSize,
+                      height: settings.lineHeight,
+                      color: textColor,
+                      fontFamily: AppTextStyles.cjkFontFamily,
+                    ),
+                  ),
                 ),
-              ),
-            ),
+              );
+            },
           );
 
     return Scaffold(

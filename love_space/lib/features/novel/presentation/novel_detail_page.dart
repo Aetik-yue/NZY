@@ -4,6 +4,8 @@ import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_text_styles.dart';
 import '../../../data/providers/data_providers.dart';
 import '../../../data/models/novel.dart';
+import '../../../shared/widgets/confirm_dialog.dart';
+import '../../../shared/widgets/app_snackbar.dart';
 import 'widgets/chapter_list_sheet.dart';
 import 'novel_reader_page.dart';
 
@@ -223,6 +225,41 @@ class NovelDetailPage extends ConsumerWidget {
               ),
               child: Text(
                 '目录',
+                style: AppTextStyles.body
+                    .copyWith(color: AppColors.accentRose),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // 删除小说
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: OutlinedButton(
+              onPressed: () async {
+                final confirmed = await showConfirmDeleteDialog(
+                  context,
+                  title: '删除小说',
+                  content: '确定要删除《${novel.title}》吗？所有章节也会被一并删除，此操作无法撤销。',
+                );
+                if (!confirmed) return;
+                if (!context.mounted) return;
+                await ref.read(novelChapterRepositoryProvider)
+                    .deleteByNovel(novel.id);
+                await ref.read(novelRepositoryProvider).delete(novel.id);
+                if (!context.mounted) return;
+                AppSnackbar.show(context, '已删除《${novel.title}》');
+                Navigator.of(context).pop();
+              },
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: AppColors.accentRose),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AppColors.radiusMd),
+                ),
+              ),
+              child: Text(
+                '删除小说',
                 style: AppTextStyles.body
                     .copyWith(color: AppColors.accentRose),
               ),

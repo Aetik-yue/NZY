@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/theme/app_colors.dart';
@@ -494,32 +496,50 @@ class _PhotoThumb extends StatelessWidget {
   Widget build(BuildContext context) {
     return AspectRatio(
       aspectRatio: 1 / 1.1,
-      child: Container(
-        padding: const EdgeInsets.only(bottom: 8, left: 8),
-        alignment: Alignment.bottomLeft,
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: gradient,
-          ),
-          borderRadius: BorderRadius.circular(14),
-          boxShadow: const [
-            BoxShadow(
-              color: AppColors.shadowCard,
-              blurRadius: 10,
-              offset: Offset(0, 3),
-              spreadRadius: -2,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // 兜底渐变背景
+            Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: gradient,
+                ),
+                boxShadow: const [
+                  BoxShadow(
+                    color: AppColors.shadowCard,
+                    blurRadius: 10,
+                    offset: Offset(0, 3),
+                    spreadRadius: -2,
+                  ),
+                ],
+              ),
+            ),
+            // 真实照片
+            if (photo.filePath != null)
+              Image.file(
+                File(photo.filePath!),
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+              ),
+            // 日期文字
+            Positioned(
+              left: 8,
+              bottom: 8,
+              child: Text(
+                _formatDate(photo.date),
+                style: AppTextStyles.label.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 11,
+                ),
+              ),
             ),
           ],
-        ),
-        child: Text(
-          _formatDate(photo.date),
-          style: AppTextStyles.label.copyWith(
-            color: Colors.white,
-            fontWeight: FontWeight.w700,
-            fontSize: 11,
-          ),
         ),
       ),
     );
