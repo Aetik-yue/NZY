@@ -1,0 +1,63 @@
+classDiagram
+    direction LR
+
+    class Novel {
+        +Id id
+        +String title
+        +String author
+        +String intro
+        +int coverColorValue
+        +List~String~ tags
+        +int chapterCount
+        +bool isBuiltin
+        +int lastChapterIndex
+        +double lastPosition
+        +DateTime lastReadAt
+        +DateTime createdAt
+    }
+
+    class NovelChapter {
+        +Id id
+        +int novelId
+        +int chapterIndex
+        +String title
+        +String content
+    }
+
+    class ReaderSettings {
+        +Id id
+        +double fontSize
+        +double lineHeight
+        +int pageMode
+        +int bgTheme
+        +bool keepScreenOn
+    }
+
+    class NovelRepository {
+        +Future~List~Novel~~ getAll()
+        +Stream~List~Novel~~ watchAll()
+        +Future~Novel?~ getById(Id id)
+        +Future~void~ add(Novel novel)
+        +Future~void~ update(Novel novel)
+        +Future~void~ delete(Id id)
+        +Future~void~ updateProgress(Id id, int chapterIndex, double position)
+    }
+
+    class NovelChapterRepository {
+        +Stream~List~NovelChapter~~ watchByNovel(int novelId)
+        +Future~NovelChapter?~ getByNovelAndIndex(int novelId, int chapterIndex)
+        +Future~void~ addAll(List~NovelChapter~ chapters)
+        +Future~void~ deleteByNovel(int novelId)
+    }
+
+    class ReaderSettingsRepository {
+        +Future~ReaderSettings~ getOrCreate()
+        +Stream~ReaderSettings?~ watch()
+        +Future~void~ save(ReaderSettings settings)
+    }
+
+    Novel "1" --> "*" NovelChapter : novelId (Index)
+    ReaderSettings ..> ReaderSettingsRepository : 单例(仅首条记录)
+    NovelRepository --> Novel
+    NovelChapterRepository --> NovelChapter
+    ReaderSettingsRepository --> ReaderSettings

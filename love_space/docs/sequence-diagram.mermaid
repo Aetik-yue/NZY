@@ -1,0 +1,78 @@
+sequenceDiagram
+    autonumber
+    actor User
+    participant Shell as MainShell / PillNavBar
+    participant List as NovelPage
+    participant Detail as NovelDetailPage
+    participant Reader as NovelReaderPage
+    participant Sheet as 设置/目录面板
+    participant RP as readerSettingsProvider
+    participant CP as chaptersProvider(family)
+    participant NP as novelsProvider
+    participant Repo as Repository
+    participant DB as Isar
+
+    Note over Shell,DB: ① 打开书架列表
+    User->>Shell: 点击「小说」Tab
+    Shell->>List: currentTabProvider = novel
+    List->>NP: ref.watch(novelsProvider)
+    NP->>Repo: NovelRepository.watchAll()
+    Repo->>DB: novels.where().sortByCreatedAt().watch(fireImmediately:true)
+    DB-->>List: Stream<List<Novel>>
+    List-->>User: 渲染书架(NovelCard 列表)
+
+    Note over List,DB: ② 进入详情
+    User->>List: 点击小说卡片
+    List->>Detail: Navigator.push(NovelDetailPage(novelId))
+    Detail->>CP: ref.watch(chaptersProvider(novelId))
+    CP->>Repo: NovelChapterRepository.watchByNovel(novelId)
+    Repo->>DB: novelChapters.where().novelIdEqualTo(novelId).sortByChapterIndex().watch()
+    DB-->>Detail: Stream<List<NovelChapter>>
+    Detail-->>User: 封面/简介/标签/目录入口/「开始阅读」
+
+    Note over Detail,DB: ③ 开始阅读（恢复进度）
+    User->>Detail: 点击「开始阅读」
+    Detail->>Reader: push(NovelReaderPage(novelId, resumeChapterIndex))
+    Reader->>CP: watch(chaptersProvider(novelId))
+    Reader->>RP: watch(readerSettingsProvider)
+    RP->>Repo: ReaderSettingsRepository.watch()
+    Repo->>DB: readerSettings.where().watch(fireImmediately:true)
+    DB-->>Reader: Stream<ReaderSettings?>
+    Reader->>Repo: NovelRepository.getById(novelId)
+    Repo->>DB: novels.get(id)
+    DB-->>Reader: Novel(lastChapterIndex, lastPosition)
+    Reader->>Reader: 按 pageMode 构建 滚动/PageView；恢复进度
+
+    Note over Reader,Sheet: ④ 阅读设置
+    User->>Reader: 点击中央 → 切换工具栏显隐
+    User->>Reader: 点击「设置」齿轮
+    Reader->>Sheet: showModalBottomSheet(ReaderSettingsSheet)
+    User->>Sheet: 调整字号/行距/翻页模式/背景/常亮
+    Sheet->>Repo: ReaderSettingsRepository.save(settings)
+    Repo->>DB: writeTxn → readerSettings.put(settings)
+    DB-->>RP: 流推送新 ReaderSettings
+    RP-->>Reader: 自动重建(字号/行距/背景实时生效)
+    Sheet->>Reader: 关闭面板
+
+    Note over Reader,DB: ⑤ 翻页 / 滚动 + 进度记忆
+    User->>Reader: 点击右/左区域 或 滑动
+    Reader->>Reader: 翻页 animateToPage / 滚动 jumpTo(offset)
+    Reader->>Reader: 计算 position = page/总页 或 offset/max
+    Reader->>Repo: NovelRepository.updateProgress(id, chapterIndex, position)
+    Repo->>DB: writeTxn → novels.put(novel)
+    DB-->>NP: 流推送(更新 lastChapterIndex/lastPosition)
+    Reader->>Reader: 节流保存(约 500ms)
+
+    Note over Reader,DB: ⑥ 章节切换
+    User->>Reader: 点击「目录」
+    Reader->>Sheet: show chapterListSheet
+    User->>Sheet: 选择目标章节
+    Sheet->>Reader: 回调 chapterIndex
+    Reader->>Reader: 重置 PageView/ScrollView 到该章首部
+    Reader->>Repo: updateProgress(id, newChapterIndex, 0)
+
+    Note over Reader,DB: ⑦ 退出阅读
+    User->>Reader: 点击返回
+    Reader->>Reader: SystemChrome 恢复系统 UI
+    Reader->>Repo: updateProgress(id, chapterIndex, position) 末次保存
+    Reader-->>Detail: pop 返回详情
