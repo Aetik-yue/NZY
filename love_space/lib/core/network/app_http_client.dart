@@ -49,9 +49,19 @@ class AppHttpClient {
     return _requestWithRetry(url, headers: headers);
   }
 
+  /// 执行 POST 请求（表单提交），返回解码后的字符串
+  Future<String> post(
+    String url, {
+    Map<String, String>? body,
+    Map<String, String>? headers,
+  }) async {
+    return _requestWithRetry(url, body: body, headers: headers);
+  }
+
   /// 带重试的请求
   Future<String> _requestWithRetry(
     String url, {
+    Map<String, String>? body,
     Map<String, String>? headers,
   }) async {
     int attempt = 0;
@@ -59,7 +69,7 @@ class AppHttpClient {
 
     while (attempt < maxRetries) {
       try {
-        final result = await _doRequest(url, headers: headers);
+        final result = await _doRequest(url, body: body, headers: headers);
         return result;
       } on _NonRetryableException catch (e) {
         // 4xx 客户端错误：不可重试，立即失败
@@ -96,6 +106,7 @@ class AppHttpClient {
   /// 执行单次请求
   Future<String> _doRequest(
     String url, {
+    Map<String, String>? body,
     Map<String, String>? headers,
   }) async {
     // 请求间隔控制
@@ -105,11 +116,16 @@ class AppHttpClient {
     final requestHeaders = _buildHeaders(headers);
 
     final stopwatch = Stopwatch()..start();
-    debugPrint('[AppHttpClient] GET $url');
+    final isPost = body != null;
+    debugPrint('[AppHttpClient] ${isPost ? "POST" : "GET"} $url');
 
-    final response = await _client
-        .get(uri, headers: requestHeaders)
-        .timeout(timeout);
+    final response = isPost
+        ? await _client
+            .post(uri, headers: requestHeaders, body: body)
+            .timeout(timeout)
+        : await _client
+            .get(uri, headers: requestHeaders)
+            .timeout(timeout);
 
     stopwatch.stop();
     debugPrint('[AppHttpClient] ${response.statusCode} ${stopwatch.elapsedMilliseconds}ms $url');

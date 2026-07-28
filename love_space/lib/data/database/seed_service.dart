@@ -43,15 +43,23 @@ class SeedService {
         .where()
         .keyEqualTo('biquge')
         .findFirst();
+
     if (existingSource == null) {
+      // 新建源
       await _isar.writeTxn(() async {
         await _isar.novelSources.put(NovelSource()
           ..key = 'biquge'
           ..name = '笔趣阁'
-          ..baseUrl = 'https://www.xbiquge.la'
+          ..baseUrl = 'https://www.biquge2.net'
           ..enabled = true
           ..createdAt = DateTime.now()
           ..selectors = _biqugeSelectors);
+      });
+    } else if (existingSource.baseUrl.contains('xbiquge.la')) {
+      // 迁移：旧域名已失效，更新为新域名
+      existingSource.baseUrl = 'https://www.biquge2.net';
+      await _isar.writeTxn(() async {
+        await _isar.novelSources.put(existingSource);
       });
     }
 

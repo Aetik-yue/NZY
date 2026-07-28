@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+import 'package:html/dom.dart';
 import 'package:html/parser.dart' as html_parser;
 
 import '../../core/network/app_http_client.dart';
@@ -41,13 +43,43 @@ class BiqugeCrawler implements BaseCrawler {
   Future<List<SearchResult>> search(String keyword) async {
     if (keyword.trim().isEmpty) return [];
 
-    // 使用 Uri 构建搜索 URL，自动处理路径拼接和编码
-    final searchUrl = Uri.parse('$baseUrl$_defaultSearchPath')
-        .replace(queryParameters: {_searchParam: keyword.trim()})
-        .toString();
+    // 笔趣阁搜索使用 POST 表单提交
+    // 注意：多数镜像站有反爬机制，搜索可能不稳定
+    final searchParams = [
+      {'s': keyword.trim()},                       // biquge2.net 等
+      {'searchkey': keyword.trim()},               // 经典笔趣阁
+      {'searchkey': keyword.trim(), 'searchtype': 'novelname'},  // 带类型
+      {'q': keyword.trim()},                       // 部分站点
+    ];
 
-    final body = await _httpClient.get(searchUrl);
-    return _parseSearchResult(body);
+    for (final params in searchParams) {
+      try {
+        final body = await _httpClient.post(
+          '$baseUrl/search.html',
+          body: params,
+          headers: {'Referer': '$baseUrl/'},
+        );
+        final results = _parseSearchResult(body);
+        if (results.isNotEmpty) return results;
+      } catch (e) {
+        debugPrint('[BiqugeCrawler] 搜索参数 $params 失败: $e');
+      }
+    }
+
+    // 尝试 /search.php 端点
+    try {
+      final body = await _httpClient.post(
+        '$baseUrl/modules/article/search.php',
+        body: {'searchkey': keyword.trim(), 'searchtype': 'novelname'},
+        headers: {'Referer': '$baseUrl/'},
+      );
+      final results = _parseSearchResult(body);
+      if (results.isNotEmpty) return results;
+    } catch (e) {
+      debugPrint('[BiqugeCrawler] search.php 失败: $e');
+    }
+
+    return [];
   }
 
   @override
@@ -68,40 +100,73 @@ class BiqugeCrawler implements BaseCrawler {
     final document = html_parser.parse(html);
     final results = <SearchResult>[];
 
-    // 笔趣阁搜索结果通常在表格 .grid 或 .result-list 中
-    // 尝试多种选择器以兼容不同镜像
+    // 策略 1: 经典笔趣阁表格布局 (table.grid)
     var rows = document.querySelectorAll('table.grid tr');
-    if (rows.isEmpty) {
-      rows = document.querySelectorAll('.result-list .result-item');
-    }
-    if (rows.isEmpty) {
-      rows = document.querySelectorAll('.novelslistss li');
+    if (rows.isNotEmpty) {
+      for (final row in rows) {
+        final link = row.querySelector('a');
+        if (link == null) continue;
+        final title = link.text.trim();
+        final href = link.attributes['href'] ?? '';
+        if (title.isEmpty || href.isEmpty) continue;
+
+        // 提取作者（第二列）
+        final tds = row.querySelectorAll('td');
+        String author = '';
+        if (tds.length >= 2) {
+          author = tds[1].text.trim();
+        }
+
+        results.add(SearchResult(
+          title: title,
+          author: author,
+          url: _resolveUrl(href, baseUrl),
+        ));
+      }
+      if (results.isNotEmpty) return results;
     }
 
-    for (final row in rows) {
-      // 跳过表头
-      final link = row.querySelector('a');
+    // 策略 2: 搜索结果列表 (.result-list / .novelslistss)
+    var items = document.querySelectorAll('.result-list .result-item, .novelslistss li, .novelitem, .search-result-item, .search-result li');
+    for (final item in items) {
+      final link = item.querySelector('a');
       if (link == null) continue;
-
       final title = link.text.trim();
       final href = link.attributes['href'] ?? '';
       if (title.isEmpty || href.isEmpty) continue;
 
-      // 提取作者（通常在第二列或 .result-game-pic 后）
-      String author = '';
-      final authorEl = row.querySelector('.odd:last-child') ??
-          row.querySelector('.result-item-author');
-      if (authorEl != null) {
-        author = authorEl.text.trim();
-      }
-
-      final url = _resolveUrl(href, baseUrl);
-
       results.add(SearchResult(
         title: title,
-        author: author,
-        url: url,
+        author: '',
+        url: _resolveUrl(href, baseUrl),
       ));
+    }
+    if (results.isNotEmpty) return results;
+
+    // 策略 3: 通用 — 查找所有指向书籍详情页的链接
+    // 匹配多种书籍详情页 URL 模式：
+    //   /book/123/          (biquge2.net)
+    //   /book/123.html      (部分镜像)
+    //   /123/456/789.html   (经典笔趣阁)
+    final allLinks = document.querySelectorAll('a[href]');
+    final seen = <String>{};
+    for (final link in allLinks) {
+      final href = link.attributes['href'] ?? '';
+      final title = link.text.trim();
+      if (title.isEmpty || title.length < 2) continue;
+
+      // 匹配书籍详情页 URL 模式
+      if (RegExp(r'/book/\d+/?$|/\d+/\d+/\d+\.html$').hasMatch(href)) {
+        final url = _resolveUrl(href, baseUrl);
+        if (seen.contains(url)) continue;
+        seen.add(url);
+
+        results.add(SearchResult(
+          title: title,
+          author: '',
+          url: url,
+        ));
+      }
     }
 
     return results;
@@ -134,17 +199,27 @@ class BiqugeCrawler implements BaseCrawler {
         document.querySelector('#bookintro');
     final intro = introEl?.text.trim() ?? '';
 
-    // 章节列表
-    final chapters = <ChapterRef>[];
-    final chapterLinks = document.querySelectorAll('#list dd a');
+    // 章节列表 — 尝试多种选择器以兼容不同镜像
+    final chapterLinks = <Element>[];
+    chapterLinks.addAll(document.querySelectorAll('#list dd a'));
     if (chapterLinks.isEmpty) {
-      // 备用选择器
       chapterLinks.addAll(document.querySelectorAll('.listmain dd a'));
     }
     if (chapterLinks.isEmpty) {
       chapterLinks.addAll(document.querySelectorAll('.catalog a'));
     }
+    if (chapterLinks.isEmpty) {
+      chapterLinks.addAll(document.querySelectorAll('#mlist a'));
+    }
+    if (chapterLinks.isEmpty) {
+      chapterLinks.addAll(document.querySelectorAll('.chapter-list a'));
+    }
+    // biquge2.net: 章节链接在列表中，href 格式为 /book/123/456.html
+    if (chapterLinks.isEmpty) {
+      chapterLinks.addAll(document.querySelectorAll('a[href*="/book/"][href\$=".html"]'));
+    }
 
+    final chapters = <ChapterRef>[];
     for (final link in chapterLinks) {
       final chapterTitle = link.text.trim();
       final href = link.attributes['href'] ?? '';

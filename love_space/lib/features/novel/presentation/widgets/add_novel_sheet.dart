@@ -137,6 +137,100 @@ class _AddNovelSheetState extends ConsumerState<AddNovelSheet> {
     }
   }
 
+  /// 从粘贴的 URL 直接添加小说
+  Future<void> _addFromUrl() async {
+    if (_isAdding) return;
+
+    // 显示输入链接的对话框
+    final urlController = TextEditingController();
+    final url = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('粘贴书籍链接', style: AppTextStyles.titleSmall),
+        content: TextField(
+          controller: urlController,
+          autofocus: true,
+          decoration: InputDecoration(
+            hintText: 'https://www.biquge2.net/book/xxx/',
+            hintStyle: AppTextStyles.body.copyWith(
+              color: AppColors.textTertiary,
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(AppColors.radiusSm),
+            ),
+          ),
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(urlController.text.trim()),
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.accentRose,
+            ),
+            child: const Text('添加'),
+          ),
+        ],
+      ),
+    );
+
+    if (url == null || url.isEmpty) return;
+    if (!mounted) return;
+
+    setState(() => _isAdding = true);
+    final navigator = Navigator.of(context);
+
+    ref.read(crawlStatusProvider.notifier).state = const CrawlStatus(
+      state: 'fetching',
+      message: '准备获取...',
+    );
+
+    CrawlProgressSheet.show(context, title: '正在添加小说');
+
+    try {
+      void onProgress(String message, int current, int total) {
+        if (!mounted) return;
+        ref.read(crawlStatusProvider.notifier).state = CrawlStatus(
+          state: 'fetching',
+          message: message,
+          current: current,
+          total: total,
+        );
+      }
+
+      await ref.read(crawlRepositoryProvider).addNovel(
+            url,
+            onProgress: onProgress,
+          );
+
+      if (!mounted) return;
+
+      ref.read(crawlStatusProvider.notifier).state = const CrawlStatus(
+        state: 'success',
+        message: '完成',
+      );
+
+      navigator.pop(); // 关闭进度面板
+      navigator.pop(); // 关闭添加面板
+      AppSnackbar.show(navigator.context, '已添加小说');
+    } on CancelledException {
+      // 用户主动取消
+    } catch (e) {
+      if (!mounted) return;
+      ref.read(crawlStatusProvider.notifier).state = CrawlStatus(
+        state: 'failed',
+        message: '添加失败：$e',
+      );
+    } finally {
+      if (mounted) setState(() => _isAdding = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -174,7 +268,7 @@ class _AddNovelSheetState extends ConsumerState<AddNovelSheet> {
                       textInputAction: TextInputAction.search,
                       onSubmitted: (_) => _search(),
                       decoration: InputDecoration(
-                        hintText: '输入小说名或关键词',
+                        hintText: '输入小说名搜索，或粘贴书籍链接',
                         hintStyle: AppTextStyles.body.copyWith(
                           color: AppColors.textTertiary,
                         ),
@@ -211,6 +305,25 @@ class _AddNovelSheetState extends ConsumerState<AddNovelSheet> {
                     child: const Text('搜索'),
                   ),
                 ],
+              ),
+            ),
+
+            // 粘贴链接入口
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+              child: GestureDetector(
+                onTap: _addFromUrl,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.link_rounded,
+                        size: 16, color: AppColors.accentRose),
+                    const SizedBox(width: 6),
+                    Text('直接粘贴书籍详情页链接',
+                        style: AppTextStyles.label
+                            .copyWith(color: AppColors.accentRose)),
+                  ],
+                ),
               ),
             ),
 
