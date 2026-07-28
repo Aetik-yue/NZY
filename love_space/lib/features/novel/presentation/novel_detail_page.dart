@@ -4,9 +4,11 @@ import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_text_styles.dart';
 import '../../../data/providers/data_providers.dart';
 import '../../../data/models/novel.dart';
+import '../../../data/repositories/crawl_repository.dart';
 import '../../../shared/widgets/confirm_dialog.dart';
 import '../../../shared/widgets/app_snackbar.dart';
 import 'widgets/chapter_list_sheet.dart';
+import 'widgets/crawl_progress_sheet.dart';
 import 'novel_reader_page.dart';
 
 /// 小说详情页
@@ -16,6 +18,75 @@ class NovelDetailPage extends ConsumerWidget {
   final int novelId;
 
   const NovelDetailPage({super.key, required this.novelId});
+
+  /// 更新章节（手动触发爬取新章节）
+  Future<void> _updateChapters(
+    BuildContext context,
+    WidgetRef ref,
+    Novel novel,
+  ) async {
+    // 重置爬取状态
+    ref.read(crawlStatusProvider.notifier).state = const CrawlStatus(
+      state: 'fetching',
+      message: '准备更新...',
+    );
+
+    // 弹出进度面板
+    CrawlProgressSheet.show(context, title: '正在更新《${novel.title}》');
+
+    try {
+      // 进度回调（作为参数传入，避免单例可变状态）
+      void onProgress(String message, int current, int total) {
+        if (!context.mounted) return;
+        ref.read(crawlStatusProvider.notifier).state = CrawlStatus(
+          state: 'fetching',
+          message: message,
+          current: current,
+          total: total,
+        );
+      }
+
+      final newCount = await ref.read(crawlRepositoryProvider).updateNovel(
+            novel.id,
+            onProgress: onProgress,
+          );
+
+      if (!context.mounted) return;
+
+      ref.read(crawlStatusProvider.notifier).state = const CrawlStatus(
+        state: 'success',
+        message: '完成',
+      );
+
+      if (newCount == 0) {
+        AppSnackbar.show(context, '暂无新章节');
+      } else {
+        AppSnackbar.show(context, '新增 $newCount 章');
+      }
+    } on CancelledException {
+      // 用户主动取消，不显示错误
+    } catch (e) {
+      if (!context.mounted) return;
+      ref.read(crawlStatusProvider.notifier).state = CrawlStatus(
+        state: 'failed',
+        message: '更新失败：$e',
+      );
+      AppSnackbar.show(context, '更新失败，请稍后重试');
+    }
+  }
+
+  /// 格式化爬取时间
+  String _formatCrawlTime(DateTime time) {
+    final now = DateTime.now();
+    final diff = now.difference(time);
+
+    if (diff.inMinutes < 1) return '刚刚';
+    if (diff.inHours < 1) return '${diff.inMinutes} 分钟前';
+    if (diff.inDays < 1) return '${diff.inHours} 小时前';
+    if (diff.inDays < 7) return '${diff.inDays} 天前';
+
+    return '${time.month}月${time.day}日 ${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -228,6 +299,36 @@ class NovelDetailPage extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 12),
+
+          // 更新章节（仅爬虫小说显示）
+          if (novel.sourceUrl != null && novel.sourceKey != null) ...[
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: OutlinedButton.icon(
+                onPressed: novel.crawlStatus == 'crawling'
+                    ? null
+                    : () => _updateChapters(context, ref, novel),
+                icon: const Icon(Icons.refresh_rounded, size: 18),
+                label: const Text('更新章节'),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: AppColors.accentRose),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppColors.radiusMd),
+                  ),
+                  foregroundColor: AppColors.accentRose,
+                ),
+              ),
+            ),
+            if (novel.lastCrawlAt != null) ...[
+              const SizedBox(height: 6),
+              Text(
+                '最后更新时间：${_formatCrawlTime(novel.lastCrawlAt!)}',
+                style: AppTextStyles.label,
+              ),
+            ],
+            const SizedBox(height: 12),
+          ],
 
           // 删除小说
           SizedBox(

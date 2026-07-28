@@ -37,6 +37,10 @@ dependencies:
   # 图片选择
   image_picker: ^1.1.2
 
+  # 小说爬虫
+  http: ^1.2.1
+  html: ^0.15.4
+
   # 本地化（中文日期选择器）
   flutter_localizations:
     sdk: flutter

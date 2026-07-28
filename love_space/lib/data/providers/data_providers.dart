@@ -8,6 +8,10 @@ import '../repositories/settings_repository.dart';
 import '../repositories/novel_repository.dart';
 import '../repositories/novel_chapter_repository.dart';
 import '../repositories/reader_settings_repository.dart';
+import '../repositories/novel_source_repository.dart';
+import '../repositories/crawl_config_repository.dart';
+import '../repositories/crawl_log_repository.dart';
+import '../repositories/crawl_repository.dart';
 import '../../core/utils/greeting.dart';
 import '../../core/utils/date_utils.dart';
 import '../../core/utils/streak.dart';
@@ -19,6 +23,9 @@ import '../models/album_photo.dart';
 import '../models/novel.dart';
 import '../models/novel_chapter.dart';
 import '../models/reader_settings.dart';
+import '../models/novel_source.dart';
+import '../models/crawl_config.dart';
+import '../models/crawl_log.dart';
 
 // ═══════════════════════════════════════════════════════════════
 // Repository providers（依赖 isarProvider）
@@ -210,4 +217,80 @@ final chaptersProvider =
 /// 阅读器设置
 final readerSettingsProvider = StreamProvider<ReaderSettings?>((ref) =>
     ref.watch(readerSettingsRepositoryProvider).watch());
+
+// ═══════════════════════════════════════════════════════════════
+// 小说爬虫模块 providers（源 / 配置 / 日志 / 协调器）
+// ═══════════════════════════════════════════════════════════════
+
+/// 小说爬取源数据仓库
+final novelSourceRepositoryProvider = Provider((ref) =>
+    NovelSourceRepository(ref.watch(isarProvider)));
+
+/// 全局爬取配置数据仓库
+final crawlConfigRepositoryProvider = Provider((ref) =>
+    CrawlConfigRepository(ref.watch(isarProvider)));
+
+/// 爬取日志数据仓库
+final crawlLogRepositoryProvider = Provider((ref) =>
+    CrawlLogRepository(ref.watch(isarProvider)));
+
+/// 爬取协调器（依赖其他 4 个 repository）
+final crawlRepositoryProvider = Provider((ref) =>
+    CrawlRepository(
+      novelRepository: ref.watch(novelRepositoryProvider),
+      novelChapterRepository: ref.watch(novelChapterRepositoryProvider),
+      sourceRepository: ref.watch(novelSourceRepositoryProvider),
+      configRepository: ref.watch(crawlConfigRepositoryProvider),
+      logRepository: ref.watch(crawlLogRepositoryProvider),
+    ));
+
+/// 所有爬取源
+final novelSourcesProvider = StreamProvider<List<NovelSource>>((ref) =>
+    ref.watch(novelSourceRepositoryProvider).watchAll());
+
+/// 全局爬取配置
+final crawlConfigProvider = FutureProvider<CrawlConfig>((ref) =>
+    ref.watch(crawlConfigRepositoryProvider).getOrCreate());
+
+/// 某小说的爬取日志（按小说 id 过滤）
+final crawlLogsProvider =
+    StreamProvider.family<List<CrawlLog>, int>((ref, novelId) =>
+        ref.watch(crawlLogRepositoryProvider).watchByNovel(novelId));
+
+/// 当前爬取状态（UI 展示进度用）
+final crawlStatusProvider = StateProvider<CrawlStatus>((ref) => CrawlStatus.idle);
+
+/// 爬取状态（不可变数据类，驱动 UI 进度展示）
+class CrawlStatus {
+  final String state; // idle / searching / fetching / success / failed
+  final String? message; // 当前操作描述
+  final int? current; // 当前进度
+  final int? total; // 总数
+
+  const CrawlStatus({
+    required this.state,
+    this.message,
+    this.current,
+    this.total,
+  });
+
+  static const idle = CrawlStatus(state: 'idle');
+  static const searching = CrawlStatus(state: 'searching');
+  static const fetching = CrawlStatus(state: 'fetching');
+  static const success = CrawlStatus(state: 'success');
+  static const failed = CrawlStatus(state: 'failed');
+
+  CrawlStatus copyWith({
+    String? state,
+    String? message,
+    int? current,
+    int? total,
+  }) =>
+      CrawlStatus(
+        state: state ?? this.state,
+        message: message ?? this.message,
+        current: current ?? this.current,
+        total: total ?? this.total,
+      );
+}
 

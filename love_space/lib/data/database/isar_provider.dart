@@ -8,6 +8,9 @@ import '../models/app_settings.dart';
 import '../models/novel.dart';
 import '../models/novel_chapter.dart';
 import '../models/reader_settings.dart';
+import '../models/novel_source.dart';
+import '../models/crawl_config.dart';
+import '../models/crawl_log.dart';
 
 /// Isar 数据库实例 provider。
 ///
@@ -27,4 +30,7 @@ const isarSchemas = [
   NovelSchema,
   NovelChapterSchema,
   ReaderSettingsSchema,
+  NovelSourceSchema,
+  CrawlConfigSchema,
+  CrawlLogSchema,
 ];

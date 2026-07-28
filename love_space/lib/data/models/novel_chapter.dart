@@ -19,4 +19,12 @@ class NovelChapter {
 
   /// 章节正文（短文本）
   late String content;
+
+  // ──────── 源站关联（用于去重与按需抓取） ────────
+
+  /// 源站章节 ID（用于增量更新时去重）
+  String? sourceChapterId;
+
+  /// 源站章节 URL（按需抓取正文时使用）
+  String? sourceUrl;
 }

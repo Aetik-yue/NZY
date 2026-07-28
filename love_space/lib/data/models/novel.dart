@@ -41,4 +41,21 @@ class Novel {
 
   /// 创建时间（用于书架排序）
   late DateTime createdAt;
+
+  // ──────── 爬虫关联（null = 预置种子数据） ────────
+
+  /// 关联的爬取源 key（对应 NovelSource.key）
+  String? sourceKey;
+
+  /// 源站书籍 ID（用于拼接源站 URL）
+  String? sourceBookId;
+
+  /// 源站书籍详情页 URL（更新时直接请求）
+  String? sourceUrl;
+
+  /// 最后爬取时间
+  DateTime? lastCrawlAt;
+
+  /// 爬取状态：idle / crawling / success / failed
+  String crawlStatus = 'idle';
 }
