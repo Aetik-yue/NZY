@@ -327,7 +327,7 @@ class CrawlRepository {
       minInterval: Duration(milliseconds: config.requestIntervalMs),
       rotateUserAgent: config.rotateUserAgent,
     );
-    final contentCleaner = ContentCleaner(adKeywords: config.adKeywords);
+    final contentCleaner = ContentCleaner(adPhrases: config.adKeywords);
 
     // 目前仅支持笔趣阁系列
     return BiqugeCrawler(

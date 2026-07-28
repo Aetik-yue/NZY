@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:charset/charset.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
@@ -50,12 +51,27 @@ class AppHttpClient {
   }
 
   /// 执行 POST 请求（表单提交），返回解码后的字符串
+  ///
+  /// [body] 中的值会按 UTF-8 进行 URL 编码。
   Future<String> post(
     String url, {
     Map<String, String>? body,
     Map<String, String>? headers,
   }) async {
-    return _requestWithRetry(url, body: body, headers: headers);
+    return _requestWithRetry(url, body: body, headers: headers, gbkBody: false);
+  }
+
+  /// 执行 POST 请求（表单值用 GBK 编码）
+  ///
+  /// 笔趣阁等中文站点的搜索表单要求关键词以 GBK 编码提交，
+  /// 否则服务器无法识别中文关键词。此方法将 body 中的值用 GBK 编码后
+  /// 再进行 URL 编码。
+  Future<String> postGbk(
+    String url, {
+    Map<String, String>? body,
+    Map<String, String>? headers,
+  }) async {
+    return _requestWithRetry(url, body: body, headers: headers, gbkBody: true);
   }
 
   /// 带重试的请求
@@ -63,13 +79,14 @@ class AppHttpClient {
     String url, {
     Map<String, String>? body,
     Map<String, String>? headers,
+    bool gbkBody = false,
   }) async {
     int attempt = 0;
     Object? lastError;
 
     while (attempt < maxRetries) {
       try {
-        final result = await _doRequest(url, body: body, headers: headers);
+        final result = await _doRequest(url, body: body, headers: headers, gbkBody: gbkBody);
         return result;
       } on _NonRetryableException catch (e) {
         // 4xx 客户端错误：不可重试，立即失败
@@ -108,6 +125,7 @@ class AppHttpClient {
     String url, {
     Map<String, String>? body,
     Map<String, String>? headers,
+    bool gbkBody = false,
   }) async {
     // 请求间隔控制
     await _enforceMinInterval();
@@ -119,9 +137,12 @@ class AppHttpClient {
     final isPost = body != null;
     debugPrint('[AppHttpClient] ${isPost ? "POST" : "GET"} $url');
 
+    // 构建请求体：GBK 编码时将值先用 GBK 编码再 URL 编码
+    final String? encodedBody = isPost ? _encodeBody(body!, gbkBody) : null;
+
     final response = isPost
         ? await _client
-            .post(uri, headers: requestHeaders, body: body)
+            .post(uri, headers: requestHeaders, body: encodedBody)
             .timeout(timeout)
         : await _client
             .get(uri, headers: requestHeaders)
@@ -146,6 +167,27 @@ class AppHttpClient {
     return _decodeBody(response);
   }
 
+  /// 编码 POST 表单体
+  ///
+  /// [gbkEncode] 为 true 时，值先用 GBK 编码再 URL 编码（笔趣阁搜索要求）；
+  /// 否则按标准 UTF-8 URL 编码。
+  String _encodeBody(Map<String, String> body, bool gbkEncode) {
+    if (gbkEncode) {
+      // GBK 编码：将每个值用 GBK 编码为字节，再逐字节 URL 编码
+      final parts = <String>[];
+      body.forEach((key, value) {
+        final gbkBytes = gbk.encode(value);
+        final encoded = gbkBytes.map((b) => '%${b.toRadixString(16).padLeft(2, '0').toUpperCase()}').join();
+        parts.add('$key=$encoded');
+      });
+      return parts.join('&');
+    }
+    // 标准 UTF-8 表单编码
+    return body.entries
+        .map((e) => '${e.key}=${Uri.encodeQueryComponent(e.value)}')
+        .join('&');
+  }
+
   /// 构建请求头
   Map<String, String> _buildHeaders(Map<String, String>? extra) {
     final headers = <String, String>{
@@ -168,37 +210,81 @@ class AppHttpClient {
     return headers;
   }
 
-  /// 解码响应体（自动检测编码）
+  /// 解码响应体（智能编码检测）
+  ///
+  /// 笔趣阁类站点存在编码欺骗与混合：meta/Content-Type 可能声明 GBK 但实际是 UTF-8，
+  /// 或 UTF-8 流中混入少量 GBK 字节（如回显的搜索关键词）。最可靠的方式是优先 UTF-8。
+  ///
+  /// 策略：
+  /// 1. UTF-8 严格解码；成功则直接采用（覆盖绝大多数页面）
+  /// 2. UTF-8 容错解码（替换非法字节为 U+FFFD）；若替换比例 < 5% 则采用
+  ///    （处理"UTF-8 为主、混入少量 GBK 字节"的混合页面）
+  /// 3. 否则按声明的 charset 用 GBK 解码（真正的 GBK 页面）
+  /// 4. 最终兜底：UTF-8 容错
   String _decodeBody(http.Response response) {
-    // 1. 从 Content-Type 头提取 charset
-    final charset = _extractCharset(response.headers['content-type']);
-    if (charset != null) {
-      return _decodeByCharset(response.bodyBytes, charset);
+    final bytes = response.bodyBytes;
+
+    // 1. UTF-8 严格
+    final strict = _tryUtf8(bytes);
+    if (strict != null) return strict;
+
+    // 2. UTF-8 容错（容忍少量坏字节）
+    final tolerant = utf8.decode(bytes, allowMalformed: true);
+    final replacementRatio = _replacementRatio(tolerant, bytes);
+    if (replacementRatio < 0.05) {
+      return tolerant;
     }
 
-    // 2. 尝试从 HTML meta 标签提取 charset
-    final metaCharset = _extractCharsetFromHtml(response.body);
-    if (metaCharset != null) {
-      return _decodeByCharset(response.bodyBytes, metaCharset);
+    // 3. 按 GBK 解码（真正的 GBK 页面）
+    final declared = _extractCharset(response.headers['content-type']) ??
+        _extractCharsetFromHtml(latin1.decode(bytes, allowInvalid: true));
+    if (declared != null) {
+      final byCharset = _decodeByCharset(bytes, declared);
+      if (byCharset != null) return byCharset;
     }
 
-    // 3. 默认 UTF-8
-    return utf8.decode(response.bodyBytes, allowMalformed: true);
+    // 4. 兜底
+    return tolerant;
   }
 
-  /// 按指定编码解码
-  String _decodeByCharset(List<int> bytes, String charset) {
+  /// 计算 UTF-8 容错解码中替换字符的字节占比
+  ///
+  /// U+FFFD 在 UTF-8 容错解码下每个坏字节产生 1 个替换字符（3 字节 UTF-8）。
+  /// 这里用替换字符数 / 原始字节数 估算坏字节比例。
+  double _replacementRatio(String decoded, List<int> rawBytes) {
+    if (rawBytes.isEmpty) return 1.0;
+    var count = 0;
+    var codeUnits = decoded.codeUnits;
+    for (var i = 0; i < codeUnits.length; i++) {
+      if (codeUnits[i] == 0xFFFD) count++;
+    }
+    return count / rawBytes.length;
+  }
+
+  /// 尝试 UTF-8 严格解码。
+  /// 返回解码结果（若无非法字节序列），否则返回 null。
+  String? _tryUtf8(List<int> bytes) {
+    try {
+      return utf8.decode(bytes, allowMalformed: false);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// 按指定编码解码。返回解码结果，或该编码不适用时返回 null。
+  String? _decodeByCharset(List<int> bytes, String charset) {
     final lower = charset.toLowerCase();
-    if (lower.contains('gbk') || lower.contains('gb2312') || lower.contains('gb-2312')) {
-      // GBK 解码：Dart 不原生支持 GBK，先用 latin1 读取再尝试 UTF-8
-      // 笔趣阁多数站点已迁移 UTF-8，此处做兜底处理
+    if (lower.contains('gbk') || lower.contains('gb2312') ||
+        lower.contains('gb-2312') || lower.contains('gb18030')) {
       try {
-        return _decodeGbk(bytes);
-      } catch (_) {
-        return utf8.decode(bytes, allowMalformed: true);
+        return gbk.decode(bytes);
+      } catch (e) {
+        debugPrint('[AppHttpClient] GBK 解码失败: $e');
+        return null;
       }
     }
-    return utf8.decode(bytes, allowMalformed: true);
+    // 其他编码（如 utf-8）已由 _tryUtf8 处理
+    return null;
   }
 
   /// 从 Content-Type 提取 charset
@@ -224,21 +310,6 @@ class AppHttpClient {
       caseSensitive: false,
     ).firstMatch(body);
     return match?.group(1);
-  }
-
-  /// GBK 解码（简化实现：逐字节解析）
-  ///
-  /// 注意：Dart 核心库不支持 GBK，此处使用查表法的简化版本。
-  /// 对于大多数已迁移 UTF-8 的笔趣阁站点不会走到这里。
-  String _decodeGbk(List<int> bytes) {
-    // 兜底：先用 UTF-8 尝试，失败则用 latin1（不会乱码但可能不正确）
-    try {
-      final result = utf8.decode(bytes, allowMalformed: false);
-      return result;
-    } catch (_) {
-      // 最终兜底：latin1 保证不抛异常
-      return latin1.decode(bytes, allowInvalid: true);
-    }
   }
 
   /// 强制请求最小间隔（使用单调计时器，不受系统时钟调整影响）

@@ -6,13 +6,14 @@
 /// 1. 规则过滤：去除 HTML 标签、广告关键词行、URL 等
 /// 2. 统计启发：去除非中文比例过高的行（乱码）、过短的碎片行
 class ContentCleaner {
-  ContentCleaner({List<String>? adKeywords})
-      : _adKeywords = adKeywords ?? _defaultAdKeywords;
+  ContentCleaner({List<String>? adPhrases})
+      : _adPhrases = adPhrases ?? _defaultAdPhrases;
 
-  final List<String> _adKeywords;
+  /// 硬广告短语（含这些的整行删除）。
+  final List<String> _adPhrases;
 
-  /// 默认广告关键词黑名单
-  static const List<String> _defaultAdKeywords = [
+  /// 默认硬广告短语
+  static const List<String> _defaultAdPhrases = [
     '笔趣阁',
     '请记住',
     '本章未完',
@@ -21,19 +22,11 @@ class ContentCleaner {
     '天才一秒',
     '最快更新',
     '无弹窗推荐',
-    '免费阅读',
     '请收藏本站',
     '顶点小说',
     '八一中文网',
     '请记住本站',
     '手机版阅读网址',
-    '笔趣阁 www',
-    'https://',
-    'http://',
-    'www.',
-    '.com',
-    '.net',
-    '.cc',
     '手机用户请',
     '请记住:域名',
     '章节错误',
@@ -54,6 +47,12 @@ class ContentCleaner {
     'xbiquge.la',
   ];
 
+  /// URL 标记：含这些的子串从行内剔除（不删整行，避免误伤含 URL 的正文）
+  static final RegExp _urlPattern = RegExp(
+    r'https?://\S+|www\.[^\s，。]+|\.(?:com|net|cc|org|info|xyz|top)\b',
+    caseSensitive: false,
+  );
+
   /// 清洗正文
   ///
   /// 输入为可能含 HTML 标签的原始文本，输出为纯净的章节正文。
@@ -61,6 +60,9 @@ class ContentCleaner {
     if (raw.trim().isEmpty) return '';
 
     var text = raw;
+
+    // 0. 剔除 Unicode 替换字符 U+FFFD（UTF-8 容错解码坏字节产生，无意义）
+    text = text.replaceAll(String.fromCharCode(0xFFFD), '');
 
     // 1. 去除 <script>、<style> 块
     text = _removeScriptAndStyle(text);
@@ -71,7 +73,10 @@ class ContentCleaner {
     // 3. 解码 HTML 实体
     text = _decodeHtmlEntities(text);
 
-    // 4. 按行处理
+    // 4. 剔除行内的 URL 子串（不删整行，避免误伤含 URL 的正文）
+    text = text.replaceAll(_urlPattern, '');
+
+    // 5. 按行处理
     final lines = text.split('\n');
     final cleanedLines = <String>[];
 
@@ -85,8 +90,8 @@ class ContentCleaner {
         continue;
       }
 
-      // 广告关键词过滤
-      if (_containsAdKeyword(trimmed)) continue;
+      // 硬广告短语过滤（整行删除）
+      if (_containsAdPhrase(trimmed)) continue;
 
       // 统计启发：非中文比例过高 → 乱码
       if (_isGarbled(trimmed)) continue;
@@ -97,7 +102,7 @@ class ContentCleaner {
       cleanedLines.add(trimmed);
     }
 
-    // 5. 去除首尾空行，合并连续空行
+    // 6. 去除首尾空行，合并连续空行
     return _normalizeSpaces(cleanedLines);
   }
 
@@ -132,7 +137,15 @@ class ContentCleaner {
   }
 
   String _removeHtmlTags(String text) {
-    return text.replaceAll(RegExp(r'<[^>]+>'), '');
+    // 块级标签转换为换行符（保留段落结构），避免正文被压成一整行
+    var result = text;
+    result = result.replaceAll(
+      RegExp(r'</?(p|div|br|tr|li|h[1-6])[^>]*>', caseSensitive: false),
+      '\n',
+    );
+    // 其余标签直接删除
+    result = result.replaceAll(RegExp(r'<[^>]+>'), '');
+    return result;
   }
 
   /// 常见 HTML 命名实体映射表
@@ -196,9 +209,9 @@ class ContentCleaner {
     return result;
   }
 
-  bool _containsAdKeyword(String line) {
-    for (final keyword in _adKeywords) {
-      if (line.contains(keyword)) return true;
+  bool _containsAdPhrase(String line) {
+    for (final phrase in _adPhrases) {
+      if (line.contains(phrase)) return true;
     }
     return false;
   }

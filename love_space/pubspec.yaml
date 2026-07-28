@@ -40,6 +40,7 @@ dependencies:
   # 小说爬虫
   http: ^1.2.1
   html: ^0.15.4
+  charset: ^2.0.1  # GBK 编码支持（笔趣阁站点使用 GBK）
 
   # 本地化（中文日期选择器）
   flutter_localizations:

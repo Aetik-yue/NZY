@@ -12,6 +12,7 @@ class CrawlConfigRepository {
   static const int defaultTimeoutMs = 15000;
   static const bool defaultRotateUserAgent = true;
   static const int defaultPrefetchChapters = 5;
+  /// 默认硬广告短语（URL 子串由 ContentCleaner 内部的正则统一处理，不在此列表）
   static const List<String> defaultAdKeywords = [
     '笔趣阁',
     '请记住',
@@ -27,13 +28,6 @@ class CrawlConfigRepository {
     '八一中文网',
     '请记住本站',
     '手机版阅读网址',
-    '笔趣阁 www',
-    'https://',
-    'http://',
-    'www.',
-    '.com',
-    '.net',
-    '.cc',
     '手机用户请',
     '请记住:域名',
     '章节错误',

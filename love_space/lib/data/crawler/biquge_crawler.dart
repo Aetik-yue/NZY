@@ -3,10 +3,18 @@ import 'package:html/dom.dart';
 import 'package:html/parser.dart' as html_parser;
 
 import '../../core/network/app_http_client.dart';
+import '../../core/network/user_agent_rotator.dart';
 import '../models/novel_source.dart';
 import 'base_crawler.dart';
 import 'content_cleaner.dart';
 import 'crawler_result.dart';
+
+/// 搜索尝试配置（端点 + 参数）
+class _SearchAttempt {
+  final String path;
+  final Map<String, String> params;
+  const _SearchAttempt(this.path, this.params);
+}
 
 /// 笔趣阁系列站点爬虫实现
 ///
@@ -41,42 +49,96 @@ class BiqugeCrawler implements BaseCrawler {
 
   @override
   Future<List<SearchResult>> search(String keyword) async {
-    if (keyword.trim().isEmpty) return [];
+    final kw = keyword.trim();
+    if (kw.isEmpty) return [];
 
-    // 笔趣阁搜索使用 POST 表单提交
-    // 注意：多数镜像站有反爬机制，搜索可能不稳定
-    final searchParams = [
-      {'s': keyword.trim()},                       // biquge2.net 等
-      {'searchkey': keyword.trim()},               // 经典笔趣阁
-      {'searchkey': keyword.trim(), 'searchtype': 'novelname'},  // 带类型
-      {'q': keyword.trim()},                       // 部分站点
+    // 笔趣阁搜索使用 POST 表单提交，关键词需 GBK 编码
+    // 不同镜像站参数名不同，依次尝试
+    final searchAttempts = <_SearchAttempt>[
+      _SearchAttempt('/search.html', {'s': kw}),
+      _SearchAttempt('/search.html', {'searchkey': kw}),
+      _SearchAttempt('/modules/article/search.php',
+          {'searchkey': kw, 'searchtype': 'novelname'}),
+      _SearchAttempt('/modules/article/search.php', {'searchkey': kw}),
     ];
 
-    for (final params in searchParams) {
+    for (final attempt in searchAttempts) {
       try {
-        final body = await _httpClient.post(
-          '$baseUrl/search.html',
-          body: params,
+        final url = '$baseUrl${attempt.path}';
+        final body = await _httpClient.postGbk(
+          url,
+          body: attempt.params,
           headers: {'Referer': '$baseUrl/'},
         );
+
+        // 检测搜索间隔限制提示
+        if (body.contains('搜索间隔') || body.contains('请于')) {
+          debugPrint('[BiqugeCrawler] 命中搜索间隔限制，跳过 $url');
+          continue;
+        }
+
         final results = _parseSearchResult(body);
         if (results.isNotEmpty) return results;
       } catch (e) {
-        debugPrint('[BiqugeCrawler] 搜索参数 $params 失败: $e');
+        debugPrint('[BiqugeCrawler] 搜索 ${attempt.path} 失败: $e');
       }
     }
 
-    // 尝试 /search.php 端点
-    try {
-      final body = await _httpClient.post(
-        '$baseUrl/modules/article/search.php',
-        body: {'searchkey': keyword.trim(), 'searchtype': 'novelname'},
-        headers: {'Referer': '$baseUrl/'},
-      );
-      final results = _parseSearchResult(body);
-      if (results.isNotEmpty) return results;
-    } catch (e) {
-      debugPrint('[BiqugeCrawler] search.php 失败: $e');
+    // 站内搜索全部失败，回退到搜索引擎兜底
+    return _searchViaEngine(kw);
+  }
+
+  /// 搜索引擎兜底：用 Bing + Google site: 搜索找书籍详情页 URL
+  ///
+  /// 当站点自身搜索不可用（如 biquge2.net 搜索索引损坏）时，
+  /// 通过搜索引擎检索 `site:<baseUrl> 书名`，从结果中提取书籍 URL。
+  /// 依赖搜索引擎对目标站的索引，效果因站而异。
+  Future<List<SearchResult>> _searchViaEngine(String keyword) async {
+    final host = Uri.parse(baseUrl).host;
+    // 转义 host 中的正则元字符（如 .）
+    final hostPattern = RegExp.escape(host);
+    final bookRe = RegExp(r'https?://[^/]*$hostPattern/book/(\d+)/?');
+
+    final engines = [
+      'https://www.bing.com/search?q=',
+      'https://www.google.com/search?q=',
+    ];
+    final query = Uri.encodeQueryComponent('site:$host $keyword');
+
+    for (final engine in engines) {
+      try {
+        final body = await _httpClient.get('$engine$query', headers: {
+          'User-Agent': UserAgentRotator.random,
+          'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+        });
+
+        final document = html_parser.parse(body);
+        final results = <SearchResult>[];
+        final seen = <String>{};
+
+        for (final link in document.querySelectorAll('a[href]')) {
+          final href = link.attributes['href'] ?? '';
+          final title = link.text.trim();
+          if (title.isEmpty || title.length < 2) continue;
+
+          final match = bookRe.firstMatch(href);
+          if (match != null) {
+            final url = match.group(0)!;
+            if (seen.contains(url)) continue;
+            seen.add(url);
+            results.add(SearchResult(title: title, author: '', url: url));
+            if (results.length >= 10) break;
+          }
+        }
+
+        if (results.isNotEmpty) {
+          debugPrint(
+              '[BiqugeCrawler] ${engine.split('/')[2]} 找到 ${results.length} 条');
+          return results;
+        }
+      } catch (e) {
+        debugPrint('[BiqugeCrawler] 搜索引擎 $engine 失败: $e');
+      }
     }
 
     return [];
@@ -85,7 +147,139 @@ class BiqugeCrawler implements BaseCrawler {
   @override
   Future<BookDetail> fetchBookDetail(String url) async {
     final body = await _httpClient.get(url);
-    return _parseBookDetail(body, url);
+    final detail = _parseBookDetail(body, url);
+
+    // 尝试从完整章节目录页抓取章节列表（biquge2.net 的 /book/{id}/ml_*.html）
+    // 详情页本身的章节列表通常不完整/乱序，目录页更可靠
+    final tocChapters = await _fetchChaptersFromToc(url, body);
+    if (tocChapters.isNotEmpty) {
+      return BookDetail(
+        title: detail.title,
+        author: detail.author,
+        intro: detail.intro,
+        chapters: tocChapters,
+      );
+    }
+
+    return detail;
+  }
+
+  /// 从章节目录页抓取完整章节列表
+  ///
+  /// biquge2.net 的目录页 URL 形如 /book/{id}/ml_1.html、ml_2.html...
+  /// 详情页里会包含指向 ml_1.html 的链接。此处合并所有分页并按章号排序去重。
+  Future<List<ChapterRef>> _fetchChaptersFromToc(
+    String bookUrl,
+    String detailHtml,
+  ) async {
+    final doc = html_parser.parse(detailHtml);
+    // 找目录页链接（ml_N.html），用于补充分页章节
+    final tocLink = doc
+        .querySelectorAll('a[href]')
+        .map((a) => a.attributes['href'] ?? '')
+        .firstWhere(
+          (href) => RegExp(r'/book/\d+/ml_\d+\.html').hasMatch(href),
+          orElse: () => '',
+        );
+
+    // 提取 bookId 用于构造后续分页 URL
+    final bookIdMatch = RegExp(r'/book/(\d+)/').firstMatch(bookUrl);
+    final bookId = bookIdMatch?.group(1);
+    if (bookId == null) return [];
+
+    final allChapters = <ChapterRef>[];
+    final seenIds = <String>{};
+
+    // 0. 先从详情页本身提取章节链接（biquge2.net 详情页含最近 ~100 章正序链接）
+    final detailDoc = html_parser.parse(detailHtml);
+    for (final link in detailDoc.querySelectorAll('a[href]')) {
+      final href = link.attributes['href'] ?? '';
+      final chapterMatch = RegExp(r'/book/\d+/(\d+)\.html$').firstMatch(href);
+      if (chapterMatch == null) continue;
+      // 跳过目录分页
+      if (RegExp(r'/ml_\d+\.html$').hasMatch(href)) continue;
+
+      final title = link.text.trim();
+      if (title.isEmpty ||
+          title.contains('目录') ||
+          title.contains('书页') ||
+          title.contains('开始阅读')) {
+        continue;
+      }
+
+      final chapterUrl = _resolveUrl(href, bookUrl);
+      final sourceId = chapterMatch.group(1)!;
+      if (seenIds.contains(sourceId)) continue;
+      seenIds.add(sourceId);
+
+      allChapters.add(ChapterRef(
+        title: title,
+        url: chapterUrl,
+        sourceId: sourceId,
+      ));
+    }
+
+    // 1. 抓取目录分页（ml_1 ~ ml_5）补充详情页未覆盖的章节
+    //    仅当详情页存在 ml 目录链接时才抓分页
+    if (tocLink.isNotEmpty && bookId != null) {
+      for (var page = 1; page <= 5; page++) {
+        final tocUrl = '$baseUrl/book/$bookId/ml_$page.html';
+        try {
+          final html = await _httpClient.get(tocUrl);
+          final pageDoc = html_parser.parse(html);
+          final links = pageDoc.querySelectorAll('a[href]');
+
+          var foundOnPage = false;
+          for (final link in links) {
+            final href = link.attributes['href'] ?? '';
+            // 只匹配真正的章节内容页：/book/{id}/{chapterId}.html（排除 ml_*.html 自身）
+            final chapterMatch =
+                RegExp(r'/book/\d+/(\d+)\.html$').firstMatch(href);
+            if (chapterMatch == null) continue;
+
+            final title = link.text.trim();
+            if (title.isEmpty || title.contains('目录') || title.contains('书页')) {
+              continue;
+            }
+
+            final chapterUrl = _resolveUrl(href, tocUrl);
+            final sourceId = chapterMatch.group(1)!;
+            if (seenIds.contains(sourceId)) continue;
+            seenIds.add(sourceId);
+
+            allChapters.add(ChapterRef(
+              title: title,
+              url: chapterUrl,
+              sourceId: sourceId,
+            ));
+            foundOnPage = true;
+          }
+          if (!foundOnPage) break; // 该页无章节，后续页也不必抓
+        } catch (e) {
+          debugPrint('[BiqugeCrawler] 目录页 $tocUrl 抓取失败: $e');
+          break;
+        }
+      }
+    }
+
+    // 按章号排序（从标题提取"第N章"的数字）
+    allChapters.sort((a, b) {
+      final na = _chapterNumber(a.title);
+      final nb = _chapterNumber(b.title);
+      if (na == null && nb == null) return 0;
+      if (na == null) return 1;
+      if (nb == null) return -1;
+      return na.compareTo(nb);
+    });
+
+    return allChapters;
+  }
+
+  /// 从章节标题提取章号（"第123章..." → 123）
+  int? _chapterNumber(String title) {
+    final m = RegExp(r'第\s*(\d+)\s*章').firstMatch(title);
+    if (m != null) return int.tryParse(m.group(1)!);
+    return null;
   }
 
   @override
@@ -127,7 +321,8 @@ class BiqugeCrawler implements BaseCrawler {
     }
 
     // 策略 2: 搜索结果列表 (.result-list / .novelslistss)
-    var items = document.querySelectorAll('.result-list .result-item, .novelslistss li, .novelitem, .search-result-item, .search-result li');
+    var items = document.querySelectorAll(
+        '.result-list .result-item, .novelslistss li, .novelitem, .search-result-item, .search-result li');
     for (final item in items) {
       final link = item.querySelector('a');
       if (link == null) continue;
@@ -199,7 +394,8 @@ class BiqugeCrawler implements BaseCrawler {
         document.querySelector('#bookintro');
     final intro = introEl?.text.trim() ?? '';
 
-    // 章节列表 — 尝试多种选择器以兼容不同镜像
+    // 章节列表（兜底：当无目录页时使用详情页本身的章节链接）
+    // 注意：详情页可能含最新章节、导航等噪声，这里只保留真正的章节内容页链接
     final chapterLinks = <Element>[];
     chapterLinks.addAll(document.querySelectorAll('#list dd a'));
     if (chapterLinks.isEmpty) {
@@ -214,19 +410,32 @@ class BiqugeCrawler implements BaseCrawler {
     if (chapterLinks.isEmpty) {
       chapterLinks.addAll(document.querySelectorAll('.chapter-list a'));
     }
-    // biquge2.net: 章节链接在列表中，href 格式为 /book/123/456.html
+    // biquge2.net: 通配章节链接，href 形如 /book/{id}/{chapterId}.html（排除 ml_*.html 目录页自身）
     if (chapterLinks.isEmpty) {
-      chapterLinks.addAll(document.querySelectorAll('a[href*="/book/"][href\$=".html"]'));
+      chapterLinks.addAll(
+        document.querySelectorAll('a[href*="/book/"][href\$=".html"]'),
+      );
     }
 
     final chapters = <ChapterRef>[];
+    final seenIds = <String>{};
     for (final link in chapterLinks) {
       final chapterTitle = link.text.trim();
       final href = link.attributes['href'] ?? '';
       if (chapterTitle.isEmpty || href.isEmpty) continue;
+      // 过滤导航/目录类噪声链接
+      if (chapterTitle.contains('目录') ||
+          chapterTitle.contains('书页') ||
+          chapterTitle.contains('开始阅读')) {
+        continue;
+      }
+      // 跳过目录分页链接 ml_*.html
+      if (RegExp(r'/ml_\d+\.html$').hasMatch(href)) continue;
 
       final chapterUrl = _resolveUrl(href, bookUrl);
       final sourceId = _extractChapterId(chapterUrl);
+      if (seenIds.contains(sourceId)) continue;
+      seenIds.add(sourceId);
 
       chapters.add(ChapterRef(
         title: chapterTitle,
@@ -234,6 +443,16 @@ class BiqugeCrawler implements BaseCrawler {
         sourceId: sourceId,
       ));
     }
+
+    // 按章号排序
+    chapters.sort((a, b) {
+      final na = _chapterNumber(a.title);
+      final nb = _chapterNumber(b.title);
+      if (na == null && nb == null) return 0;
+      if (na == null) return 1;
+      if (nb == null) return -1;
+      return na.compareTo(nb);
+    });
 
     return BookDetail(
       title: title,
