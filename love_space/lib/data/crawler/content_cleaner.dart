@@ -45,6 +45,13 @@ class ContentCleaner {
     '请记住:新域名',
     'biqg.cc',
     'xbiquge.la',
+    // 分页导航（章节页底部的翻页控件）
+    '上一页',
+    '下一页',
+    '上一章',
+    '下一章',
+    '返回目录',
+    '章节目录',
   ];
 
   /// URL 标记：含这些的子串从行内剔除（不删整行，避免误伤含 URL 的正文）
@@ -92,6 +99,9 @@ class ContentCleaner {
 
       // 硬广告短语过滤（整行删除）
       if (_containsAdPhrase(trimmed)) continue;
+
+      // 孤立导航词行（章节页翻页控件残留）删除
+      if (_isNavigationWord(trimmed)) continue;
 
       // 统计启发：非中文比例过高 → 乱码
       if (_isGarbled(trimmed)) continue;
@@ -217,6 +227,10 @@ class ContentCleaner {
   }
 
   /// 判断是否为乱码行（非中文比例 > 60%）
+  /// 判断是否为孤立的导航词行（章节页翻页控件残留）
+  static const _navigationWords = {"目录", "书页", "首页", "返回顶部", "上页", "下页"};
+  bool _isNavigationWord(String line) => _navigationWords.contains(line);
+
   bool _isGarbled(String line) {
     if (line.isEmpty) return false;
     final chineseCount = RegExp(r'[一-龥]').allMatches(line).length;

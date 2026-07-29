@@ -284,8 +284,65 @@ class BiqugeCrawler implements BaseCrawler {
 
   @override
   Future<ChapterContent> fetchChapterContent(String url) async {
-    final body = await _httpClient.get(url);
-    return _parseChapterContent(body);
+    final parts = <String>[];
+    var title = '';
+    var currentUrl = url;
+    // 防止恶意循环，最多拼接 20 页
+    for (var i = 0; i < 20; i++) {
+      final body = await _httpClient.get(currentUrl);
+      final parsed = _parseChapterContent(body);
+      if (title.isEmpty) title = parsed.title;
+      parts.add(parsed.content);
+
+      // 检测同章下一页链接（{chapterId}_{N}.html 模式）
+      final nextPageUrl = _nextPageUrl(body, currentUrl);
+      if (nextPageUrl == null) break;
+      currentUrl = nextPageUrl;
+    }
+    return ChapterContent(title: title, content: parts.join('\n'));
+  }
+
+  /// 从章节页 HTML 提取同章"下一页"URL
+  ///
+  /// biquge2.net 将长章节分页：第1页 `135023.html`，第2页 `135023_1.html`...
+  /// 下一章则是不同的 chapterId（如 `135025.html`）。只返回同章分页链接。
+  String? _nextPageUrl(String html, String currentUrl) {
+    final doc = html_parser.parse(html);
+    // 找文本含"下一页"/"继续阅读"的链接
+    for (final a in doc.querySelectorAll('a[href]')) {
+      final text = a.text.trim();
+      if (text.contains('下一页') || text.contains('继续阅读') || text.contains('下页')) {
+        final href = a.attributes['href'] ?? '';
+        if (href.isEmpty) continue;
+        final resolved = _resolveUrl(href, currentUrl);
+        // 仅当是同章分页（当前 chapterId_N.html -> chapterId_(N+1).html）才跟随
+        if (_isSameChapterPage(currentUrl, resolved)) {
+          return resolved;
+        }
+      }
+    }
+    return null;
+  }
+
+  /// 判断两个 URL 是否属于同一章节的不同分页
+  ///
+  /// 同章分页模式：`{base}/{chapterId}.html` 与 `{base}/{chapterId}_{N}.html`
+  bool _isSameChapterPage(String urlA, String urlB) {
+    final a = _chapterIdAndPage(urlA);
+    final b = _chapterIdAndPage(urlB);
+    if (a == null || b == null) return false;
+    return a.chapterId == b.chapterId; // chapterId 相同即同章
+  }
+
+  /// 从 URL 提取 (chapterId, 页码)，页码 0 表示首页
+  ({String chapterId, int page})? _chapterIdAndPage(String url) {
+    // 135023.html -> (135023, 0)
+    var m = RegExp(r'/(\d+)\.html$').firstMatch(url);
+    if (m != null) return (chapterId: m.group(1)!, page: 0);
+    // 135023_3.html -> (135023, 3)
+    m = RegExp(r'/(\d+)_(\d+)\.html$').firstMatch(url);
+    if (m != null) return (chapterId: m.group(1)!, page: int.parse(m.group(2)!));
+    return null;
   }
 
   // ──────── 解析方法 ────────
@@ -519,7 +576,12 @@ class BiqugeCrawler implements BaseCrawler {
     // 去除查询参数和 fragment
     final cleanUrl = url.split('?')[0].split('#')[0];
 
-    final match = RegExp(r'(\d+)\.html?$').firstMatch(cleanUrl);
+    // 分页形式 135023_3.html -> 取基础 chapterId "135023"（同章各页共享 ID）
+    var match = RegExp(r'/(\d+)_\d+\.html?$').firstMatch(cleanUrl);
+    if (match != null) return match.group(1)!;
+
+    // 普通形式 135023.html -> "135023"
+    match = RegExp(r'/(\d+)\.html?$').firstMatch(cleanUrl);
     if (match != null) return match.group(1)!;
 
     // 备用：取最后一段路径
