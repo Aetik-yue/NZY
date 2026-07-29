@@ -18,11 +18,14 @@ import '../../../../shared/widgets/confirm_dialog.dart';
 class PhotoViewer extends ConsumerStatefulWidget {
   final List<AlbumPhoto> photos;
   final int initialIndex;
+  /// 删除回调（通知父组件更新状态）
+  final void Function(AlbumPhoto photo)? onDelete;
 
   const PhotoViewer({
     super.key,
     required this.photos,
     this.initialIndex = 0,
+    this.onDelete,
   });
 
   /// 全屏查看照片
@@ -30,6 +33,7 @@ class PhotoViewer extends ConsumerStatefulWidget {
     BuildContext context, {
     required List<AlbumPhoto> photos,
     int initialIndex = 0,
+    void Function(AlbumPhoto photo)? onDelete,
   }) {
     return Navigator.of(context).push(
       PageRouteBuilder(
@@ -40,6 +44,7 @@ class PhotoViewer extends ConsumerStatefulWidget {
         pageBuilder: (_, __, ___) => PhotoViewer(
           photos: photos,
           initialIndex: initialIndex,
+          onDelete: onDelete,
         ),
       ),
     );
@@ -52,13 +57,16 @@ class PhotoViewer extends ConsumerStatefulWidget {
 class _PhotoViewerState extends ConsumerState<PhotoViewer> {
   late final PageController _pageController;
   late int _currentIndex;
+  late List<AlbumPhoto> _photos;
   bool _showAppBar = true;
 
   @override
   void initState() {
     super.initState();
-    _currentIndex = widget.initialIndex;
-    _pageController = PageController(initialPage: widget.initialIndex);
+    // 复制列表，避免修改父组件的不可变列表
+    _photos = List.from(widget.photos);
+    _currentIndex = widget.initialIndex.clamp(0, _photos.length - 1);
+    _pageController = PageController(initialPage: _currentIndex);
   }
 
   @override
@@ -72,7 +80,7 @@ class _PhotoViewerState extends ConsumerState<PhotoViewer> {
   }
 
   Future<void> _deleteCurrent() async {
-    if (widget.photos.isEmpty) return;
+    if (_photos.isEmpty) return;
     final confirmed = await showConfirmDeleteDialog(
       context,
       title: '删除照片',
@@ -81,22 +89,38 @@ class _PhotoViewerState extends ConsumerState<PhotoViewer> {
     if (!confirmed) return;
     if (!mounted) return;
 
-    final photo = widget.photos[_currentIndex];
-    await ref.read(albumRepositoryProvider).delete(photo.id);
+    final photo = _photos[_currentIndex];
+
+    try {
+      await ref.read(albumRepositoryProvider).delete(photo.id);
+    } catch (e) {
+      if (mounted) AppSnackbar.show(context, '删除失败，请重试');
+      return;
+    }
+
+    // 通知父组件删除成功（在修改本地状态前）
+    widget.onDelete?.call(photo);
 
     if (!mounted) return;
     AppSnackbar.show(context, '已删除照片');
 
-    setState(() {
-      widget.photos.removeAt(_currentIndex);
-      if (widget.photos.isEmpty) {
-        Navigator.of(context).pop();
-        return;
-      }
-      if (_currentIndex >= widget.photos.length) {
-        _currentIndex = widget.photos.length - 1;
-      }
-    });
+    // 更新本地列表
+    _photos.removeAt(_currentIndex);
+
+    if (_photos.isEmpty) {
+      // 所有照片已删除，关闭查看器
+      Navigator.of(context).pop();
+      return;
+    }
+
+    // 调整当前索引
+    if (_currentIndex >= _photos.length) {
+      _currentIndex = _photos.length - 1;
+    }
+    // 同步 PageController 位置
+    _pageController.jumpToPage(_currentIndex);
+
+    setState(() {});
   }
 
   @override
@@ -110,10 +134,10 @@ class _PhotoViewerState extends ConsumerState<PhotoViewer> {
             onTap: _toggleAppBar,
             child: PageView.builder(
               controller: _pageController,
-              itemCount: widget.photos.length,
+              itemCount: _photos.length,
               onPageChanged: (i) => setState(() => _currentIndex = i),
               itemBuilder: (_, i) {
-                final photo = widget.photos[i];
+                final photo = _photos[i];
                 return InteractiveViewer(
                   minScale: 0.5,
                   maxScale: 4.0,
@@ -165,7 +189,7 @@ class _PhotoViewerState extends ConsumerState<PhotoViewer> {
                     ),
                     Expanded(
                       child: Text(
-                        '${_currentIndex + 1} / ${widget.photos.length}',
+                        '${_currentIndex + 1} / ${_photos.length}',
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 16,
@@ -186,7 +210,7 @@ class _PhotoViewerState extends ConsumerState<PhotoViewer> {
           ),
 
           // 底部日期信息
-          if (_showAppBar && widget.photos.isNotEmpty)
+          if (_showAppBar && _photos.isNotEmpty)
             Positioned(
               bottom: 0,
               left: 0,
@@ -206,7 +230,7 @@ class _PhotoViewerState extends ConsumerState<PhotoViewer> {
                     ),
                   ),
                   child: Text(
-                    _formatPhotoDate(widget.photos[_currentIndex].date),
+                    _formatPhotoDate(_photos[_currentIndex].date),
                     style: const TextStyle(
                       color: Colors.white70,
                       fontSize: 14,

@@ -172,6 +172,7 @@ class BiqugeCrawler implements BaseCrawler {
     String bookUrl,
     String detailHtml,
   ) async {
+    var consecutiveEmptyTocPages = 0; // 连续无新章节的目录页数
     final doc = html_parser.parse(detailHtml);
     // 找目录页链接（ml_N.html），用于补充分页章节
     final tocLink = doc
@@ -194,7 +195,9 @@ class BiqugeCrawler implements BaseCrawler {
     final detailDoc = html_parser.parse(detailHtml);
     for (final link in detailDoc.querySelectorAll('a[href]')) {
       final href = link.attributes['href'] ?? '';
-      final chapterMatch = RegExp(r'/book/\d+/(\d+)\.html$').firstMatch(href);
+      // 匹配章节内容页（含分页 135023_1.html）
+      final chapterMatch =
+          RegExp(r'/book/\d+/(\d+)(_\d+)?\.html$').firstMatch(href);
       if (chapterMatch == null) continue;
       // 跳过目录分页
       if (RegExp(r'/ml_\d+\.html$').hasMatch(href)) continue;
@@ -229,32 +232,44 @@ class BiqugeCrawler implements BaseCrawler {
           final pageDoc = html_parser.parse(html);
           final links = pageDoc.querySelectorAll('a[href]');
 
-          var foundOnPage = false;
+          var hasAnyChapterLink = false;
+          var foundNewChapter = false;
           for (final link in links) {
             final href = link.attributes['href'] ?? '';
-            // 只匹配真正的章节内容页：/book/{id}/{chapterId}.html（排除 ml_*.html 自身）
+            // 匹配章节内容页（含分页 135023_1.html），排除 ml_*.html 目录页自身
             final chapterMatch =
-                RegExp(r'/book/\d+/(\d+)\.html$').firstMatch(href);
+                RegExp(r'/book/\d+/(\d+)(_\d+)?\.html$').firstMatch(href);
             if (chapterMatch == null) continue;
+
+            hasAnyChapterLink = true;
 
             final title = link.text.trim();
             if (title.isEmpty || title.contains('目录') || title.contains('书页')) {
               continue;
             }
 
-            final chapterUrl = _resolveUrl(href, tocUrl);
+            // 用基础 chapterId 去重（135023 而非 135023_1）
             final sourceId = chapterMatch.group(1)!;
             if (seenIds.contains(sourceId)) continue;
             seenIds.add(sourceId);
 
+            final chapterUrl = _resolveUrl(href, tocUrl);
             allChapters.add(ChapterRef(
               title: title,
               url: chapterUrl,
               sourceId: sourceId,
             ));
-            foundOnPage = true;
+            foundNewChapter = true;
           }
-          if (!foundOnPage) break; // 该页无章节，后续页也不必抓
+          // 只有该页完全没有章节链接时才终止（说明已到目录末尾）
+          // 如果该页有章节但全为重复，继续抓下一页（可能有新章节）
+          if (!hasAnyChapterLink) break;
+          // 连续 2 页无新章节时终止（避免无限抓取空页）
+          if (!foundNewChapter) {
+            if (consecutiveEmptyTocPages++ >= 1) break;
+          } else {
+            consecutiveEmptyTocPages = 0;
+          }
         } catch (e) {
           debugPrint('[BiqugeCrawler] 目录页 $tocUrl 抓取失败: $e');
           break;
@@ -289,7 +304,14 @@ class BiqugeCrawler implements BaseCrawler {
     var currentUrl = url;
     // 防止恶意循环，最多拼接 20 页
     for (var i = 0; i < 20; i++) {
-      final body = await _httpClient.get(currentUrl);
+      String body;
+      try {
+        body = await _httpClient.get(currentUrl);
+      } catch (e) {
+        // 中间页抓取失败：返回已抓取的部分内容，不全部丢弃
+        debugPrint('[BiqugeCrawler] 第 ${i + 1} 页抓取失败，返回部分内容: $e');
+        break;
+      }
       final parsed = _parseChapterContent(body);
       if (title.isEmpty) title = parsed.title;
       parts.add(parsed.content);
@@ -297,9 +319,12 @@ class BiqugeCrawler implements BaseCrawler {
       // 检测同章下一页链接（{chapterId}_{N}.html 模式）
       final nextPageUrl = _nextPageUrl(body, currentUrl);
       if (nextPageUrl == null) break;
+      // 防止自指链接导致死循环
+      if (nextPageUrl == currentUrl) break;
       currentUrl = nextPageUrl;
     }
-    return ChapterContent(title: title, content: parts.join('\n'));
+    // 用双换行连接分页，保持段落结构
+    return ChapterContent(title: title, content: parts.join('\n\n'));
   }
 
   /// 从章节页 HTML 提取同章"下一页"URL

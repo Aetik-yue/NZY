@@ -28,6 +28,7 @@ class _PhotoTimelinePageState extends ConsumerState<PhotoTimelinePage> {
   final ScrollController _scrollController = ScrollController();
   final List<GlobalKey> _sectionKeys = [];
   int _currentIndex = 0;
+  bool _isJumping = false; // 跳转动画期间屏蔽 _onScroll 更新
 
   @override
   void initState() {
@@ -58,15 +59,23 @@ class _PhotoTimelinePageState extends ConsumerState<PhotoTimelinePage> {
   /// 滚动时计算当前高亮的分组
   ///
   /// 策略：找到第一个顶部进入阈值区域（刚好在导航条下方）的 section，
-  /// 其前一个 section 即为当前高亮项。这样高亮始终跟随滚动位置。
+  /// 其前一个 section 即为当前高亮项。
+  /// 优化：跳转动画期间（_isJumping=true）不更新，避免与动画竞态。
   void _onScroll() {
     if (_sectionKeys.isEmpty) return;
+    // 跳转动画期间不更新高亮，避免与动画竞态
+    if (_isJumping) return;
+
+    // 只在可见区域内检测（从当前索引附近开始，减少遍历）
+    final viewportHeight = MediaQuery.of(context).size.height;
     for (int i = 0; i < _sectionKeys.length; i++) {
       final ctx = _sectionKeys[i].currentContext;
       if (ctx == null) continue;
       final box = ctx.findRenderObject();
       if (box is! RenderBox || !box.attached) continue;
       final pos = box.localToGlobal(Offset.zero);
+      // 跳过完全不在视口内的 section
+      if (pos.dy > viewportHeight || pos.dy < -200) continue;
       // 找到第一个顶部 >= 阈值的 section，高亮其前一个
       if (pos.dy >= _topThreshold) {
         final target = i > 0 ? i - 1 : 0;
@@ -88,13 +97,21 @@ class _PhotoTimelinePageState extends ConsumerState<PhotoTimelinePage> {
     if (index < 0 || index >= _sectionKeys.length) return;
     final ctx = _sectionKeys[index].currentContext;
     if (ctx == null) return;
+
+    setState(() {
+      _isJumping = true;
+      _currentIndex = index;
+    });
+
     Scrollable.ensureVisible(
       ctx,
       duration: const Duration(milliseconds: 450),
       curve: Curves.easeOutCubic,
       alignment: 0.0,
-    );
-    setState(() => _currentIndex = index);
+    ).whenComplete(() {
+      // 动画结束后恢复滚动监听
+      if (mounted) setState(() => _isJumping = false);
+    });
   }
 
   @override
@@ -503,6 +520,10 @@ class _PhotoGrid extends StatelessWidget {
                     context,
                     photos: photos,
                     initialIndex: i,
+                    onDelete: (photo) {
+                      // 从 Isar 删除后，StreamProvider 会自动刷新 UI
+                      // 这里不需要额外操作，但保留回调以便未来扩展
+                    },
                   ),
                 ),
               ),

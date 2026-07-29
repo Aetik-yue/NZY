@@ -226,6 +226,9 @@ class _PhotoGrid extends ConsumerWidget {
                 context,
                 photos: photos,
                 initialIndex: index,
+                onDelete: (photo) {
+                  // StreamProvider 会在 Isar 数据变化后自动刷新 UI
+                },
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(12),
