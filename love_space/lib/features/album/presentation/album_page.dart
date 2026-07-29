@@ -7,6 +7,7 @@ import '../../../app/theme/app_text_styles.dart';
 import '../../../data/providers/data_providers.dart';
 import '../../../data/models/album_photo.dart';
 import '../../../features/album/presentation/widgets/add_photo_sheet.dart';
+import '../../../features/album/presentation/widgets/photo_viewer.dart';
 import '../../../features/album/presentation/photo_timeline_page.dart';
 
 /// 相册页
@@ -17,41 +18,50 @@ class AlbumPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final photoCount = ref.watch(photoCountProvider);
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(20, 4, 20, 100),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 顶部栏：标题 + 添加按钮
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('我们的相册', style: AppTextStyles.titleLarge),
-                  const SizedBox(height: 2),
-                  Text('共记录了 $photoCount 张照片', style: AppTextStyles.label),
-                ],
-              ),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _TimelineButton(),
-                  const SizedBox(width: 10),
-                  _AddButton(),
-                ],
-              ),
-            ],
+    return CustomScrollView(
+      slivers: [
+        // 顶部栏：标题 + 添加按钮
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('我们的相册', style: AppTextStyles.titleLarge),
+                    const SizedBox(height: 2),
+                    Text('共记录了 $photoCount 张照片',
+                        style: AppTextStyles.label),
+                  ],
+                ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _TimelineButton(),
+                    const SizedBox(width: 10),
+                    _AddButton(),
+                  ],
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: 16),
-          // 筛选 chip 行
-          const _FilterChips(),
-          const SizedBox(height: 16),
-          // 九宫格
-          const _PhotoGrid(),
-        ],
-      ),
+        ),
+        // 筛选 chip 行
+        const SliverToBoxAdapter(
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(20, 16, 20, 16),
+            child: _FilterChips(),
+          ),
+        ),
+        // 九宫格（懒加载）
+        const _PhotoGrid(),
+        // 底部留白
+        const SliverToBoxAdapter(
+          child: SizedBox(height: 100),
+        ),
+      ],
     );
   }
 }
@@ -189,14 +199,17 @@ class _PhotoGrid extends ConsumerWidget {
     return photosAsync.when(
       data: (photos) {
         if (photos.isEmpty) {
-          return const Padding(
-            padding: EdgeInsets.symmetric(vertical: 24),
-            child: Text('还没有照片，快去添加第一张吧'),
+          return const SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: 48),
+              child: Center(
+                child: Text('还没有照片，快去添加第一张吧'),
+              ),
+            ),
           );
         }
-        return GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
+        // SliverGrid 实现懒加载，大量照片时只渲染可见项
+        return SliverGrid.builder(
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 3,
             mainAxisSpacing: 6,
@@ -208,63 +221,72 @@ class _PhotoGrid extends ConsumerWidget {
             final photo = photos[index];
             final gradient =
                 _photoGradients[photo.gradientIndex % _photoGradients.length];
-            return ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  // 兜底渐变背景
-                  Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: gradient,
-                      ),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: AppColors.shadowCard,
-                          blurRadius: 12,
-                          offset: Offset(0, 4),
-                          spreadRadius: -2,
+            return GestureDetector(
+              onTap: () => PhotoViewer.show(
+                context,
+                photos: photos,
+                initialIndex: index,
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    // 兜底渐变背景
+                    Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: gradient,
                         ),
-                      ],
-                    ),
-                  ),
-                  // 真实照片
-                  if (photo.filePath != null)
-                    Image.file(
-                      File(photo.filePath!),
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-                    ),
-                  // 日期文字
-                  Positioned(
-                    left: 8,
-                    bottom: 8,
-                    child: Text(
-                      _formatPhotoDate(photo.date),
-                      style: AppTextStyles.caption.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
+                        boxShadow: const [
+                          BoxShadow(
+                            color: AppColors.shadowCard,
+                            blurRadius: 12,
+                            offset: Offset(0, 4),
+                            spreadRadius: -2,
+                          ),
+                        ],
                       ),
                     ),
-                  ),
-                ],
+                    // 真实照片
+                    if (photo.filePath != null)
+                      Image.file(
+                        File(photo.filePath!),
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                      ),
+                    // 日期文字
+                    Positioned(
+                      left: 8,
+                      bottom: 8,
+                      child: Text(
+                        _formatPhotoDate(photo.date),
+                        style: AppTextStyles.caption.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             );
           },
         );
       },
-      loading: () => const Center(
+      loading: () => const SliverToBoxAdapter(
         child: Padding(
-          padding: EdgeInsets.symmetric(vertical: 24),
-          child: CircularProgressIndicator(strokeWidth: 2),
+          padding: EdgeInsets.symmetric(vertical: 48),
+          child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
         ),
       ),
-      error: (_, __) => const Padding(
-        padding: EdgeInsets.symmetric(vertical: 24),
-        child: Text('加载失败'),
+      error: (_, __) => const SliverToBoxAdapter(
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: 48),
+          child: Center(child: Text('加载失败')),
+        ),
       ),
     );
   }

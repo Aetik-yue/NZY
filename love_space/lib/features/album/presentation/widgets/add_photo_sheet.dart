@@ -39,11 +39,44 @@ class _AddPhotoSheetState extends ConsumerState<AddPhotoSheet> {
   String? _imagePath;
   PhotoCategory _selectedCategory = PhotoCategory.daily;
   bool _isSubmitting = false;
+  DateTime _selectedDate = DateTime.now();
+  int _gradientIndex = 0;
+
+  static const _gradients = [
+    [Color(0xFFFFBFD0), Color(0xFFFF8FB1)],
+    [Color(0xFFFFD1BF), Color(0xFFFFB5A1)],
+    [Color(0xFFFFB5CC), Color(0xFFFFD4E0)],
+    [Color(0xFFFFBFCC), Color(0xFFFFA1B5)],
+    [Color(0xFFFFE0D4), Color(0xFFFFB5CC)],
+    [Color(0xFFFF8FB1), Color(0xFFFF6B9D)],
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    // 随机渐变色，让每张照片视觉有区别
+    _gradientIndex = DateTime.now().millisecondsSinceEpoch % _gradients.length;
+  }
 
   Future<void> _pickImage() async {
     final path = await ImagePickerHelper.pickImage(context);
     if (path != null && mounted) {
       setState(() => _imagePath = path);
+    }
+  }
+
+  Future<void> _pickDate() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate,
+      firstDate: DateTime(2010),
+      lastDate: now,
+      confirmText: '确定',
+      cancelText: '取消',
+    );
+    if (picked != null && mounted) {
+      setState(() => _selectedDate = picked);
     }
   }
 
@@ -56,10 +89,10 @@ class _AddPhotoSheetState extends ConsumerState<AddPhotoSheet> {
 
     try {
       final photo = AlbumPhoto()
-        ..date = DateTime.now()
+        ..date = _selectedDate
         ..category = _selectedCategory
         ..filePath = _imagePath
-        ..gradientIndex = 0;
+        ..gradientIndex = _gradientIndex;
 
       await ref.read(albumRepositoryProvider).add(photo);
 
@@ -133,6 +166,36 @@ class _AddPhotoSheetState extends ConsumerState<AddPhotoSheet> {
                             Text('点击选择照片', style: AppTextStyles.caption),
                           ],
                         ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // 日期选择
+              GestureDetector(
+                onTap: _pickDate,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: AppColors.bgCream,
+                    borderRadius: BorderRadius.circular(AppColors.radiusSm),
+                    border: Border.all(color: AppColors.borderSoft),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.calendar_today_rounded,
+                          size: 18, color: AppColors.accentRose),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          _formatDate(_selectedDate),
+                          style: AppTextStyles.body,
+                        ),
+                      ),
+                      const Icon(Icons.chevron_right_rounded,
+                          size: 20, color: AppColors.textTertiary),
+                    ],
+                  ),
                 ),
               ),
               const SizedBox(height: 20),
@@ -209,4 +272,7 @@ class _AddPhotoSheetState extends ConsumerState<AddPhotoSheet> {
       ),
     );
   }
+
+  String _formatDate(DateTime d) =>
+      '${d.year}年${d.month}月${d.day}日';
 }

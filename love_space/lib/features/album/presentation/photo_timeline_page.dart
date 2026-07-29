@@ -6,6 +6,7 @@ import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_text_styles.dart';
 import '../../../data/models/album_photo.dart';
 import '../../../data/providers/data_providers.dart';
+import 'widgets/photo_viewer.dart';
 
 /// 相册时间轴页
 ///
@@ -27,9 +28,6 @@ class _PhotoTimelinePageState extends ConsumerState<PhotoTimelinePage> {
   final ScrollController _scrollController = ScrollController();
   final List<GlobalKey> _sectionKeys = [];
   int _currentIndex = 0;
-
-  /// 顶部导航条 + AppBar 的预估高度，用于滚动高亮判断
-  static const double _topThreshold = 140;
 
   @override
   void initState() {
@@ -54,7 +52,13 @@ class _PhotoTimelinePageState extends ConsumerState<PhotoTimelinePage> {
     }
   }
 
+  /// 顶部导航条 + AppBar 的预估高度，用于滚动高亮判断
+  static const double _topThreshold = 120;
+
   /// 滚动时计算当前高亮的分组
+  ///
+  /// 策略：找到第一个顶部进入阈值区域（刚好在导航条下方）的 section，
+  /// 其前一个 section 即为当前高亮项。这样高亮始终跟随滚动位置。
   void _onScroll() {
     if (_sectionKeys.isEmpty) return;
     for (int i = 0; i < _sectionKeys.length; i++) {
@@ -63,8 +67,8 @@ class _PhotoTimelinePageState extends ConsumerState<PhotoTimelinePage> {
       final box = ctx.findRenderObject();
       if (box is! RenderBox || !box.attached) continue;
       final pos = box.localToGlobal(Offset.zero);
-      // 找到第一个顶部 >= 阈值 的下一个，则当前是 i-1
-      if (pos.dy > _topThreshold) {
+      // 找到第一个顶部 >= 阈值的 section，高亮其前一个
+      if (pos.dy >= _topThreshold) {
         final target = i > 0 ? i - 1 : 0;
         if (_currentIndex != target) {
           setState(() => _currentIndex = target);
@@ -278,6 +282,17 @@ class _TimelineNavStrip extends StatelessWidget {
                       fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
                     ),
                   ),
+                  // 照片数量角标
+                  if (g.photos.length > 1)
+                    Text(
+                      '${g.photos.length}',
+                      style: TextStyle(
+                        fontSize: 9,
+                        color: isActive
+                            ? Colors.white.withValues(alpha: 0.8)
+                            : AppColors.textTertiary,
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -309,7 +324,8 @@ class _TimelineSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return IntrinsicHeight(
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 24),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -322,57 +338,55 @@ class _TimelineSection extends StatelessWidget {
           const SizedBox(width: 14),
           // 右侧照片内容
           Expanded(
-            child: Padding(
-              padding: const EdgeInsets.only(bottom: 24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // 分组标题
-                  Row(
-                    children: [
-                      Text(
-                        group.label,
-                        style: AppTextStyles.titleSmall.copyWith(fontSize: 16),
-                      ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 分组标题
+                Row(
+                  children: [
+                    Text(
+                      group.label,
+                      style: AppTextStyles.titleSmall.copyWith(fontSize: 16),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      '${group.photos.length} 张',
+                      style: AppTextStyles.label,
+                    ),
+                    if (isHighlight) ...[
                       const SizedBox(width: 8),
-                      Text(
-                        '${group.photos.length} 张',
-                        style: AppTextStyles.label,
-                      ),
-                      if (isHighlight) ...[
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: AppColors.accentRose.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(Icons.favorite,
-                                  size: 10, color: AppColors.accentRose),
-                              const SizedBox(width: 3),
-                              Text(
-                                '纪念日',
-                                style: AppTextStyles.label.copyWith(
-                                  color: AppColors.accentRose,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color:
+                              AppColors.accentRose.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(6),
                         ),
-                      ],
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.favorite,
+                                size: 10, color: AppColors.accentRose),
+                            const SizedBox(width: 3),
+                            Text(
+                              '纪念日',
+                              style: AppTextStyles.label.copyWith(
+                                color: AppColors.accentRose,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ],
-                  ),
-                  const SizedBox(height: 10),
-                  // 照片网格（2 列）
-                  _PhotoGrid(photos: group.photos),
-                ],
-              ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                // 照片网格（2 列）
+                _PhotoGrid(photos: group.photos),
+              ],
             ),
           ),
         ],
@@ -381,7 +395,10 @@ class _TimelineSection extends StatelessWidget {
   }
 }
 
-/// 左侧时间轴轨道（圆点 + 竖线 + 年标签）
+/// 左侧时间轴轨道（圆点 + 竖线）
+///
+/// 使用 Stack 定位：圆点顶部居中，竖线从圆点底部延伸到 section 底部。
+/// 最后一个分组不显示竖线。
 class _TimelineTrack extends StatelessWidget {
   final PhotoGroup group;
   final bool isHighlight;
@@ -395,14 +412,35 @@ class _TimelineTrack extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    const dotSize = 12.0;
+    const dotSizeHighlight = 16.0;
+    final size = isHighlight ? dotSizeHighlight : dotSize;
     return SizedBox(
       width: 44,
-      child: Column(
+      child: Stack(
+        alignment: Alignment.topCenter,
         children: [
+          // 竖线：从圆点底部到 section 底部（最后一个分组不显示）
+          if (!isLast)
+            Positioned(
+              top: size,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: Container(
+                width: 2,
+                margin: const EdgeInsets.symmetric(horizontal: 21),
+                decoration: BoxDecoration(
+                  color: AppColors.accentPinkSoft.withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(1),
+                ),
+              ),
+            ),
           // 圆点
           Container(
-            width: isHighlight ? 16 : 12,
-            height: isHighlight ? 16 : 12,
+            width: size,
+            height: size,
+            margin: const EdgeInsets.only(top: 4),
             decoration: BoxDecoration(
               gradient: isHighlight ? AppColors.pinkButtonGradient : null,
               color: isHighlight ? null : AppColors.accentPink,
@@ -423,17 +461,6 @@ class _TimelineTrack extends StatelessWidget {
                   : null,
             ),
           ),
-          // 竖线（最后一个分组不显示）
-          if (!isLast)
-            Expanded(
-              child: Container(
-                width: 2,
-                decoration: BoxDecoration(
-                  color: AppColors.accentPinkSoft.withValues(alpha: 0.5),
-                  borderRadius: BorderRadius.circular(1),
-                ),
-              ),
-            ),
         ],
       ),
     );
@@ -443,7 +470,8 @@ class _TimelineTrack extends StatelessWidget {
 /// 照片网格（2 列）
 class _PhotoGrid extends StatelessWidget {
   final List<AlbumPhoto> photos;
-  const _PhotoGrid({required this.photos});
+  final int startIndex;
+  const _PhotoGrid({required this.photos, this.startIndex = 0});
 
   static const _gradients = [
     [Color(0xFFFFBFD0), Color(0xFFFF8FB1)],
@@ -464,12 +492,18 @@ class _PhotoGrid extends StatelessWidget {
           spacing: spacing,
           runSpacing: spacing,
           children: [
-            for (final photo in photos)
+            for (var i = 0; i < photos.length; i++)
               SizedBox(
                 width: width,
                 child: _PhotoThumb(
-                  photo: photo,
-                  gradient: _gradients[photo.gradientIndex % _gradients.length],
+                  photo: photos[i],
+                  gradient:
+                      _gradients[photos[i].gradientIndex % _gradients.length],
+                  onTap: () => PhotoViewer.show(
+                    context,
+                    photos: photos,
+                    initialIndex: i,
+                  ),
                 ),
               ),
           ],
@@ -483,18 +517,25 @@ class _PhotoGrid extends StatelessWidget {
 class _PhotoThumb extends StatelessWidget {
   final AlbumPhoto photo;
   final List<Color> gradient;
+  final VoidCallback? onTap;
 
-  const _PhotoThumb({required this.photo, required this.gradient});
+  const _PhotoThumb({
+    required this.photo,
+    required this.gradient,
+    this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
     return AspectRatio(
       aspectRatio: 1 / 1.1,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(14),
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
+      child: GestureDetector(
+        onTap: onTap,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(14),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
             // 兜底渐变背景
             Container(
               decoration: BoxDecoration(
@@ -520,20 +561,21 @@ class _PhotoThumb extends StatelessWidget {
                 fit: BoxFit.cover,
                 errorBuilder: (_, __, ___) => const SizedBox.shrink(),
               ),
-            // 日期文字
-            Positioned(
-              left: 8,
-              bottom: 8,
-              child: Text(
-                _formatDate(photo.date),
-                style: AppTextStyles.label.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 11,
+              // 日期文字
+              Positioned(
+                left: 8,
+                bottom: 8,
+                child: Text(
+                  _formatDate(photo.date),
+                  style: AppTextStyles.label.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 11,
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
