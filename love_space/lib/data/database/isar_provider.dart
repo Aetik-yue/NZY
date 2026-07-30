@@ -11,6 +11,7 @@ import '../models/reader_settings.dart';
 import '../models/novel_source.dart';
 import '../models/crawl_config.dart';
 import '../models/crawl_log.dart';
+import '../models/memo.dart';
 
 /// Isar 数据库实例 provider。
 ///
@@ -33,4 +34,5 @@ const isarSchemas = [
   NovelSourceSchema,
   CrawlConfigSchema,
   CrawlLogSchema,
+  MemoSchema,
 ];

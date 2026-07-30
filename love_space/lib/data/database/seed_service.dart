@@ -4,6 +4,7 @@ import '../../data/models/timeline_event.dart';
 import '../../data/models/check_in.dart';
 import '../../data/models/app_settings.dart';
 import '../../data/models/novel_source.dart';
+import '../../data/models/memo.dart';
 import '../repositories/crawl_config_repository.dart';
 
 /// 首次启动种子数据服务
@@ -30,6 +31,28 @@ class SeedService {
 
       // 打卡
       await _isar.checkIns.putAll(Seed.checkIns());
+
+      // 备忘录种子数据
+      await _isar.memos.putAll([
+        Memo()
+          ..content = '第一次牵手的那天，心跳得好快 💕'
+          ..author = 1
+          ..isPinned = true
+          ..colorValue = 0xFFFF8FB1
+          ..createdAt = DateTime.now().subtract(const Duration(days: 30)),
+        Memo()
+          ..content = '一起去北海道看雪！#旅行计划'
+          ..author = 2
+          ..isPinned = false
+          ..colorValue = 0xFFFFD1BF
+          ..createdAt = DateTime.now().subtract(const Duration(days: 15)),
+        Memo()
+          ..content = '记得买牛奶和面包 #购物'
+          ..author = 1
+          ..isPinned = false
+          ..colorValue = 0xFFFF8FB1
+          ..createdAt = DateTime.now().subtract(const Duration(hours: 3)),
+      ]);
     });
 
     // 爬虫默认源与配置（独立事务，避免重复写入）

@@ -4,6 +4,7 @@ import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_text_styles.dart';
 import '../../../data/providers/data_providers.dart';
 import '../../../shared/widgets/app_snackbar.dart';
+import '../../memo/presentation/memo_page.dart';
 
 /// 我的页
 /// 还原设计稿：渐变头部 → 统计行 → 音乐卡 → 功能卡（小说/备忘录/设置）
@@ -146,8 +147,7 @@ class _StatsRow extends ConsumerWidget {
     final days = ref.watch(daysTogetherProvider);
     final photoCount = ref.watch(photoCountProvider);
     final wishStats = ref.watch(wishStatsProvider);
-    final settings = ref.watch(appSettingsProvider).valueOrNull;
-    final memoCount = settings?.memoCount ?? 0;
+    final memoCount = ref.watch(memoCountProvider);
 
     final stats = [
       ('$days', '相伴天数', AppColors.textPrimary),
@@ -253,11 +253,12 @@ class _MusicCard extends StatelessWidget {
 }
 
 /// 功能卡行（小说 / 备忘录 / 设置）
-class _FunctionCards extends StatelessWidget {
+class _FunctionCards extends ConsumerWidget {
   const _FunctionCards();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final memoCount = ref.watch(memoCountProvider);
     final cards = [
       _FuncCard(
         icon: Icons.menu_book_rounded,
@@ -270,10 +271,12 @@ class _FunctionCards extends StatelessWidget {
       _FuncCard(
         icon: Icons.sticky_note_2_rounded,
         title: '备忘录',
-        sub: '86 条记录',
+        sub: '${memoCount} 条记录',
         bg: AppColors.accentPeach,
         iconColor: AppColors.accentCoral,
-        onTap: () => AppSnackbar.show(context, '即将上线 📝'),
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const MemoPage()),
+        ),
       ),
       _FuncCard(
         icon: Icons.settings_rounded,

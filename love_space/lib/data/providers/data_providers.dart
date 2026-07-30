@@ -12,6 +12,7 @@ import '../repositories/novel_source_repository.dart';
 import '../repositories/crawl_config_repository.dart';
 import '../repositories/crawl_log_repository.dart';
 import '../repositories/crawl_repository.dart';
+import '../repositories/memo_repository.dart';
 import '../../core/utils/greeting.dart';
 import '../../core/utils/date_utils.dart';
 import '../../core/utils/streak.dart';
@@ -26,6 +27,7 @@ import '../models/reader_settings.dart';
 import '../models/novel_source.dart';
 import '../models/crawl_config.dart';
 import '../models/crawl_log.dart';
+import '../models/memo.dart';
 
 // ═══════════════════════════════════════════════════════════════
 // Repository providers（依赖 isarProvider）
@@ -293,4 +295,59 @@ class CrawlStatus {
         total: total ?? this.total,
       );
 }
+
+// ═══════════════════════════════════════════════════════════════
+// 备忘录模块 providers（数据仓库 / 流 / 筛选 / 衍生）
+// ═══════════════════════════════════════════════════════════════
+
+/// 备忘录数据仓库
+final memoRepositoryProvider = Provider((ref) =>
+    MemoRepository(ref.watch(isarProvider)));
+
+/// 所有备忘录（实时流，按创建时间降序）
+final memosProvider = StreamProvider<List<Memo>>((ref) =>
+    ref.watch(memoRepositoryProvider).watchAll());
+
+/// 搜索关键词
+final memoSearchProvider = StateProvider<String>((ref) => '');
+
+/// 当前筛选标签（null = 全部）
+final memoTagFilterProvider = StateProvider<String?>((ref) => null);
+
+/// 当前作者筛选（null = 全部, 1 或 2）
+final memoAuthorFilterProvider = StateProvider<int?>((ref) => null);
+
+/// 过滤后的备忘录（搜索 + 标签 + 作者）
+final filteredMemosProvider = Provider<List<Memo>>((ref) {
+  final memos = ref.watch(memosProvider).valueOrNull ?? [];
+  final query = ref.watch(memoSearchProvider).toLowerCase();
+  final tag = ref.watch(memoTagFilterProvider);
+  final author = ref.watch(memoAuthorFilterProvider);
+
+  return memos.where((m) {
+    if (author != null && m.author != author) return false;
+    if (tag != null && !m.content.contains('#$tag')) return false;
+    if (query.isNotEmpty && !m.content.toLowerCase().contains(query)) {
+      return false;
+    }
+    return true;
+  }).toList();
+});
+
+/// 备忘录总数
+final memoCountProvider = Provider<int>((ref) =>
+    ref.watch(memosProvider).valueOrNull?.length ?? 0);
+
+/// 所有可用标签（去重排序）
+final allTagsProvider = Provider<List<String>>((ref) {
+  final memos = ref.watch(memosProvider).valueOrNull ?? [];
+  final tags = <String>{};
+  final regex = RegExp(r'#(\S+)');
+  for (final m in memos) {
+    for (final match in regex.allMatches(m.content)) {
+      tags.add(match.group(1)!);
+    }
+  }
+  return tags.toList()..sort();
+});
 

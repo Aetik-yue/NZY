@@ -7,6 +7,7 @@ import 'package:love_space/data/providers/data_providers.dart';
 import 'package:love_space/data/models/timeline_event.dart';
 import 'package:love_space/data/models/app_settings.dart';
 import 'package:love_space/data/models/reader_settings.dart';
+import 'package:love_space/data/models/memo.dart';
 import 'package:love_space/core/utils/date_utils.dart';
 
 void main() {
@@ -67,6 +68,10 @@ void main() {
               ..bgTheme = 0
               ..keepScreenOn = true),
           ),
+          // 备忘录
+          memosProvider.overrideWith((ref) => Stream.value([])),
+          // 备忘录总数
+          memoCountProvider.overrideWithValue(0),
         ],
         child: const LoveSpaceApp(),
       ),
