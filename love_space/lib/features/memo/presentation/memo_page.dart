@@ -23,6 +23,10 @@ class MemoPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final memos = ref.watch(filteredMemosProvider);
     final allTags = ref.watch(allTagsProvider);
+    final searchQuery = ref.watch(memoSearchProvider);
+    final tagFilter = ref.watch(memoTagFilterProvider);
+    final isSearchResult =
+        searchQuery.isNotEmpty || tagFilter != null;
 
     return Scaffold(
       backgroundColor: AppColors.bgPrimary,
@@ -59,7 +63,7 @@ class MemoPage extends ConsumerWidget {
             // 列表区域
             Expanded(
               child: memos.isEmpty
-                  ? const _EmptyState()
+                  ? _EmptyState(isSearchResult: isSearchResult)
                   : _MemoList(memos: memos),
             ),
           ],
@@ -178,9 +182,10 @@ class _DateGroup {
   const _DateGroup({required this.label, required this.memos});
 }
 
-/// 空状态
+/// 空状态（区分：无备忘录 / 搜索无结果 / 标签无结果）
 class _EmptyState extends StatelessWidget {
-  const _EmptyState();
+  final bool isSearchResult;
+  const _EmptyState({this.isSearchResult = false});
 
   @override
   Widget build(BuildContext context) {
@@ -188,16 +193,19 @@ class _EmptyState extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(
-            Icons.sticky_note_2_outlined,
+          Icon(
+            isSearchResult ? Icons.search_off_rounded : Icons.sticky_note_2_outlined,
             size: 64,
             color: AppColors.accentPinkSoft,
           ),
           const SizedBox(height: 16),
-          Text('还没有备忘录', style: AppTextStyles.titleSmall),
+          Text(
+            isSearchResult ? '没有找到相关备忘录' : '还没有备忘录',
+            style: AppTextStyles.titleSmall,
+          ),
           const SizedBox(height: 6),
           Text(
-            '记录第一条吧 ✨',
+            isSearchResult ? '试试其他关键词吧' : '记录第一条吧 ✨',
             style: AppTextStyles.caption,
           ),
         ],
