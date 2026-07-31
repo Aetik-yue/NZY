@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:html/dom.dart';
 import 'package:html/parser.dart' as html_parser;
@@ -53,9 +55,10 @@ class BiqugeCrawler implements BaseCrawler {
     if (kw.isEmpty) return [];
 
     // 笔趣阁搜索使用 POST 表单提交，关键词需 GBK 编码
-    // 不同镜像站参数名不同，依次尝试
+    // 不同镜像站参数名和端点不同，依次尝试
     final searchAttempts = <_SearchAttempt>[
-      _SearchAttempt('/search.html', {'s': kw}),
+      _SearchAttempt('/search.php', {'searchkey': kw}), // bqgbb.cc 等
+      _SearchAttempt('/search.html', {'s': kw}), // biquge2.net 等
       _SearchAttempt('/search.html', {'searchkey': kw}),
       _SearchAttempt('/modules/article/search.php',
           {'searchkey': kw, 'searchtype': 'novelname'}),
@@ -77,7 +80,7 @@ class BiqugeCrawler implements BaseCrawler {
           continue;
         }
 
-        final results = _parseSearchResult(body);
+        final results = _parseSearchResult(body, keyword: kw);
         if (results.isNotEmpty) return results;
       } catch (e) {
         debugPrint('[BiqugeCrawler] 搜索 ${attempt.path} 失败: $e');
@@ -145,6 +148,110 @@ class BiqugeCrawler implements BaseCrawler {
   }
 
   @override
+  Future<List<CategoryBook>> browseCategory(int categoryId,
+      {int page = 1}) async {
+    // 尝试多种分类页 URL 格式：
+    // - biquge2.net: /fenlei/lastupdate_{cat}_0_0_{page}.html
+    // - bqgbb.cc:    /fenlei/{cat}/{page}.html
+    final urlCandidates = [
+      '$baseUrl/fenlei/${categoryId}_$page/',
+      '$baseUrl/fenlei/${categoryId}_$page.html',
+      '$baseUrl/fenlei/${categoryId}/$page.html',
+      '$baseUrl/fenlei/lastupdate_${categoryId}_0_0_$page.html',
+    ];
+
+    for (final url in urlCandidates) {
+      try {
+        final body = await _httpClient.get(url);
+        final books = _parseCategoryPage(body);
+        if (books.isNotEmpty) return books;
+      } catch (e) {
+        debugPrint('[BiqugeCrawler] 分类浏览尝试失败 ($url): $e');
+      }
+    }
+
+    return [];
+  }
+
+  /// 解析分类页 HTML，提取书籍列表
+  ///
+  /// 兼容两种镜像结构：
+  /// - biquge2.net: <div class="item"> 卡片（含简介/字数/更新时间）
+  /// - bqgbb.cc:    <li><a href="/book/xxx/">书名</a><span>作者</span></li>
+  List<CategoryBook> _parseCategoryPage(String html) {
+    final document = html_parser.parse(html);
+    final results = <CategoryBook>[];
+    final seen = <String>{};
+
+    void addBook(String title, String href, String author,
+        {String intro = '', String wordCount = '', String updateTime = ''}) {
+      if (title.isEmpty || href.isEmpty) return;
+      final match = RegExp(r'/book/(\d+)/?').firstMatch(href);
+      if (match == null) return;
+      final bookUrl = '$baseUrl/book/${match.group(1)}/';
+      if (seen.contains(bookUrl)) return;
+      seen.add(bookUrl);
+
+      results.add(CategoryBook(
+        title: title,
+        author: author,
+        url: bookUrl,
+        intro: intro,
+        wordCount: wordCount,
+        updateTime: updateTime,
+      ));
+    }
+
+    // 策略 1: biquge2.net 的 <div class="item"> 卡片
+    final items = document.querySelectorAll('.item');
+    for (final item in items) {
+      final link = item.querySelector('a[href*="/book/"]');
+      if (link == null) continue;
+      final href = link.attributes['href'] ?? '';
+      final title = link.attributes['title']?.trim() ?? link.text.trim();
+
+      // 简介
+      final introEl = item.querySelector('dd');
+      final intro = introEl?.text.trim() ?? '';
+
+      // 作者 + 字数 + 时间（在 .btm 中）
+      String author = '';
+      String wordCount = '';
+      String updateTime = '';
+      final btm = item.querySelector('.btm');
+      if (btm != null) {
+        final btmText = btm.text.trim();
+        final ems = btm.querySelectorAll('em');
+        author = btmText.split(RegExp(r'\s')).first.trim();
+        if (ems.isNotEmpty) wordCount = ems.first.text.trim();
+        if (ems.length > 1) updateTime = ems[1].text.trim();
+      }
+
+      addBook(title, href, author,
+          intro: intro, wordCount: wordCount, updateTime: updateTime);
+    }
+
+    // 策略 2: bqgbb.cc 的 <li><a>书名</a><span>作者</span></li>
+    if (results.isEmpty) {
+      for (final li in document.querySelectorAll('li')) {
+        final link = li.querySelector('a[href*="/book/"]');
+        if (link == null) continue;
+        final href = link.attributes['href'] ?? '';
+        final title = link.text.trim();
+        if (title.isEmpty) continue;
+
+        String author = '';
+        final authorSpan = li.querySelector('span');
+        if (authorSpan != null) author = authorSpan.text.trim();
+
+        addBook(title, href, author);
+      }
+    }
+
+    return results;
+  }
+
+  @override
   Future<BookDetail> fetchBookDetail(String url) async {
     final body = await _httpClient.get(url);
     final detail = _parseBookDetail(body, url);
@@ -174,14 +281,17 @@ class BiqugeCrawler implements BaseCrawler {
   ) async {
     var consecutiveEmptyTocPages = 0; // 连续无新章节的目录页数
     final doc = html_parser.parse(detailHtml);
-    // 找目录页链接（ml_N.html），用于补充分页章节
+    // 找目录页链接（ml_N.html 或 index_N.html），用于补充分页章节
     final tocLink = doc
         .querySelectorAll('a[href]')
         .map((a) => a.attributes['href'] ?? '')
         .firstWhere(
-          (href) => RegExp(r'/book/\d+/ml_\d+\.html').hasMatch(href),
+          (href) =>
+              RegExp(r'/book/\d+/(ml|index)_\d+\.html').hasMatch(href),
           orElse: () => '',
         );
+    // 判断目录页前缀（ml_ 或 index_）
+    final tocPrefix = RegExp(r'/(ml|index)_\d+\.html').firstMatch(tocLink)?.group(1) ?? 'ml';
 
     // 提取 bookId 用于构造后续分页 URL
     final bookIdMatch = RegExp(r'/book/(\d+)/').firstMatch(bookUrl);
@@ -226,7 +336,7 @@ class BiqugeCrawler implements BaseCrawler {
     //    仅当详情页存在 ml 目录链接时才抓分页
     if (tocLink.isNotEmpty && bookId != null) {
       for (var page = 1; page <= 5; page++) {
-        final tocUrl = '$baseUrl/book/$bookId/ml_$page.html';
+        final tocUrl = '$baseUrl/book/$bookId/${tocPrefix}_$page.html';
         try {
           final html = await _httpClient.get(tocUrl);
           final pageDoc = html_parser.parse(html);
@@ -372,7 +482,7 @@ class BiqugeCrawler implements BaseCrawler {
 
   // ──────── 解析方法 ────────
 
-  List<SearchResult> _parseSearchResult(String html) {
+  List<SearchResult> _parseSearchResult(String html, {String? keyword}) {
     final document = html_parser.parse(html);
     final results = <SearchResult>[];
 
@@ -446,19 +556,52 @@ class BiqugeCrawler implements BaseCrawler {
       }
     }
 
+    return _filterRelevant(results, keyword);
+  }
+
+  /// 过滤出与关键词相关的搜索结果
+  ///
+  /// 笔趣阁镜像的搜索常返回"最新推荐"列表（与关键词无关），
+  /// 真正匹配的书混在其中。这里优先返回书名含关键词的结果；
+  /// 若无含关键词的结果，则返回全部（兼容搜索已精确的场景）。
+  List<SearchResult> _filterRelevant(
+      List<SearchResult> results, String? keyword) {
+    if (keyword == null || keyword.trim().isEmpty) return results;
+    final kw = keyword.trim();
+
+    // 按书名包含关键词排序：匹配的在前
+    final relevant = results
+        .where((r) => r.title.contains(kw))
+        .toList();
+    if (relevant.isNotEmpty) return relevant;
+
+    // 宽松匹配：书名含关键词任一字（对长词有效）
+    final chars = kw.split('').toSet().where((c) => c.trim().isNotEmpty).toList();
+    if (chars.length >= 2) {
+      final fuzzy = results.where((r) {
+        final title = r.title;
+        return chars.any((c) => title.contains(c));
+      }).toList();
+      if (fuzzy.isNotEmpty) return fuzzy;
+    }
+
     return results;
   }
 
   BookDetail _parseBookDetail(String html, String bookUrl) {
     final document = html_parser.parse(html);
 
-    // 书名
+    // 书名（兼容 biquge2.net 的 #info h1 和 bqgbb.cc 的 .details h2）
     final titleEl = document.querySelector('#info h1') ??
         document.querySelector('.info h1') ??
+        document.querySelector('.details h2') ??
+        document.querySelector('.intro .details h2') ??
+        document.querySelector('h1:not(.title)') ??
+        document.querySelector('h2') ??
         document.querySelector('.title');
-    final title = titleEl?.text.trim() ?? '';
+    var title = titleEl?.text.trim() ?? '';
 
-    // 作者
+    // 作者（兼容 biquge2.net 和 bqgbb.cc 结构）
     String author = '';
     final authorEl = document.querySelector('#info p a') ??
         document.querySelector('#info p') ??
@@ -469,12 +612,51 @@ class BiqugeCrawler implements BaseCrawler {
       // 格式可能是 "作者：张三" 或 "著者:张三"
       author = raw.replaceAll(RegExp(r'^(作者|著者|作\s*者)\s*[:：]\s*'), '').trim();
     }
+    if (author.isEmpty) {
+      // bqgbb.cc: 作者在 "作者：<a>" 或 ".details p i" 中
+      final authorLink = document.querySelector('.details p a[href*="/zuozhe/"]') ??
+          document.querySelector('.details p a');
+      if (authorLink != null) {
+        author = authorLink.text.trim();
+      }
+    }
+    if (author.isEmpty) {
+      // 从正文中提取 "作者：xxx"
+      final bodyText = document.body?.text ?? '';
+      final authorMatch =
+          RegExp(r'作者[:：]\s*([^\s，。<]+)').firstMatch(bodyText);
+      if (authorMatch != null) {
+        author = authorMatch.group(1)!.trim();
+      }
+    }
 
-    // 简介
+    // 简介（兼容 biquge2.net 的 #intro 和 bqgbb.cc 的 .intro .p2）
     final introEl = document.querySelector('#intro') ??
+        document.querySelector('.intro .p2') ??
+        document.querySelector('.p2') ??
         document.querySelector('.intro') ??
         document.querySelector('#bookintro');
-    final intro = introEl?.text.trim() ?? '';
+    var intro = introEl?.text.trim() ?? '';
+
+    // 若书名仍为空或误判为站点名，尝试从 og:title meta 提取
+    if (title.isEmpty ||
+        title == sourceName ||
+        title.contains('笔趣阁')) {
+      final ogTitle = document
+          .querySelector('meta[property="og:novel:book_name"]')
+          ?.attributes['content'];
+      if (ogTitle != null && ogTitle.isNotEmpty) {
+        title = ogTitle.trim();
+      }
+    }
+    if (author.isEmpty) {
+      final ogAuthor = document
+          .querySelector('meta[property="og:novel:author"]')
+          ?.attributes['content'];
+      if (ogAuthor != null && ogAuthor.isNotEmpty) {
+        author = ogAuthor.trim();
+      }
+    }
 
     // 章节列表（兜底：当无目录页时使用详情页本身的章节链接）
     // 注意：详情页可能含最新章节、导航等噪声，这里只保留真正的章节内容页链接
@@ -491,6 +673,10 @@ class BiqugeCrawler implements BaseCrawler {
     }
     if (chapterLinks.isEmpty) {
       chapterLinks.addAll(document.querySelectorAll('.chapter-list a'));
+    }
+    // bqgbb.cc: .yanqing_list li a 结构
+    if (chapterLinks.isEmpty) {
+      chapterLinks.addAll(document.querySelectorAll('.yanqing_list li a'));
     }
     // biquge2.net: 通配章节链接，href 形如 /book/{id}/{chapterId}.html（排除 ml_*.html 目录页自身）
     if (chapterLinks.isEmpty) {
@@ -547,23 +733,35 @@ class BiqugeCrawler implements BaseCrawler {
   ChapterContent _parseChapterContent(String html) {
     final document = html_parser.parse(html);
 
-    // 章节标题
+    // 章节标题（兼容 biquge2.net 的 .bookname h1 和 bqgbb.cc 的 .chapter-title）
     String title = '';
     final titleEl = document.querySelector('.bookname h1') ??
+        document.querySelector('.chapter-title') ??
         document.querySelector('h1') ??
+        document.querySelector('h2') ??
         document.querySelector('.title');
     if (titleEl != null) {
       title = titleEl.text.trim();
     }
 
-    // 正文
+    // 正文容器（兼容多站点）
     String rawContent = '';
     final contentEl = document.querySelector('#content') ??
+        document.querySelector('#chaptercontent') ??
         document.querySelector('.content') ??
         document.querySelector('#booktext') ??
         document.querySelector('.showtxt');
+
     if (contentEl != null) {
       rawContent = contentEl.innerHtml;
+
+      // 处理 bqgbb.cc 的 base64 加密正文：
+      // <script>document.writeln(qsbs.bb('PHA+...=='));</script>
+      // 需要 base64 解码并 UTF-8 还原为 HTML
+      if (rawContent.contains('qsbs.bb(')) {
+        final decoded = _decodeBase64Content(rawContent);
+        if (decoded.isNotEmpty) rawContent = decoded;
+      }
     }
 
     final content = _contentCleaner.clean(rawContent);
@@ -572,6 +770,26 @@ class BiqugeCrawler implements BaseCrawler {
       title: title,
       content: content,
     );
+  }
+
+  /// 解码 bqgbb.cc 的 base64 加密正文
+  ///
+  /// 正文格式：`document.writeln(qsbs.bb('BASE64'));`
+  /// 将多个 base64 片段解码并拼接为 HTML。
+  String _decodeBase64Content(String rawHtml) {
+    final buffer = StringBuffer();
+    final regex = RegExp(r"qsbs\.bb\('([^']+)'\)");
+    for (final match in regex.allMatches(rawHtml)) {
+      final b64 = match.group(1);
+      if (b64 == null) continue;
+      try {
+        final bytes = base64Decode(b64);
+        buffer.write(utf8.decode(bytes, allowMalformed: true));
+      } catch (_) {
+        // 单个片段失败不影响其他片段
+      }
+    }
+    return buffer.toString();
   }
 
   /// 将 href 解析为绝对 URL

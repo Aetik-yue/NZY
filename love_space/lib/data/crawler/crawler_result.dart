@@ -72,3 +72,25 @@ class ChapterContent {
   @override
   String toString() => 'ChapterContent($title, ${content.length}字)';
 }
+
+/// 分类浏览结果（比 SearchResult 多字数和更新时间）
+class CategoryBook {
+  final String title;
+  final String author;
+  final String url;
+  final String intro;
+  final String wordCount;
+  final String updateTime;
+
+  const CategoryBook({
+    required this.title,
+    required this.author,
+    required this.url,
+    this.intro = '',
+    this.wordCount = '',
+    this.updateTime = '',
+  });
+
+  @override
+  String toString() => 'CategoryBook($title / $author)';
+}

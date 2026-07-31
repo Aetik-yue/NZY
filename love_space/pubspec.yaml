@@ -2,7 +2,7 @@ name: love_space
 description: "以越之名 · 情侣恋爱空间"
 publish_to: 'none'
 
-version: 1.0.4+5
+version: 1.0.5+6
 
 environment:
   sdk: ^3.5.4

@@ -58,7 +58,13 @@ class AppHttpClient {
     Map<String, String>? body,
     Map<String, String>? headers,
   }) async {
-    return _requestWithRetry(url, body: body, headers: headers, gbkBody: false);
+    // 表单提交必须显式声明 Content-Type，否则服务器可能 404/不识别
+    final mergedHeaders = <String, String>{
+      'Content-Type': 'application/x-www-form-urlencoded',
+      if (headers != null) ...headers,
+    };
+    return _requestWithRetry(
+        url, body: body, headers: mergedHeaders, gbkBody: false);
   }
 
   /// 执行 POST 请求（表单值用 GBK 编码）
@@ -71,7 +77,13 @@ class AppHttpClient {
     Map<String, String>? body,
     Map<String, String>? headers,
   }) async {
-    return _requestWithRetry(url, body: body, headers: headers, gbkBody: true);
+    // 表单提交必须显式声明 Content-Type，否则服务器可能 404/不识别
+    final mergedHeaders = <String, String>{
+      'Content-Type': 'application/x-www-form-urlencoded',
+      if (headers != null) ...headers,
+    };
+    return _requestWithRetry(
+        url, body: body, headers: mergedHeaders, gbkBody: true);
   }
 
   /// 带重试的请求
@@ -159,7 +171,9 @@ class AppHttpClient {
       );
     }
 
-    if (response.statusCode != 200) {
+    // 404 特殊处理：笔趣阁镜像常以 404 状态码返回正常搜索/章节内容（反爬手段）
+    // 因此 404 时仍返回 body，交由上层解析；其他 4xx 才抛异常。
+    if (response.statusCode != 200 && response.statusCode != 404) {
       // 4xx 客户端错误：不可重试，立即失败
       throw _NonRetryableException('HTTP ${response.statusCode}');
     }

@@ -39,11 +39,63 @@ class _AddNovelSheetState extends ConsumerState<AddNovelSheet> {
   String? _errorMessage;
   bool _isAdding = false;
 
+  // ──── 分类浏览状态 ────
+  int _tabIndex = 0; // 0=搜索 1=分类浏览
+  int _selectedCategory = 1;
+  int _categoryPage = 1;
+  List<CategoryBook> _categoryBooks = [];
+  bool _isBrowsing = false;
+  bool _hasMore = true;
+
+  /// 分类定义（biquge2.net 的分类 ID 和名称）
+  static const _categories = [
+    (1, '玄幻'),
+    (2, '修真'),
+    (3, '都市'),
+    (4, '历史'),
+    (5, '网游'),
+    (6, '科幻'),
+    (7, '恐怖'),
+    (8, '其他'),
+  ];
+
   @override
   void dispose() {
     _searchController.dispose();
     _focusNode.dispose();
     super.dispose();
+  }
+
+  /// 浏览分类小说
+  Future<void> _browseCategory({bool loadMore = false}) async {
+    if (_isBrowsing) return;
+    if (loadMore && !_hasMore) return;
+
+    setState(() {
+      _isBrowsing = true;
+      if (!loadMore) {
+        _categoryBooks = [];
+        _categoryPage = 1;
+      }
+    });
+
+    try {
+      final books = await ref.read(crawlRepositoryProvider).browseCategory(
+            _selectedCategory,
+            page: _categoryPage,
+          );
+      if (!mounted) return;
+      setState(() {
+        _categoryBooks = [..._categoryBooks, ...books];
+        _isBrowsing = false;
+        _hasMore = books.isNotEmpty && books.length >= 10;
+        if (loadMore) _categoryPage++;
+      });
+    } catch (e) {
+      debugPrint('[AddNovelSheet] 分类浏览失败: $e');
+      if (!mounted) return;
+      setState(() => _isBrowsing = false);
+    }
   }
 
   /// 执行搜索
@@ -74,6 +126,58 @@ class _AddNovelSheetState extends ConsumerState<AddNovelSheet> {
         _isSearching = false;
         _errorMessage = '搜索失败，请稍后重试';
       });
+    }
+  }
+
+  /// 添加分类浏览到的书到书架
+  Future<void> _addCategoryBook(CategoryBook book) async {
+    if (_isAdding) return;
+
+    setState(() => _isAdding = true);
+    final navigator = Navigator.of(context);
+
+    ref.read(crawlStatusProvider.notifier).state = const CrawlStatus(
+      state: 'fetching',
+      message: '准备获取...',
+    );
+
+    CrawlProgressSheet.show(context, title: '正在添加《${book.title}》');
+
+    try {
+      void onProgress(String message, int current, int total) {
+        if (!mounted) return;
+        ref.read(crawlStatusProvider.notifier).state = CrawlStatus(
+          state: 'fetching',
+          message: message,
+          current: current,
+          total: total,
+        );
+      }
+
+      await ref.read(crawlRepositoryProvider).addNovel(
+            book.url,
+            onProgress: onProgress,
+          );
+
+      if (!mounted) return;
+      ref.read(crawlStatusProvider.notifier).state = const CrawlStatus(
+        state: 'success',
+        message: '完成',
+      );
+
+      navigator.pop();
+      navigator.pop();
+      AppSnackbar.show(navigator.context, '已添加《${book.title}》');
+    } on CancelledException {
+      // 用户主动取消
+    } catch (e) {
+      if (!mounted) return;
+      ref.read(crawlStatusProvider.notifier).state = CrawlStatus(
+        state: 'failed',
+        message: '添加失败：$e',
+      );
+    } finally {
+      if (mounted) setState(() => _isAdding = false);
     }
   }
 
@@ -256,87 +360,280 @@ class _AddNovelSheetState extends ConsumerState<AddNovelSheet> {
               ),
             ),
 
-            // 搜索栏
+            // 模式切换 Tab
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _searchController,
-                      focusNode: _focusNode,
-                      textInputAction: TextInputAction.search,
-                      onSubmitted: (_) => _search(),
-                      decoration: InputDecoration(
-                        hintText: '输入小说名搜索，或粘贴书籍链接',
-                        hintStyle: AppTextStyles.body.copyWith(
-                          color: AppColors.textTertiary,
-                        ),
-                        prefixIcon: const Icon(Icons.search_rounded,
-                            color: AppColors.textTertiary),
-                        filled: true,
-                        fillColor: AppColors.bgCream,
-                        border: OutlineInputBorder(
-                          borderRadius:
-                              BorderRadius.circular(AppColors.radiusMd),
-                          borderSide: BorderSide.none,
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 12,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  FilledButton(
-                    onPressed: _isSearching ? null : _search,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: AppColors.accentRose,
-                      shape: RoundedRectangleBorder(
-                        borderRadius:
-                            BorderRadius.circular(AppColors.radiusMd),
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 14,
-                      ),
-                    ),
-                    child: const Text('搜索'),
-                  ),
-                ],
-              ),
-            ),
-
-            // 粘贴链接入口
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-              child: GestureDetector(
-                onTap: _addFromUrl,
+              child: Container(
+                height: 36,
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: AppColors.bgBlush,
+                  borderRadius: BorderRadius.circular(AppColors.radiusPill),
+                ),
                 child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(Icons.link_rounded,
-                        size: 16, color: AppColors.accentRose),
-                    const SizedBox(width: 6),
-                    Text('直接粘贴书籍详情页链接',
-                        style: AppTextStyles.label
-                            .copyWith(color: AppColors.accentRose)),
+                    _buildModeTab(0, Icons.search_rounded, '搜索'),
+                    _buildModeTab(1, Icons.category_rounded, '分类浏览'),
                   ],
                 ),
               ),
             ),
-
             const SizedBox(height: 12),
-            const Divider(height: 1, color: AppColors.borderSoft),
 
-            // 结果列表
+            // 搜索模式内容
+            if (_tabIndex == 0) ...[
+              // 搜索栏
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _searchController,
+                        focusNode: _focusNode,
+                        textInputAction: TextInputAction.search,
+                        onSubmitted: (_) => _search(),
+                        decoration: InputDecoration(
+                          hintText: '输入小说名搜索',
+                          hintStyle: AppTextStyles.body.copyWith(
+                            color: AppColors.textTertiary,
+                          ),
+                          prefixIcon: const Icon(Icons.search_rounded,
+                              color: AppColors.textTertiary),
+                          filled: true,
+                          fillColor: AppColors.bgCream,
+                          border: OutlineInputBorder(
+                            borderRadius:
+                                BorderRadius.circular(AppColors.radiusMd),
+                            borderSide: BorderSide.none,
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    FilledButton(
+                      onPressed: _isSearching ? null : _search,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppColors.accentRose,
+                        shape: RoundedRectangleBorder(
+                          borderRadius:
+                              BorderRadius.circular(AppColors.radiusMd),
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 14,
+                        ),
+                      ),
+                      child: const Text('搜索'),
+                    ),
+                  ],
+                ),
+              ),
+
+              // 粘贴链接入口
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                child: GestureDetector(
+                  onTap: _addFromUrl,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.link_rounded,
+                          size: 16, color: AppColors.accentRose),
+                      const SizedBox(width: 6),
+                      Text('直接粘贴书籍详情页链接',
+                          style: AppTextStyles.label
+                              .copyWith(color: AppColors.accentRose)),
+                    ],
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 12),
+              const Divider(height: 1, color: AppColors.borderSoft),
+            ] else ...[
+              // 分类浏览内容
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: SizedBox(
+                  height: 36,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: _categories.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: 8),
+                    itemBuilder: (context, i) {
+                      final (id, label) = _categories[i];
+                      final isActive = _selectedCategory == id;
+                      return GestureDetector(
+                        onTap: () {
+                          setState(() => _selectedCategory = id);
+                          _browseCategory();
+                        },
+                        child: Container(
+                          padding:
+                              const EdgeInsets.symmetric(horizontal: 14),
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: isActive
+                                ? AppColors.accentRose
+                                : AppColors.bgCard,
+                            borderRadius:
+                                BorderRadius.circular(AppColors.radiusPill),
+                            border: isActive
+                                ? null
+                                : Border.all(color: AppColors.borderSoft),
+                          ),
+                          child: Text(
+                            label,
+                            style: AppTextStyles.caption.copyWith(
+                              color: isActive
+                                  ? Colors.white
+                                  : AppColors.textSecondary,
+                              fontWeight: isActive
+                                  ? FontWeight.w600
+                                  : FontWeight.w400,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Divider(height: 1, color: AppColors.borderSoft),
+            ],
+
+            // 内容区域（搜索或分类浏览）
             Expanded(
-              child: _buildContent(),
+              child: _tabIndex == 0 ? _buildContent() : _buildCategoryContent(),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  /// 模式切换 Tab 按钮
+  Widget _buildModeTab(int index, IconData icon, String label) {
+    final isActive = _tabIndex == index;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () {
+          setState(() {
+            _tabIndex = index;
+            if (index == 1) {
+              // 切到分类浏览时自动加载
+              if (_categoryBooks.isEmpty) _browseCategory();
+            }
+          });
+        },
+        behavior: HitTestBehavior.opaque,
+        child: Container(
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: isActive ? AppColors.bgCard : Colors.transparent,
+            borderRadius: BorderRadius.circular(AppColors.radiusPill),
+            boxShadow: isActive
+                ? const [
+                    BoxShadow(
+                      color: AppColors.shadowCard,
+                      blurRadius: 6,
+                      offset: Offset(0, 2),
+                      spreadRadius: -2,
+                    ),
+                  ]
+                : null,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon,
+                  size: 16,
+                  color: isActive
+                      ? AppColors.accentRose
+                      : AppColors.textTertiary),
+              const SizedBox(width: 4),
+              Text(
+                label,
+                style: AppTextStyles.caption.copyWith(
+                  color: isActive
+                      ? AppColors.accentRose
+                      : AppColors.textTertiary,
+                  fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 分类浏览内容区域
+  Widget _buildCategoryContent() {
+    if (_isBrowsing && _categoryBooks.isEmpty) {
+      return const Center(
+        child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.accentRose),
+      );
+    }
+
+    if (_categoryBooks.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.menu_book_rounded,
+                size: 48, color: AppColors.textTertiary),
+            const SizedBox(height: 12),
+            Text('选择上方分类浏览小说', style: AppTextStyles.caption),
+            const SizedBox(height: 4),
+            Text('搜索不可用？分类浏览也能找书', style: AppTextStyles.label),
+          ],
+        ),
+      );
+    }
+
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+      itemCount: _categoryBooks.length + 1, // +1 用于加载更多按钮
+      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      itemBuilder: (_, i) {
+        if (i == _categoryBooks.length) {
+          // 加载更多按钮
+          if (_isBrowsing) {
+            return const Center(
+              child: Padding(
+                padding: EdgeInsets.all(16),
+                child: CircularProgressIndicator(
+                    strokeWidth: 2, color: AppColors.accentRose),
+              ),
+            );
+          }
+          if (_hasMore) {
+            return Center(
+              child: TextButton(
+                onPressed: () => _browseCategory(loadMore: true),
+                child: Text('加载更多',
+                    style: AppTextStyles.caption
+                        .copyWith(color: AppColors.accentRose)),
+              ),
+            );
+          }
+          return const SizedBox(height: 4);
+        }
+
+        final book = _categoryBooks[i];
+        return _CategoryBookCard(
+          book: book,
+          onTap: () => _addCategoryBook(book),
+        );
+      },
     );
   }
 
@@ -478,6 +775,116 @@ class _NovelSearchResultCard extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       '最新：${result.latestChapter}',
+                      style: AppTextStyles.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ],
+              ),
+            ),
+
+            const SizedBox(width: 8),
+
+            // 添加按钮
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: AppColors.accentPinkSoft,
+                borderRadius: BorderRadius.circular(AppColors.radiusPill),
+              ),
+              child: Text(
+                '加入书架',
+                style: AppTextStyles.label.copyWith(
+                  color: AppColors.accentRose,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 分类浏览书籍卡片
+class _CategoryBookCard extends StatelessWidget {
+  final CategoryBook book;
+  final VoidCallback onTap;
+
+  const _CategoryBookCard({
+    required this.book,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.bgCard,
+          borderRadius: BorderRadius.circular(AppColors.radiusMd),
+          border: Border.all(color: AppColors.borderSoft),
+        ),
+        child: Row(
+          children: [
+            // 封面占位
+            Container(
+              width: 56,
+              height: 76,
+              decoration: BoxDecoration(
+                color: AppColors.accentPeach.withValues(alpha: 0.6),
+                borderRadius: BorderRadius.circular(AppColors.radiusSm),
+              ),
+              child: const Center(
+                child: Icon(
+                  Icons.menu_book_rounded,
+                  color: AppColors.accentCoral,
+                  size: 28,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+
+            // 信息
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    book.title,
+                    style: AppTextStyles.titleSmall,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    book.author.isNotEmpty ? '作者：${book.author}' : '作者未知',
+                    style: AppTextStyles.caption,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (book.intro.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      book.intro,
+                      style: AppTextStyles.label,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                  if (book.wordCount.isNotEmpty ||
+                      book.updateTime.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      [
+                        if (book.wordCount.isNotEmpty) book.wordCount,
+                        if (book.updateTime.isNotEmpty) book.updateTime,
+                      ].join(' · '),
                       style: AppTextStyles.label,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,

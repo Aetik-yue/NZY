@@ -86,6 +86,23 @@ class SeedService {
       });
     }
 
+    // 补充搜索源：bqgbb.cc（搜索有效，作为 biquge2.net 的搜索替代）
+    final bqgbbSource = await _isar.novelSources
+        .where()
+        .keyEqualTo('bqgbb')
+        .findFirst();
+    if (bqgbbSource == null) {
+      await _isar.writeTxn(() async {
+        await _isar.novelSources.put(NovelSource()
+          ..key = 'bqgbb'
+          ..name = '笔趣阁（搜索源）'
+          ..baseUrl = 'https://www.bqgbb.cc'
+          ..enabled = true
+          ..createdAt = DateTime.now()
+          ..selectors = _bqgbbSelectors);
+      });
+    }
+
     // 默认爬取配置
     final configRepo = CrawlConfigRepository(_isar);
     await configRepo.getOrCreate();
@@ -100,6 +117,20 @@ class SeedService {
   "authorSelector": "#info p a",
   "introSelector": "#intro",
   "chapterListSelector": "#list dd a",
+  "chapterTitleSelector": ".bookname h1",
+  "chapterContentSelector": "#content"
+}
+''';
+
+  /// bqgbb.cc 选择器配置（搜索源）
+  static const String _bqgbbSelectors = '''
+{
+  "searchUrl": "/search.php?searchkey={keyword}",
+  "bookLinkSelector": "li a[href*=\\\"/book/\\\"]",
+  "titleSelector": ".details h2",
+  "authorSelector": ".details p a[href*=\\\"/zuozhe/\\\"]",
+  "introSelector": ".intro .p2",
+  "chapterListSelector": ".yanqing_list li a",
   "chapterTitleSelector": ".bookname h1",
   "chapterContentSelector": "#content"
 }

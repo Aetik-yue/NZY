@@ -75,6 +75,33 @@ class CrawlRepository {
     return results;
   }
 
+  /// 按分类浏览小说（跨所有启用的源）
+  ///
+  /// [categoryId] 为分类 ID（1=玄幻 2=修真 3=都市 4=历史 5=网游 6=科幻 7=恐怖 8=其他），
+  /// [page] 为页码（从 1 开始）。
+  ///
+  /// 搜索不可靠时，分类浏览是找书的可靠替代方案。
+  Future<List<CategoryBook>> browseCategory(int categoryId,
+      {int page = 1}) async {
+    final sources = await sourceRepository.getEnabled();
+    if (sources.isEmpty) return [];
+
+    final config = await configRepository.getOrCreate();
+    final results = <CategoryBook>[];
+
+    for (final source in sources) {
+      try {
+        final crawler = _createCrawler(source, config);
+        final books = await crawler.browseCategory(categoryId, page: page);
+        results.addAll(books);
+      } catch (e) {
+        debugPrint('[CrawlRepository] 分类浏览失败 (${source.name}): $e');
+      }
+    }
+
+    return results;
+  }
+
   /// 从源站添加小说到书架
   ///
   /// [sourceUrl] 为书籍详情页 URL。
