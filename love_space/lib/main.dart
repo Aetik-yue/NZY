@@ -5,6 +5,7 @@ import 'package:path_provider/path_provider.dart';
 import 'app/app.dart';
 import 'data/database/isar_provider.dart';
 import 'data/database/seed_service.dart';
+import 'data/repositories/novel_repository.dart';
 
 /// 以越之名 · 情侣恋爱空间
 /// 入口
@@ -17,6 +18,9 @@ void main() async {
 
   // 首次启动写入种子数据
   await SeedService.seedIfEmpty(isar);
+
+  // 每次启动恢复异常中断的爬取状态（进程被杀导致的卡死 crawling / 半成品）
+  await NovelRepository(isar).recoverInterruptedCrawls();
 
   runApp(
     ProviderScope(

@@ -1,4 +1,4 @@
-// 冒烟测试：验证应用能正常构建并渲染首页
+// 冒烟测试：验证应用能正常构建并渲染首页，且所有 Tab 均不落入错误态
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -7,8 +7,8 @@ import 'package:love_space/data/providers/data_providers.dart';
 import 'package:love_space/data/models/timeline_event.dart';
 import 'package:love_space/data/models/app_settings.dart';
 import 'package:love_space/data/models/reader_settings.dart';
-import 'package:love_space/data/models/memo.dart';
 import 'package:love_space/core/utils/date_utils.dart';
+import 'package:love_space/shared/widgets/pill_nav_bar.dart';
 
 void main() {
   testWidgets('App renders home page smoke test', (WidgetTester tester) async {
@@ -35,6 +35,9 @@ void main() {
           photoCountProvider.overrideWithValue(128),
           // 相册照片
           allPhotosTypedProvider.overrideWith((ref) => Stream.value([])),
+          // 相册筛选后的照片（相册页 build 时 watch，必须 override，
+          // 否则依赖链会走到真实 isarProvider 抛 UnimplementedError）
+          filteredAlbumPhotosProvider.overrideWith((ref) => Stream.value([])),
           // 愿望列表
           wishesProvider.overrideWith((ref) => Stream.value([])),
           // 愿望统计
@@ -83,5 +86,19 @@ void main() {
     // 验证底部导航 Tab 标签存在
     expect(find.text('时光'), findsWidgets);
     expect(find.text('相册'), findsWidgets);
+    expect(find.text('加载失败'), findsNothing);
+
+    // 切换到相册 Tab，验证数据层 override 生效（空状态而非错误态）
+    await tester.tap(
+      find.descendant(
+        of: find.byType(PillNavBar),
+        matching: find.text('相册'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // 空列表应渲染空状态引导，而非「加载失败」
+    expect(find.text('还没有照片，快去添加第一张吧'), findsOneWidget);
+    expect(find.text('加载失败'), findsNothing);
   });
 }

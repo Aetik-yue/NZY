@@ -1,5 +1,6 @@
 import 'package:isar/isar.dart';
 import '../models/novel.dart';
+import '../models/novel_chapter.dart';
 
 /// 小说书架数据仓库
 class NovelRepository {
@@ -42,5 +43,30 @@ class NovelRepository {
         novel.lastPosition = position.clamp(0.0, 1.0);
         novel.lastReadAt = DateTime.now();
         await _isar.novels.put(novel);
+      });
+
+  /// 启动时恢复异常中断的爬取状态
+  ///
+  /// 进程被杀后 crawlStatus 可能永久卡在 'crawling'（详情页「更新章节」按钮
+  /// 永久禁用）；addNovel 中途被杀也可能残留 0 章节的半成品。此方法：
+  /// - crawling → success（恢复正常可更新）
+  /// - 非内置且无实际章节的小说删除（半成品残骸）
+  Future<void> recoverInterruptedCrawls() =>
+      _isar.writeTxn(() async {
+        final all = await _isar.novels.where().findAll();
+        for (final novel in all) {
+          final chapterCount = await _isar.novelChapters
+              .where()
+              .novelIdEqualTo(novel.id)
+              .count();
+          if (chapterCount == 0 && !novel.isBuiltin) {
+            await _isar.novels.delete(novel.id);
+            continue;
+          }
+          if (novel.crawlStatus == 'crawling') {
+            novel.crawlStatus = 'success';
+            await _isar.novels.put(novel);
+          }
+        }
       });
 }

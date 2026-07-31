@@ -7,6 +7,7 @@ import '../../../shared/widgets/app_snackbar.dart';
 import '../../../shared/widgets/confirm_dialog.dart';
 import '../../../data/providers/data_providers.dart';
 import '../../../shared/widgets/pill_nav_bar.dart';
+import 'widgets/add_timeline_sheet.dart';
 
 /// 首页 · 时光
 /// 还原设计稿：问候区 → 纪念日主卡片 → 今日打卡 → 快捷入口 → 时间轴
@@ -353,6 +354,13 @@ class _TimelineSection extends ConsumerWidget {
           title: '我们的时光',
           actionText: '全部',
           onAction: () => AppSnackbar.show(context, '即将上线 📅'),
+          // 添加入口（表单此前为死代码，无任何调用点）
+          trailing: IconButton(
+            icon: const Icon(Icons.add_circle_rounded,
+                color: AppColors.accentRose),
+            tooltip: '添加时光',
+            onPressed: () => AddTimelineSheet.show(context),
+          ),
         ),
         const SizedBox(height: 14),
         Container(
@@ -372,9 +380,26 @@ class _TimelineSection extends ConsumerWidget {
           child: eventsAsync.when(
             data: (events) {
               if (events.isEmpty) {
-                return const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 12),
-                  child: Text('还没有时光记录，快去添加第一个吧'),
+                // 空状态：友好提示 + 操作引导（规范 3.4）
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: Column(
+                    children: [
+                      const Text('还没有时光记录'),
+                      const SizedBox(height: 8),
+                      FilledButton(
+                        onPressed: () => AddTimelineSheet.show(context),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: AppColors.accentRose,
+                          shape: RoundedRectangleBorder(
+                            borderRadius:
+                                BorderRadius.circular(AppColors.radiusMd),
+                          ),
+                        ),
+                        child: const Text('添加第一个'),
+                      ),
+                    ],
+                  ),
                 );
               }
               return Column(

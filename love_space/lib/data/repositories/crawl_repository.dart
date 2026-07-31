@@ -115,85 +115,102 @@ class CrawlRepository {
   }) async {
     _resetCancellation();
 
-    // 1. 确定源
-    final source = await _resolveSourceByUrl(sourceUrl);
-    final config = await configRepository.getOrCreate();
-    final crawler = _createCrawler(source, config);
+    // 记录已创建的小说，用于中途失败/取消时回滚半成品
+    Novel? created;
 
-    // 2. 抓取书籍详情
-    _checkCancelled();
-    onProgress?.call('正在获取书籍详情...', 0, 0);
-    final detail = await crawler.fetchBookDetail(sourceUrl);
+    try {
+      // 1. 确定源
+      final source = await _resolveSourceByUrl(sourceUrl);
+      final config = await configRepository.getOrCreate();
+      final crawler = _createCrawler(source, config);
 
-    // 3. 写入 Novel
-    final novel = Novel()
-      ..title = detail.title.isEmpty ? '未知书名' : detail.title
-      ..author = detail.author.isEmpty ? '佚名' : detail.author
-      ..intro = detail.intro
-      ..tags = []
-      ..chapterCount = detail.chapters.length
-      ..isBuiltin = false
-      ..lastChapterIndex = -1
-      ..lastPosition = 0.0
-      ..coverColorValue = _coverColorFor(detail.title)
-      ..createdAt = DateTime.now()
-      ..sourceKey = source.key
-      ..sourceBookId = _extractBookId(sourceUrl)
-      ..sourceUrl = sourceUrl
-      ..lastCrawlAt = DateTime.now()
-      ..crawlStatus = 'success';
-
-    _checkCancelled();
-    await novelRepository.add(novel);
-
-    // 4. 写入章节列表 + 预取正文
-    final prefetch =
-        prefetchChapters ?? config.prefetchChapters;
-    final chaptersToFetch =
-        detail.chapters.length < prefetch ? detail.chapters.length : prefetch;
-
-    final chapters = <NovelChapter>[];
-    for (var i = 0; i < detail.chapters.length; i++) {
+      // 2. 抓取书籍详情
       _checkCancelled();
-      final ref = detail.chapters[i];
-      String content = '';
+      onProgress?.call('正在获取书籍详情...', 0, 0);
+      final detail = await crawler.fetchBookDetail(sourceUrl);
 
-      // 仅预取前 N 章正文
-      if (i < chaptersToFetch) {
-        onProgress?.call('正在抓取章节 ${i + 1}/$chaptersToFetch', i + 1, chaptersToFetch);
-        try {
-          final chapterContent = await crawler.fetchChapterContent(ref.url);
-          content = chapterContent.content;
-        } on CancelledException {
-          rethrow;
-        } catch (e) {
-          debugPrint('[CrawlRepository] 章节抓取失败 (${ref.title}): $e');
-          content = '（本章内容抓取失败，请稍后重试）';
+      // 3. 写入 Novel
+      final novel = Novel()
+        ..title = detail.title.isEmpty ? '未知书名' : detail.title
+        ..author = detail.author.isEmpty ? '佚名' : detail.author
+        ..intro = detail.intro
+        ..tags = []
+        ..chapterCount = detail.chapters.length
+        ..isBuiltin = false
+        ..lastChapterIndex = -1
+        ..lastPosition = 0.0
+        ..coverColorValue = _coverColorFor(detail.title)
+        ..createdAt = DateTime.now()
+        ..sourceKey = source.key
+        ..sourceBookId = _extractBookId(sourceUrl)
+        ..sourceUrl = sourceUrl
+        ..lastCrawlAt = DateTime.now()
+        ..crawlStatus = 'success';
+
+      _checkCancelled();
+      created = novel;
+      await novelRepository.add(novel);
+
+      // 4. 写入章节列表 + 预取正文
+      final prefetch =
+          prefetchChapters ?? config.prefetchChapters;
+      final chaptersToFetch =
+          detail.chapters.length < prefetch ? detail.chapters.length : prefetch;
+
+      final chapters = <NovelChapter>[];
+      for (var i = 0; i < detail.chapters.length; i++) {
+        _checkCancelled();
+        final ref = detail.chapters[i];
+        String content = '';
+
+        // 仅预取前 N 章正文
+        if (i < chaptersToFetch) {
+          onProgress?.call('正在抓取章节 ${i + 1}/$chaptersToFetch', i + 1, chaptersToFetch);
+          try {
+            final chapterContent = await crawler.fetchChapterContent(ref.url);
+            content = chapterContent.content;
+          } on CancelledException {
+            rethrow;
+          } catch (e) {
+            debugPrint('[CrawlRepository] 章节抓取失败 (${ref.title}): $e');
+            content = '（本章内容抓取失败，请稍后重试）';
+          }
         }
+
+        chapters.add(NovelChapter()
+          ..novelId = novel.id
+          ..chapterIndex = i
+          ..title = ref.title
+          ..content = content
+          ..sourceChapterId = ref.sourceId
+          ..sourceUrl = ref.url);
       }
 
-      chapters.add(NovelChapter()
+      await novelChapterRepository.addAll(chapters);
+
+      // 5. 更新日志
+      await logRepository.add(CrawlLog()
         ..novelId = novel.id
-        ..chapterIndex = i
-        ..title = ref.title
-        ..content = content
-        ..sourceChapterId = ref.sourceId
-        ..sourceUrl = ref.url);
+        ..crawledAt = DateTime.now()
+        ..status = 'success'
+        ..message = '新增 ${detail.chapters.length} 章'
+        ..newChapters = detail.chapters.length);
+
+      onProgress?.call('完成', chaptersToFetch, chaptersToFetch);
+
+      return novel;
+    } catch (_) {
+      // 取消或失败：回滚半成品，避免书架残留 0 章/缺章小说
+      if (created != null) {
+        try {
+          await novelChapterRepository.deleteByNovel(created.id);
+          await novelRepository.delete(created.id);
+        } catch (e) {
+          debugPrint('[CrawlRepository] 添加回滚失败: $e');
+        }
+      }
+      rethrow;
     }
-
-    await novelChapterRepository.addAll(chapters);
-
-    // 5. 更新日志
-    await logRepository.add(CrawlLog()
-      ..novelId = novel.id
-      ..crawledAt = DateTime.now()
-      ..status = 'success'
-      ..message = '新增 ${detail.chapters.length} 章'
-      ..newChapters = detail.chapters.length);
-
-    onProgress?.call('完成', chaptersToFetch, chaptersToFetch);
-
-    return novel;
   }
 
   /// 手动更新：抓取新章节（增量，基于 sourceChapterId 去重）
@@ -311,6 +328,11 @@ class CrawlRepository {
       onProgress?.call('完成', newRefs.length, newRefs.length);
 
       return newRefs.length;
+    } on CancelledException {
+      // 用户主动取消：恢复原状态（不标记失败、不写失败日志）
+      novel.crawlStatus = 'success';
+      await novelRepository.update(novel);
+      rethrow;
     } catch (e) {
       // 标记失败
       novel.crawlStatus = 'failed';

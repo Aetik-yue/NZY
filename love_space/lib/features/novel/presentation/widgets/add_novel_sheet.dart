@@ -134,6 +134,8 @@ class _AddNovelSheetState extends ConsumerState<AddNovelSheet> {
     if (_isAdding) return;
 
     setState(() => _isAdding = true);
+
+    // 捕获根导航器（用于后续关闭添加面板 + 显示提示）
     final navigator = Navigator.of(context);
 
     ref.read(crawlStatusProvider.notifier).state = const CrawlStatus(
@@ -141,22 +143,25 @@ class _AddNovelSheetState extends ConsumerState<AddNovelSheet> {
       message: '准备获取...',
     );
 
-    CrawlProgressSheet.show(context, title: '正在添加《${book.title}》');
+    // 弹出进度面板：成功/失败/取消时面板会自动关闭，
+    // 其返回值 true=成功、false=失败/取消，据此再关闭添加面板（只 pop 一次）。
+    final sheetFuture = CrawlProgressSheet.show(
+      context,
+      title: '正在添加《${book.title}》',
+    );
 
     try {
-      void onProgress(String message, int current, int total) {
-        if (!mounted) return;
-        ref.read(crawlStatusProvider.notifier).state = CrawlStatus(
-          state: 'fetching',
-          message: message,
-          current: current,
-          total: total,
-        );
-      }
-
       await ref.read(crawlRepositoryProvider).addNovel(
             book.url,
-            onProgress: onProgress,
+            onProgress: (message, current, total) {
+              if (!mounted) return;
+              ref.read(crawlStatusProvider.notifier).state = CrawlStatus(
+                state: 'fetching',
+                message: message,
+                current: current,
+                total: total,
+              );
+            },
           );
 
       if (!mounted) return;
@@ -164,21 +169,26 @@ class _AddNovelSheetState extends ConsumerState<AddNovelSheet> {
         state: 'success',
         message: '完成',
       );
-
-      navigator.pop();
-      navigator.pop();
-      AppSnackbar.show(navigator.context, '已添加《${book.title}》');
     } on CancelledException {
       // 用户主动取消
     } catch (e) {
+      debugPrint('[AddNovelSheet] 添加失败: $e');
       if (!mounted) return;
       ref.read(crawlStatusProvider.notifier).state = CrawlStatus(
         state: 'failed',
         message: '添加失败：$e',
       );
-    } finally {
-      if (mounted) setState(() => _isAdding = false);
     }
+
+    // 等待进度面板自动关闭
+    final ok = await sheetFuture;
+    if (!mounted) return;
+
+    if (ok == true) {
+      navigator.pop(); // 关闭添加面板（进度面板已自动关闭）
+      AppSnackbar.show(navigator.context, '已添加《${book.title}》');
+    }
+    if (mounted) setState(() => _isAdding = false);
   }
 
   /// 添加小说到书架
@@ -187,7 +197,7 @@ class _AddNovelSheetState extends ConsumerState<AddNovelSheet> {
 
     setState(() => _isAdding = true);
 
-    // 捕获根导航器（在显示任何面板之前），用于后续关闭面板和显示提示
+    // 捕获根导航器（用于后续关闭添加面板 + 显示提示）
     final navigator = Navigator.of(context);
 
     // 重置爬取状态
@@ -196,24 +206,25 @@ class _AddNovelSheetState extends ConsumerState<AddNovelSheet> {
       message: '准备获取...',
     );
 
-    // 弹出进度面板
-    CrawlProgressSheet.show(context, title: '正在添加《${result.title}》');
+    // 弹出进度面板：成功/失败/取消时面板会自动关闭，
+    // 其返回值 true=成功、false=失败/取消，据此再关闭添加面板（只 pop 一次）。
+    final sheetFuture = CrawlProgressSheet.show(
+      context,
+      title: '正在添加《${result.title}》',
+    );
 
     try {
-      // 进度回调（作为参数传入，避免单例可变状态）
-      void onProgress(String message, int current, int total) {
-        if (!mounted) return;
-        ref.read(crawlStatusProvider.notifier).state = CrawlStatus(
-          state: 'fetching',
-          message: message,
-          current: current,
-          total: total,
-        );
-      }
-
       await ref.read(crawlRepositoryProvider).addNovel(
             result.url,
-            onProgress: onProgress,
+            onProgress: (message, current, total) {
+              if (!mounted) return;
+              ref.read(crawlStatusProvider.notifier).state = CrawlStatus(
+                state: 'fetching',
+                message: message,
+                current: current,
+                total: total,
+              );
+            },
           );
 
       if (!mounted) return;
@@ -223,22 +234,27 @@ class _AddNovelSheetState extends ConsumerState<AddNovelSheet> {
         state: 'success',
         message: '完成',
       );
-
-      // 关闭进度面板 + 添加面板，然后提示
-      navigator.pop(); // 关闭进度面板
-      navigator.pop(); // 关闭添加面板
-      AppSnackbar.show(navigator.context, '已添加《${result.title}》');
     } on CancelledException {
       // 用户主动取消，不显示错误
     } catch (e) {
+      debugPrint('[AddNovelSheet] 添加失败: $e');
       if (!mounted) return;
       ref.read(crawlStatusProvider.notifier).state = CrawlStatus(
         state: 'failed',
         message: '添加失败：$e',
       );
-    } finally {
-      if (mounted) setState(() => _isAdding = false);
     }
+
+    // 等待进度面板自动关闭
+    final ok = await sheetFuture;
+    if (!mounted) return;
+
+    if (ok == true) {
+      // 关闭添加面板（进度面板已自动关闭）
+      navigator.pop();
+      AppSnackbar.show(navigator.context, '已添加《${result.title}》');
+    }
+    if (mounted) setState(() => _isAdding = false);
   }
 
   /// 从粘贴的 URL 直接添加小说
@@ -287,6 +303,8 @@ class _AddNovelSheetState extends ConsumerState<AddNovelSheet> {
     if (!mounted) return;
 
     setState(() => _isAdding = true);
+
+    // 捕获根导航器（用于后续关闭添加面板 + 显示提示）
     final navigator = Navigator.of(context);
 
     ref.read(crawlStatusProvider.notifier).state = const CrawlStatus(
@@ -294,22 +312,22 @@ class _AddNovelSheetState extends ConsumerState<AddNovelSheet> {
       message: '准备获取...',
     );
 
-    CrawlProgressSheet.show(context, title: '正在添加小说');
+    // 弹出进度面板：成功/失败/取消时面板会自动关闭，
+    // 其返回值 true=成功、false=失败/取消，据此再关闭添加面板（只 pop 一次）。
+    final sheetFuture = CrawlProgressSheet.show(context, title: '正在添加小说');
 
     try {
-      void onProgress(String message, int current, int total) {
-        if (!mounted) return;
-        ref.read(crawlStatusProvider.notifier).state = CrawlStatus(
-          state: 'fetching',
-          message: message,
-          current: current,
-          total: total,
-        );
-      }
-
       await ref.read(crawlRepositoryProvider).addNovel(
             url,
-            onProgress: onProgress,
+            onProgress: (message, current, total) {
+              if (!mounted) return;
+              ref.read(crawlStatusProvider.notifier).state = CrawlStatus(
+                state: 'fetching',
+                message: message,
+                current: current,
+                total: total,
+              );
+            },
           );
 
       if (!mounted) return;
@@ -318,21 +336,27 @@ class _AddNovelSheetState extends ConsumerState<AddNovelSheet> {
         state: 'success',
         message: '完成',
       );
-
-      navigator.pop(); // 关闭进度面板
-      navigator.pop(); // 关闭添加面板
-      AppSnackbar.show(navigator.context, '已添加小说');
     } on CancelledException {
       // 用户主动取消
     } catch (e) {
+      debugPrint('[AddNovelSheet] 添加失败: $e');
       if (!mounted) return;
       ref.read(crawlStatusProvider.notifier).state = CrawlStatus(
         state: 'failed',
         message: '添加失败：$e',
       );
-    } finally {
-      if (mounted) setState(() => _isAdding = false);
     }
+
+    // 等待进度面板自动关闭
+    final ok = await sheetFuture;
+    if (!mounted) return;
+
+    if (ok == true) {
+      // 关闭添加面板（进度面板已自动关闭）
+      navigator.pop();
+      AppSnackbar.show(navigator.context, '已添加小说');
+    }
+    if (mounted) setState(() => _isAdding = false);
   }
 
   @override

@@ -40,6 +40,11 @@ class _NovelReaderPageState extends ConsumerState<NovelReaderPage> {
   ReaderSettings? _settings;
   Timer? _saveTimer;
 
+  // 按需抓取正文状态（正文为空时抓取，避免预取不足导致整章空白）
+  int? _loadingChapterId;
+  bool _chapterLoadFailed = false;
+  String? _chapterLoadMessage;
+
   // 分页缓存（避免每次 rebuild 重复计算 TextPainter 布局）
   String? _paginateContent;
   double? _paginateWidth;
@@ -131,21 +136,16 @@ class _NovelReaderPageState extends ConsumerState<NovelReaderPage> {
   // ──────── 章节切换 ────────
 
   void _goToChapter(int index, List<NovelChapter> chapters) {
-    // 如果传入了 chapters 列表则校验范围，否则直接跳转（由调用方保证范围）
-    final clamped = chapters.isEmpty
-        ? index.clamp(0, 0)
-        : index.clamp(0, chapters.length - 1);
+    // 传入的 chapters 用于校验范围；chapters 为空说明没有章节可跳
+    final clamped = chapters.isEmpty ? 0 : index.clamp(0, chapters.length - 1);
     setState(() {
       _currentChapterIndex = clamped;
-      _restored = true;
-    });
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      if (_settings?.pageMode == 1) {
-        if (_pages.isNotEmpty) _pageController.jumpToPage(0);
-      } else {
-        if (_scrollController.hasClients) _scrollController.jumpTo(0);
-      }
+      // 切章后重新定位/恢复（由 _maybeRestore 统一在滚动/翻页两种模式下执行）
+      _restored = false;
+      // 重置按需抓取状态，为当前章重新评估
+      _loadingChapterId = null;
+      _chapterLoadFailed = false;
+      _chapterLoadMessage = null;
     });
     _saveProgress(0.0);
   }
@@ -260,21 +260,95 @@ class _NovelReaderPageState extends ConsumerState<NovelReaderPage> {
         effectiveIndex == _novel!.lastChapterIndex
             ? _novel!.lastPosition
             : 0.0;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      if (settings.pageMode == 1) {
-        if (_pages.isNotEmpty) {
-          final target = (restoreRatio * _pages.length)
-              .round()
-              .clamp(0, _pages.length - 1);
-          _pageController.jumpToPage(target);
-        }
-      } else if (_scrollController.hasClients &&
-          _scrollController.position.maxScrollExtent > 0) {
-        final max = _scrollController.position.maxScrollExtent;
-        _scrollController.jumpTo((restoreRatio * max).clamp(0.0, max));
+    // 由 build 的 post-frame 钩子调用，此时布局已完成，可直接定位；
+    // 滚动 / 翻页两种模式都执行，保证滚动模式进度也能恢复。
+    if (settings.pageMode == 1) {
+      if (_pages.isNotEmpty) {
+        final target = (restoreRatio * _pages.length)
+            .round()
+            .clamp(0, _pages.length - 1);
+        _pageController.jumpToPage(target);
       }
-      if (mounted) setState(() => _restored = true);
+    } else if (_scrollController.hasClients &&
+        _scrollController.position.maxScrollExtent > 0) {
+      final max = _scrollController.position.maxScrollExtent;
+      _scrollController.jumpTo((restoreRatio * max).clamp(0.0, max));
+    }
+    // 恢复后立即保存，防止 _onScroll/_onPageChanged 未触发的场景丢进度
+    _saveProgress(restoreRatio);
+    if (mounted) setState(() => _restored = true);
+  }
+
+  // ──────── 正文按需抓取（预取不足的章节）────────
+
+  /// 当前章正文为空时按需抓取并写回数据库
+  ///
+  /// 由 build 的 post-frame 钩子在每次进入章节时调用；内部有幂等守卫，
+  /// 仅在正文为空、未在加载、未失败时真正发起网络请求。
+  Future<void> _ensureChapterContent(
+    List<NovelChapter> chapters,
+    int index,
+  ) async {
+    if (index < 0 || index >= chapters.length) return;
+    final chapter = chapters[index];
+    if (chapter.content.isNotEmpty) return; // 已有正文，无需抓取
+    if (_loadingChapterId == chapter.id) return; // 正在加载
+    if (_chapterLoadFailed) return; // 等待用户手动重试
+
+    final novel = _novel;
+    if (novel == null) return; // 小说进度尚未就绪，等下一次构建重试
+
+    final sourceKey = novel.sourceKey;
+    final sourceUrl = chapter.sourceUrl;
+    if (sourceKey == null || sourceUrl == null || sourceUrl.isEmpty) {
+      // 本地书 / 无源站信息：无法按需抓取
+      setState(() {
+        _chapterLoadFailed = true;
+        _chapterLoadMessage = '本章暂无内容';
+      });
+      return;
+    }
+
+    setState(() {
+      _loadingChapterId = chapter.id;
+      _chapterLoadFailed = false;
+      _chapterLoadMessage = null;
+    });
+    try {
+      final content = await ref
+          .read(crawlRepositoryProvider)
+          .fetchChapterContent(chapterUrl: sourceUrl, novelSourceKey: sourceKey);
+      if (!mounted) return;
+      if (content.isEmpty) {
+        setState(() {
+          _loadingChapterId = null;
+          _chapterLoadFailed = true;
+          _chapterLoadMessage = '本章暂无内容';
+        });
+        return;
+      }
+      // 写回数据库，触发 chaptersProvider 流刷新自动渲染
+      await ref
+          .read(novelChapterRepositoryProvider)
+          .updateContent(widget.novelId, chapter.chapterIndex, content);
+      if (!mounted) return;
+      setState(() => _loadingChapterId = null);
+    } catch (e) {
+      debugPrint('[NovelReaderPage] 章节正文抓取失败: $e');
+      if (!mounted) return;
+      setState(() {
+        _loadingChapterId = null;
+        _chapterLoadFailed = true;
+        _chapterLoadMessage = '加载失败，请重试';
+      });
+    }
+  }
+
+  /// 手动重试抓取当前章正文（清空失败状态，触发 post-frame 钩子重新抓取）
+  void _retryChapter() {
+    setState(() {
+      _chapterLoadFailed = false;
+      _chapterLoadMessage = null;
     });
   }
 
@@ -336,77 +410,92 @@ class _NovelReaderPageState extends ConsumerState<NovelReaderPage> {
     final paddingTop = MediaQuery.of(context).padding.top;
     final paddingBottom = MediaQuery.of(context).padding.bottom;
 
-    final readingArea = settings.pageMode == 0
-        ? SingleChildScrollView(
-            controller: _scrollController,
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  chapterTitle,
-                  style: TextStyle(
-                    fontSize: settings.fontSize + 4,
-                    fontWeight: FontWeight.w700,
-                    color: textColor,
-                    fontFamily: AppTextStyles.cjkFontFamily,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  content,
-                  style: TextStyle(
-                    fontSize: settings.fontSize,
-                    height: settings.lineHeight,
-                    color: textColor,
-                    fontFamily: AppTextStyles.cjkFontFamily,
-                  ),
-                ),
-                const SizedBox(height: 48),
-              ],
+    // 进入本章后统一处理：恢复进度（滚动/翻页两种模式）+ 按需抓取空正文。
+    // 放在 post-frame 而非 build 中执行，避免在 build 内触发副作用。
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _maybeRestore(settings, effectiveIndex);
+      _ensureChapterContent(chapters, effectiveIndex);
+    });
+
+    final Widget readingArea;
+    if (content.isEmpty) {
+      // 正文为空：展示加载/失败占位（按需抓取中）
+      readingArea = _buildEmptyContent(settings, textColor, chapterTitle);
+    } else if (settings.pageMode == 0) {
+      // 滚动模式
+      readingArea = SingleChildScrollView(
+        controller: _scrollController,
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              chapterTitle,
+              style: TextStyle(
+                fontSize: settings.fontSize + 4,
+                fontWeight: FontWeight.w700,
+                color: textColor,
+                fontFamily: AppTextStyles.cjkFontFamily,
+              ),
             ),
-          )
-        : LayoutBuilder(
-            builder: (context, constraints) {
-              final availWidth = constraints.maxWidth - 48;
-              final availHeight = constraints.maxHeight - 48;
-              if (_pages.isEmpty ||
-                  _paginateContent != content ||
-                  _paginateWidth != availWidth ||
-                  _paginateHeight != availHeight ||
-                  _paginateFontSize != settings.fontSize ||
-                  _paginateLineHeight != settings.lineHeight) {
-                _pages = _paginate(
-                  content, availWidth, availHeight,
-                  settings.fontSize, settings.lineHeight,
-                );
-                _paginateContent = content;
-                _paginateWidth = availWidth;
-                _paginateHeight = availHeight;
-                _paginateFontSize = settings.fontSize;
-                _paginateLineHeight = settings.lineHeight;
-              }
-              _maybeRestore(settings, effectiveIndex);
-              return PageView.builder(
-                controller: _pageController,
-                itemCount: _pages.length,
-                onPageChanged: _onPageChanged,
-                itemBuilder: (_, i) => Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-                  child: Text(
-                    _pages[i],
-                    style: TextStyle(
-                      fontSize: settings.fontSize,
-                      height: settings.lineHeight,
-                      color: textColor,
-                      fontFamily: AppTextStyles.cjkFontFamily,
-                    ),
-                  ),
+            const SizedBox(height: 16),
+            Text(
+              content,
+              style: TextStyle(
+                fontSize: settings.fontSize,
+                height: settings.lineHeight,
+                color: textColor,
+                fontFamily: AppTextStyles.cjkFontFamily,
+              ),
+            ),
+            const SizedBox(height: 48),
+          ],
+        ),
+      );
+    } else {
+      // 翻页模式
+      readingArea = LayoutBuilder(
+        builder: (context, constraints) {
+          final availWidth = constraints.maxWidth - 48;
+          final availHeight = constraints.maxHeight - 48;
+          if (_pages.isEmpty ||
+              _paginateContent != content ||
+              _paginateWidth != availWidth ||
+              _paginateHeight != availHeight ||
+              _paginateFontSize != settings.fontSize ||
+              _paginateLineHeight != settings.lineHeight) {
+            _pages = _paginate(
+              content, availWidth, availHeight,
+              settings.fontSize, settings.lineHeight,
+            );
+            _paginateContent = content;
+            _paginateWidth = availWidth;
+            _paginateHeight = availHeight;
+            _paginateFontSize = settings.fontSize;
+            _paginateLineHeight = settings.lineHeight;
+          }
+          return PageView.builder(
+            controller: _pageController,
+            itemCount: _pages.length,
+            onPageChanged: _onPageChanged,
+            itemBuilder: (_, i) => Padding(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+              child: Text(
+                _pages[i],
+                style: TextStyle(
+                  fontSize: settings.fontSize,
+                  height: settings.lineHeight,
+                  color: textColor,
+                  fontFamily: AppTextStyles.cjkFontFamily,
                 ),
-              );
-            },
+              ),
+            ),
           );
+        },
+      );
+    }
 
     return Scaffold(
       backgroundColor: bg,
@@ -424,9 +513,74 @@ class _NovelReaderPageState extends ConsumerState<NovelReaderPage> {
               child: readingArea,
             ),
           ),
-          if (_showToolbars) _buildTopBar(context, theme, chapterTitle),
+          if (_showToolbars) _buildTopBar(context, theme, chapterTitle, chapters),
           if (_showToolbars)
             _buildBottomBar(context, theme, chapters, effectiveIndex),
+        ],
+      ),
+    );
+  }
+
+  /// 正文为空的占位（按需抓取中 / 抓取失败）
+  Widget _buildEmptyContent(
+    ReaderSettings settings,
+    Color textColor,
+    String chapterTitle,
+  ) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (chapterTitle.isNotEmpty) ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Text(
+                chapterTitle,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: settings.fontSize + 4,
+                  fontWeight: FontWeight.w700,
+                  color: textColor,
+                  fontFamily: AppTextStyles.cjkFontFamily,
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+          ],
+          if (_chapterLoadFailed)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 32),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    _chapterLoadMessage ?? '本章暂无内容',
+                    style: AppTextStyles.body.copyWith(color: textColor),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  FilledButton(
+                    onPressed: _retryChapter,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.accentRose,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppColors.radiusMd),
+                      ),
+                    ),
+                    child: const Text('重试'),
+                  ),
+                ],
+              ),
+            )
+          else
+            const SizedBox(
+              width: 28,
+              height: 28,
+              child: CircularProgressIndicator(
+                strokeWidth: 3,
+                color: AppColors.accentRose,
+              ),
+            ),
         ],
       ),
     );
@@ -436,6 +590,7 @@ class _NovelReaderPageState extends ConsumerState<NovelReaderPage> {
     BuildContext context,
     int theme,
     String title,
+    List<NovelChapter> chapters,
   ) {
     final textColor = AppColors.readerTextOn(theme);
     final paddingTop = MediaQuery.of(context).padding.top;
@@ -472,7 +627,8 @@ class _NovelReaderPageState extends ConsumerState<NovelReaderPage> {
                 context,
                 novelId: widget.novelId,
                 currentIndex: _currentChapterIndex,
-                onSelect: (i) => _goToChapter(i, []),
+                // 传入章节列表，确保跳章时按真实章节数做范围校验（而非 clamp 恒为 0）
+                onSelect: (i) => _goToChapter(i, chapters),
               ),
             ),
           ],

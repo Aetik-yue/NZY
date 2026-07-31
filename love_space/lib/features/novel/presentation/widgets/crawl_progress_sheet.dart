@@ -7,15 +7,17 @@ import '../../../../data/providers/data_providers.dart';
 /// 爬取进度面板
 ///
 /// 显示当前爬取操作的进度（搜索中 / 抓取详情 / 抓取章节 N/M），
-/// 完成后自动关闭。
-class CrawlProgressSheet extends ConsumerWidget {
+/// 完成后自动关闭（带防重守卫，避免与调用方手动关闭叠加造成重复 pop）。
+class CrawlProgressSheet extends ConsumerStatefulWidget {
   final String title;
 
   const CrawlProgressSheet({super.key, this.title = '正在获取小说'});
 
   /// 弹出进度面板
-  static Future<void> show(BuildContext context, {String title = '正在获取小说'}) {
-    return showModalBottomSheet(
+  ///
+  /// 返回 Future，面板关闭时完成；成功关闭返回 true，失败/取消返回 false。
+  static Future<bool?> show(BuildContext context, {String title = '正在获取小说'}) {
+    return showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       isDismissible: false,
@@ -28,15 +30,23 @@ class CrawlProgressSheet extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<CrawlProgressSheet> createState() => _CrawlProgressSheetState();
+}
+
+class _CrawlProgressSheetState extends ConsumerState<CrawlProgressSheet> {
+  /// 是否已自动关闭（防止 status 连续为 success/failed 时重复 pop）
+  bool _autoClosed = false;
+
+  @override
+  Widget build(BuildContext context) {
     final status = ref.watch(crawlStatusProvider);
 
-    // 成功或失败后自动关闭
-    if (status.state == 'success' || status.state == 'failed') {
+    // 成功或失败后自动关闭（只触发一次）
+    if (!_autoClosed && (status.state == 'success' || status.state == 'failed')) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (context.mounted) {
-          Navigator.of(context).pop(status.state == 'success');
-        }
+        if (!mounted || _autoClosed) return;
+        _autoClosed = true;
+        Navigator.of(context).pop(status.state == 'success');
       });
     }
 
@@ -76,7 +86,7 @@ class CrawlProgressSheet extends ConsumerWidget {
             const SizedBox(height: 16),
 
             // 标题
-            Text(title, style: AppTextStyles.titleMedium),
+            Text(widget.title, style: AppTextStyles.titleMedium),
 
             const SizedBox(height: 8),
 
