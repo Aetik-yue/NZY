@@ -87,60 +87,104 @@ class BiqugeCrawler implements BaseCrawler {
     return _searchViaEngine(kw);
   }
 
-  /// 搜索引擎兜底：用 Bing + Google site: 搜索找书籍详情页 URL
+  /// 搜索引擎兜底：用多引擎 site: 搜索找书籍详情页 URL
   ///
-  /// 当站点自身搜索不可用（如 biquge2.net 搜索索引损坏）时，
-  /// 通过搜索引擎检索 `site:<baseUrl> 书名`，从结果中提取书籍 URL。
-  /// 依赖搜索引擎对目标站的索引，效果因站而异。
+  /// 笔趣阁镜像站站内搜索普遍失效（404 / JS 渲染 / 搜索索引损坏），
+  /// 通过搜索引擎检索 `site:<baseUrl> 书名` 是找到书籍 URL 的最后手段。
+  ///
+  /// 逐个引擎尝试（Bing / Google / 搜狗 / 360 / DuckDuckGo），任一命中即返回：
+  /// - 国内网络下 Bing/Google 常被墙或返回机器人检测页，搜狗/360 是补充
+  /// - 结果链接常被包装成重定向 URL（bing.com/ck/a、google.com/url 等），
+  ///   需先解出真实地址再匹配书籍 URL 模式
   Future<List<SearchResult>> _searchViaEngine(String keyword) async {
     final host = Uri.parse(baseUrl).host;
     // 转义 host 中的正则元字符（如 .）；注意不能用 raw string，否则 $hostPattern 不参与插值
     final hostPattern = RegExp.escape(host);
-    final bookRe = RegExp('https?://[^/]*$hostPattern/book/(\\d+)/?');
+    // 匹配源站书籍 URL（bqgbb / biquge2 均为 /book/{id}/）
+    final bookRe = RegExp('https?://[^/]*$hostPattern/book/[0-9]+/?');
 
-    final engines = [
-      'https://www.bing.com/search?q=',
-      'https://www.google.com/search?q=',
-    ];
     final query = Uri.encodeQueryComponent('site:$host $keyword');
+    final engines = <String, String>{
+      'bing': 'https://www.bing.com/search?q=$query',
+      'google': 'https://www.google.com/search?q=$query',
+      'sogou': 'https://www.sogou.com/web?query=$query',
+      '360': 'https://www.so.com/s?q=$query',
+      'duckduckgo': 'https://html.duckduckgo.com/html/?q=$query',
+    };
 
-    for (final engine in engines) {
+    for (final entry in engines.entries) {
       try {
-        final body = await _httpClient.get('$engine$query', headers: {
+        final body = await _httpClient.get(entry.value, headers: {
           'User-Agent': UserAgentRotator.random,
           'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
         });
 
-        final document = html_parser.parse(body);
-        final results = <SearchResult>[];
-        final seen = <String>{};
-
-        for (final link in document.querySelectorAll('a[href]')) {
-          final href = link.attributes['href'] ?? '';
-          final title = link.text.trim();
-          if (title.isEmpty || title.length < 2) continue;
-
-          final match = bookRe.firstMatch(href);
-          if (match != null) {
-            final url = match.group(0)!;
-            if (seen.contains(url)) continue;
-            seen.add(url);
-            results.add(SearchResult(title: title, author: '', url: url));
-            if (results.length >= 10) break;
-          }
-        }
-
+        final results = _parseEngineResults(body, bookRe);
         if (results.isNotEmpty) {
-          debugPrint(
-              '[BiqugeCrawler] ${engine.split('/')[2]} 找到 ${results.length} 条');
+          debugPrint('[BiqugeCrawler] ${entry.key} 找到 ${results.length} 条');
           return results;
         }
       } catch (e) {
-        debugPrint('[BiqugeCrawler] 搜索引擎 $engine 失败: $e');
+        debugPrint('[BiqugeCrawler] 搜索引擎 ${entry.key} 失败: $e');
       }
     }
 
     return [];
+  }
+
+  /// 解析搜索引擎结果页，提取指向源站书籍页的链接
+  ///
+  /// 每个结果链接先用 [_extractRedirectTarget] 解出真实地址（绕过搜索引擎的
+  /// 重定向包装），再匹配书籍 URL 模式；命中后去重并截断到 10 条。
+  List<SearchResult> _parseEngineResults(String html, RegExp bookRe) {
+    final document = html_parser.parse(html);
+    final results = <SearchResult>[];
+    final seen = <String>{};
+
+    for (final link in document.querySelectorAll('a[href]')) {
+      final rawHref = link.attributes['href'] ?? '';
+      final title = link.text.trim();
+      if (title.isEmpty || title.length < 2) continue;
+
+      final realUrl = _extractRedirectTarget(rawHref) ?? rawHref;
+      final match = bookRe.firstMatch(realUrl);
+      if (match == null) continue;
+
+      final url = match.group(0)!;
+      if (seen.contains(url)) continue;
+      seen.add(url);
+      results.add(SearchResult(title: title, author: '', url: url));
+      if (results.length >= 10) break;
+    }
+    return results;
+  }
+
+  /// 从搜索引擎重定向 URL 中解出真实目标地址
+  ///
+  /// - Bing：`u=<base64url>`（对真实 URL encodeURIComponent 后 base64）
+  /// - Google：`q=<url>`（URL 编码）
+  /// - 360 / 搜狗：`url=<base64url>`
+  /// 解不出时返回 null，由调用方直接用原 href 匹配。
+  String? _extractRedirectTarget(String href) {
+    final uri = Uri.tryParse(href);
+    if (uri == null || uri.queryParameters.isEmpty) return null;
+
+    final encoded = uri.queryParameters['u'] ??
+        uri.queryParameters['q'] ??
+        uri.queryParameters['url'];
+    if (encoded == null || encoded.isEmpty) return null;
+
+    // 优先按 base64url 解码（Bing / 360 常见）
+    var b64 = encoded.replaceAll('-', '+').replaceAll('_', '/');
+    while (b64.length % 4 != 0) {
+      b64 += '=';
+    }
+    try {
+      return utf8.decode(base64.decode(b64));
+    } catch (_) {
+      // 非 base64（如 Google 的 q= 直接是 URL）时按 URL 解码
+      return Uri.decodeFull(encoded);
+    }
   }
 
   @override

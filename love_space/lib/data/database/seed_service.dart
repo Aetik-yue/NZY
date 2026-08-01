@@ -101,6 +101,12 @@ class SeedService {
           ..createdAt = DateTime.now()
           ..selectors = _bqgbbSelectors);
       });
+    } else if (!bqgbbSource.selectors.contains('#chaptercontent')) {
+      // 迁移：老设备已存旧选择器（正文 #content / 标题 .bookname h1），对齐新结构
+      bqgbbSource.selectors = _bqgbbSelectors;
+      await _isar.writeTxn(() async {
+        await _isar.novelSources.put(bqgbbSource);
+      });
     }
 
     // 默认爬取配置
@@ -123,6 +129,10 @@ class SeedService {
 ''';
 
   /// bqgbb.cc 选择器配置（搜索源）
+  ///
+  /// 选择器对齐 bqgbb.cc 真实结构（2026-08 实测）：
+  /// - 章节标题：.chapter-title（非 .bookname h1）
+  /// - 正文容器：id="chaptercontent"（非 #content）
   static const String _bqgbbSelectors = '''
 {
   "searchUrl": "/search.php?searchkey={keyword}",
@@ -131,8 +141,8 @@ class SeedService {
   "authorSelector": ".details p a[href*=\\"/zuozhe/\\"]",
   "introSelector": ".intro .p2",
   "chapterListSelector": ".yanqing_list li a",
-  "chapterTitleSelector": ".bookname h1",
-  "chapterContentSelector": "#content"
+  "chapterTitleSelector": ".chapter-title",
+  "chapterContentSelector": "#chaptercontent"
 }
 ''';
 }
