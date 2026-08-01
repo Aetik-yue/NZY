@@ -8,6 +8,7 @@ import '../../../data/providers/data_providers.dart';
 import '../../../data/models/novel.dart';
 import '../../../data/models/novel_chapter.dart';
 import '../../../data/models/reader_settings.dart';
+import '../../../shared/widgets/app_snackbar.dart';
 import 'widgets/chapter_list_sheet.dart';
 import 'widgets/reader_settings_sheet.dart';
 
@@ -52,6 +53,22 @@ class _NovelReaderPageState extends ConsumerState<NovelReaderPage> {
   double? _paginateFontSize;
   double? _paginateLineHeight;
 
+  // 滚动模式连续阅读：已追加渲染的章节 + 每章起始滚动偏移（用于章内进度换算）
+  List<NovelChapter> _scrollChapters = [];
+  List<double> _chapterBases = [];
+  bool _scrollFetchingNext = false;
+
+  // 翻页模式自动翻章：到达章末“下一章”页时的加载状态
+  bool _autoAdvancing = false;
+  bool _autoAdvanceFailed = false;
+
+  // 最近一次构建的章节列表（滚动监听里做自动追加时需要）
+  List<NovelChapter> _latestChapters = [];
+
+  // 连续阅读列表构建时的字号/行距（变化时重置高度基准）
+  double? _scrollFontSize;
+  double? _scrollLineHeight;
+
   @override
   void initState() {
     super.initState();
@@ -72,15 +89,22 @@ class _NovelReaderPageState extends ConsumerState<NovelReaderPage> {
 
   @override
   void dispose() {
-    final ratio = _currentRatio();
     _saveTimer?.cancel();
+    // 滚动模式连续阅读时，按视口当前所在章节保存进度（先于控制器 dispose 计算）
+    int chapterIndex = _currentChapterIndex;
+    double ratio = _currentRatio();
+    if (_settings?.pageMode == 0 && _scrollController.hasClients) {
+      final (idx, r) = _computeScrollProgress();
+      chapterIndex = idx;
+      ratio = r;
+    }
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     _pageController.dispose();
     // 末次保存进度
     ref
         .read(novelRepositoryProvider)
-        .updateProgress(widget.novelId, _currentChapterIndex, ratio);
+        .updateProgress(widget.novelId, chapterIndex, ratio);
     // 恢复系统 UI，否则返回后系统栏丢失
     SystemChrome.setEnabledSystemUIMode(
       SystemUiMode.manual,
@@ -100,20 +124,20 @@ class _NovelReaderPageState extends ConsumerState<NovelReaderPage> {
     }
     if (_scrollController.hasClients &&
         _scrollController.position.maxScrollExtent > 0) {
-      return (_scrollController.offset / _scrollController.position.maxScrollExtent)
-          .clamp(0.0, 1.0);
+      // 滚动模式（含连续阅读）：按视口所在章节换算章内进度
+      return _computeScrollProgress().$2;
     }
     return 0.0;
   }
 
-  void _saveProgress(double ratio) {
+  void _saveProgress(double ratio, {int? chapterIndex}) {
     if (!mounted) return;
     _saveTimer?.cancel();
     _saveTimer = Timer(const Duration(milliseconds: 500), () {
       if (!mounted) return;
       ref.read(novelRepositoryProvider).updateProgress(
             widget.novelId,
-            _currentChapterIndex,
+            chapterIndex ?? _currentChapterIndex,
             ratio,
           );
     });
@@ -123,7 +147,16 @@ class _NovelReaderPageState extends ConsumerState<NovelReaderPage> {
     if (!_restored || !_scrollController.hasClients) return;
     final pos = _scrollController.position;
     if (pos.maxScrollExtent <= 0) return;
-    _saveProgress((pos.pixels / pos.maxScrollExtent).clamp(0.0, 1.0));
+    // 连续阅读：接近列表底部时自动追加下一章
+    if (pos.maxScrollExtent - pos.pixels < _appendThreshold) {
+      _maybeAppendNextChapter();
+    }
+    // 按视口所在章节保存进度（连续阅读跨章时进度会指向新章节）
+    final (idx, ratio) = _computeScrollProgress();
+    if (idx != _currentChapterIndex) {
+      setState(() => _currentChapterIndex = idx);
+    }
+    _saveProgress(ratio);
   }
 
   void _onPageChanged(int page) {
@@ -146,6 +179,14 @@ class _NovelReaderPageState extends ConsumerState<NovelReaderPage> {
       _loadingChapterId = null;
       _chapterLoadFailed = false;
       _chapterLoadMessage = null;
+      if (_settings?.pageMode == 0) {
+        // 滚动模式：重置连续阅读列表，仅渲染目标章
+        _scrollChapters = chapters.isEmpty ? [] : [chapters[clamped]];
+        _chapterBases = [0.0];
+        _scrollFetchingNext = false;
+      }
+      _autoAdvancing = false;
+      _autoAdvanceFailed = false;
     });
     _saveProgress(0.0);
   }
@@ -183,8 +224,19 @@ class _NovelReaderPageState extends ConsumerState<NovelReaderPage> {
 
   void _next() {
     if (_settings?.pageMode == 1) {
-      if (_pageController.page != null &&
-          _pageController.page! < _pages.length - 1) {
+      final page = _pageController.page;
+      if (page == null) return;
+      final lastRealPage = _pages.length - 1;
+      if (page < lastRealPage) {
+        _pageController.nextPage(
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeOut,
+        );
+      } else if (_isLastChapter) {
+        // 已是最后一章的最后一页
+        if (mounted) AppSnackbar.show(context, '已经是最后一章');
+      } else {
+        // 翻到本章末尾的“下一章”哨兵页，触发自动翻章
         _pageController.nextPage(
           duration: const Duration(milliseconds: 250),
           curve: Curves.easeOut,
@@ -263,7 +315,8 @@ class _NovelReaderPageState extends ConsumerState<NovelReaderPage> {
     // 由 build 的 post-frame 钩子调用，此时布局已完成，可直接定位；
     // 滚动 / 翻页两种模式都执行，保证滚动模式进度也能恢复。
     if (settings.pageMode == 1) {
-      if (_pages.isNotEmpty) {
+      // hasClients 防御：正文为空时展示占位（无 PageView），此时不可定位
+      if (_pages.isNotEmpty && _pageController.hasClients) {
         final target = (restoreRatio * _pages.length)
             .round()
             .clamp(0, _pages.length - 1);
@@ -352,6 +405,152 @@ class _NovelReaderPageState extends ConsumerState<NovelReaderPage> {
     });
   }
 
+  // ──────── 自动翻章（滚动模式追加 / 翻页模式哨兵页） ────────
+
+  /// 距列表底部多少像素内视为“读到章尾”，触发自动追加下一章
+  static const double _appendThreshold = 240;
+
+  /// 滚动模式连续阅读已装载到的最后章序号（-1 表示尚未装载）
+  int get _scrollLastIndex =>
+      _scrollChapters.isEmpty ? -1 : _scrollChapters.last.chapterIndex;
+
+  /// 当前章是否为最后一章（用于自动翻章的“已是最后一章”提示）
+  bool get _isLastChapter {
+    final chapters = _latestChapters;
+    if (chapters.isEmpty) return true;
+    final effective = _currentChapterIndex.clamp(0, chapters.length - 1);
+    return effective >= chapters.length - 1;
+  }
+
+  /// 计算滚动模式下视口当前所在章节及其章内进度（0..1）
+  ///
+  /// 连续阅读把多章内容顺序拼进同一个滚动列表；借助每章开始时的滚动偏移
+  /// （_chapterBases）定位视口所在的章节，并把该章区间内的滚动位置换算成
+  /// 章内比例，从而保证自动翻章后进度正确指向新章节。
+  (int, double) _computeScrollProgress() {
+    final pos = _scrollController.position;
+    if (_scrollChapters.isEmpty ||
+        _chapterBases.isEmpty ||
+        pos.maxScrollExtent <= 0) {
+      return (_currentChapterIndex, 0.0);
+    }
+    final pixels = pos.pixels;
+    var listIdx = 0;
+    for (var i = 0; i < _chapterBases.length; i++) {
+      if (pixels >= _chapterBases[i]) {
+        listIdx = i;
+      } else {
+        break;
+      }
+    }
+    final base = _chapterBases[listIdx];
+    final double extent;
+    if (listIdx + 1 < _chapterBases.length) {
+      extent = _chapterBases[listIdx + 1] - base;
+    } else {
+      // 最后一章：区间延伸到当前滚动上界
+      extent = pos.maxScrollExtent - base;
+    }
+    if (extent <= 0) return (_currentChapterIndex, 0.0);
+    final ratio = ((pixels - base) / extent).clamp(0.0, 1.0);
+    return (_scrollChapters[listIdx].chapterIndex, ratio);
+  }
+
+  /// 确保指定章节正文已就绪（自动翻章用）
+  ///
+  /// 正文已在库中直接返回 true；为空时按需抓取并写回数据库。
+  /// 失败（无源站 / 网络错误 / 内容为空）返回 false，由调用方提示用户。
+  Future<bool> _ensureChapterBodyReady(
+    List<NovelChapter> chapters,
+    int index,
+  ) async {
+    if (index < 0 || index >= chapters.length) return false;
+    final chapter = chapters[index];
+    if (chapter.content.isNotEmpty) return true;
+    final novel = _novel;
+    if (novel == null) return false;
+    final sourceKey = novel.sourceKey;
+    final sourceUrl = chapter.sourceUrl;
+    if (sourceKey == null || sourceUrl == null || sourceUrl.isEmpty) {
+      return false; // 本地书 / 无源站信息，无法按需抓取
+    }
+    try {
+      final content = await ref
+          .read(crawlRepositoryProvider)
+          .fetchChapterContent(chapterUrl: sourceUrl, novelSourceKey: sourceKey);
+      if (content.isEmpty) return false;
+      await ref
+          .read(novelChapterRepositoryProvider)
+          .updateContent(widget.novelId, chapter.chapterIndex, content);
+      return true;
+    } catch (e) {
+      debugPrint('[NovelReaderPage] 自动翻章正文抓取失败: $e');
+      return false;
+    }
+  }
+
+  /// 滚动模式连续阅读：将下一章追加到当前列表底部
+  ///
+  /// 由 _onScroll 在接近底部时触发；正文缺失时先按需抓取，成功后追加，
+  /// 并把阅读进度指向新章节。最后一章不再追加（列表尾部显示结尾提示）。
+  Future<void> _maybeAppendNextChapter() async {
+    if (_settings?.pageMode != 0) return;
+    if (_scrollFetchingNext) return; // 幂等守卫
+    if (_scrollChapters.isEmpty) return;
+    final chapters = _latestChapters;
+    final nextIndex = _scrollLastIndex + 1;
+    if (nextIndex >= chapters.length) return; // 已是最后一章
+
+    _scrollFetchingNext = true;
+    setState(() {}); // 列表底部显示加载占位
+    final ok = await _ensureChapterBodyReady(chapters, nextIndex);
+    if (!mounted) return;
+    if (!ok) {
+      setState(() => _scrollFetchingNext = false);
+      AppSnackbar.show(context, '下一章加载失败，请重试');
+      return;
+    }
+    setState(() {
+      _scrollFetchingNext = false;
+      // 新章起始滚动偏移 = 追加前的最大滚动距离（正文已随 Isar 对象实例更新）
+      final base = _scrollController.hasClients
+          ? _scrollController.position.maxScrollExtent
+          : 0.0;
+      _scrollChapters.add(chapters[nextIndex]);
+      _chapterBases.add(base);
+      _currentChapterIndex = nextIndex;
+    });
+    _saveProgress(0.0);
+  }
+
+  /// 翻页模式：滑到本章末尾的“下一章”页时，加载并切换到下一章第一页
+  Future<void> _handleNextChapterPage(
+    List<NovelChapter> chapters,
+    int effectiveIndex,
+  ) async {
+    if (_autoAdvancing) return; // 幂等守卫
+    final nextIndex = effectiveIndex + 1;
+    if (nextIndex >= chapters.length) {
+      if (mounted) AppSnackbar.show(context, '已经是最后一章');
+      return;
+    }
+    _autoAdvancing = true;
+    _autoAdvanceFailed = false;
+    setState(() {}); // 哨兵页显示加载中
+    final ok = await _ensureChapterBodyReady(chapters, nextIndex);
+    if (!mounted) return;
+    if (!ok) {
+      setState(() {
+        _autoAdvancing = false;
+        _autoAdvanceFailed = true;
+      });
+      AppSnackbar.show(context, '下一章加载失败，请重试');
+      return;
+    }
+    _autoAdvancing = false;
+    _goToChapter(nextIndex, chapters);
+  }
+
   // ──────── 构建 ────────
 
   @override
@@ -418,43 +617,19 @@ class _NovelReaderPageState extends ConsumerState<NovelReaderPage> {
       _ensureChapterContent(chapters, effectiveIndex);
     });
 
+    // 供滚动监听 / 自动翻章使用的最新章节列表
+    _latestChapters = chapters;
+
     final Widget readingArea;
-    if (content.isEmpty) {
+    if (settings.pageMode == 0) {
+      // 滚动模式（支持连续阅读：读到章尾自动追加下一章）
+      readingArea =
+          _buildScrollReader(settings, textColor, chapters, effectiveIndex);
+    } else if (content.isEmpty) {
       // 正文为空：展示加载/失败占位（按需抓取中）
       readingArea = _buildEmptyContent(settings, textColor, chapterTitle);
-    } else if (settings.pageMode == 0) {
-      // 滚动模式
-      readingArea = SingleChildScrollView(
-        controller: _scrollController,
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              chapterTitle,
-              style: TextStyle(
-                fontSize: settings.fontSize + 4,
-                fontWeight: FontWeight.w700,
-                color: textColor,
-                fontFamily: AppTextStyles.cjkFontFamily,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              content,
-              style: TextStyle(
-                fontSize: settings.fontSize,
-                height: settings.lineHeight,
-                color: textColor,
-                fontFamily: AppTextStyles.cjkFontFamily,
-              ),
-            ),
-            const SizedBox(height: 48),
-          ],
-        ),
-      );
     } else {
-      // 翻页模式
+      // 翻页模式（章末追加一页“下一章”哨兵页，滑到它即自动翻章）
       readingArea = LayoutBuilder(
         builder: (context, constraints) {
           final availWidth = constraints.maxWidth - 48;
@@ -475,23 +650,37 @@ class _NovelReaderPageState extends ConsumerState<NovelReaderPage> {
             _paginateFontSize = settings.fontSize;
             _paginateLineHeight = settings.lineHeight;
           }
+          final isLastChapter = effectiveIndex >= chapters.length - 1;
+          final itemCount = _pages.length + (isLastChapter ? 0 : 1);
           return PageView.builder(
             controller: _pageController,
-            itemCount: _pages.length,
-            onPageChanged: _onPageChanged,
-            itemBuilder: (_, i) => Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-              child: Text(
-                _pages[i],
-                style: TextStyle(
-                  fontSize: settings.fontSize,
-                  height: settings.lineHeight,
-                  color: textColor,
-                  fontFamily: AppTextStyles.cjkFontFamily,
-                ),
-              ),
-            ),
+            itemCount: itemCount,
+            onPageChanged: (page) {
+              if (page < _pages.length) {
+                _onPageChanged(page);
+              } else {
+                // 已滑到本章末尾的“下一章”页：自动加载并切换下一章
+                _handleNextChapterPage(chapters, effectiveIndex);
+              }
+            },
+            itemBuilder: (_, i) {
+              if (i < _pages.length) {
+                return Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+                  child: Text(
+                    _pages[i],
+                    style: TextStyle(
+                      fontSize: settings.fontSize,
+                      height: settings.lineHeight,
+                      color: textColor,
+                      fontFamily: AppTextStyles.cjkFontFamily,
+                    ),
+                  ),
+                );
+              }
+              return _buildChapterEndPage(settings, textColor);
+            },
           );
         },
       );
@@ -582,6 +771,133 @@ class _NovelReaderPageState extends ConsumerState<NovelReaderPage> {
               ),
             ),
         ],
+      ),
+    );
+  }
+
+  /// 滚动模式阅读区（支持连续阅读：读到章尾自动追加下一章）
+  ///
+  /// 已装载章节按顺序渲染；列表尾部按状态展示“加载中 / 已经读到最后一章”。
+  Widget _buildScrollReader(
+    ReaderSettings settings,
+    Color textColor,
+    List<NovelChapter> chapters,
+    int effectiveIndex,
+  ) {
+    if (chapters.isEmpty) {
+      return Center(
+        child:
+            Text('暂无章节', style: AppTextStyles.body.copyWith(color: textColor)),
+      );
+    }
+    // 初始化连续阅读列表（首次进入 / 从翻页模式切回时）
+    if (_scrollChapters.isEmpty) {
+      _scrollChapters = [chapters[effectiveIndex]];
+      _chapterBases = [0.0];
+      _scrollFontSize = settings.fontSize;
+      _scrollLineHeight = settings.lineHeight;
+    } else if (_scrollFontSize != settings.fontSize ||
+        _scrollLineHeight != settings.lineHeight) {
+      // 字号/行距变化会使已追加章节的高度基准失效，重置为当前章重新累计
+      _scrollChapters = [chapters[effectiveIndex]];
+      _chapterBases = [0.0];
+      _scrollFontSize = settings.fontSize;
+      _scrollLineHeight = settings.lineHeight;
+    }
+    // 起始章正文已按需抓取到时，用最新章节对象刷新（保证正文可渲染）
+    if (_scrollChapters.isNotEmpty && _scrollChapters.first.content.isEmpty) {
+      final firstIdx = _scrollChapters.first.chapterIndex;
+      if (firstIdx >= 0 &&
+          firstIdx < chapters.length &&
+          chapters[firstIdx].content.isNotEmpty) {
+        _scrollChapters = [chapters[firstIdx]];
+        _chapterBases = [0.0];
+      }
+    }
+    // 起始章正文未就绪（按需抓取中 / 失败）：沿用现有加载/失败占位
+    if (_scrollChapters.isEmpty || _scrollChapters.first.content.isEmpty) {
+      return _buildEmptyContent(
+        settings,
+        textColor,
+        chapters[effectiveIndex].title,
+      );
+    }
+    final showEndHint = _scrollLastIndex >= chapters.length - 1;
+    return SingleChildScrollView(
+      controller: _scrollController,
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (final c in _scrollChapters) ...[
+            Text(
+              c.title,
+              style: TextStyle(
+                fontSize: settings.fontSize + 4,
+                fontWeight: FontWeight.w700,
+                color: textColor,
+                fontFamily: AppTextStyles.cjkFontFamily,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              c.content,
+              style: TextStyle(
+                fontSize: settings.fontSize,
+                height: settings.lineHeight,
+                color: textColor,
+                fontFamily: AppTextStyles.cjkFontFamily,
+              ),
+            ),
+            const SizedBox(height: 32),
+          ],
+          if (_scrollFetchingNext) ...[
+            const SizedBox(height: 8),
+            const Center(
+              child: SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: AppColors.accentRose,
+                ),
+              ),
+            ),
+          ] else if (showEndHint) ...[
+            const SizedBox(height: 24),
+            Center(
+              child: Text(
+                '已经读到最后一章',
+                style: AppTextStyles.caption
+                    .copyWith(color: textColor.withValues(alpha: 0.6)),
+              ),
+            ),
+          ],
+          const SizedBox(height: 48),
+        ],
+      ),
+    );
+  }
+
+  /// 翻页模式章末的“下一章”页（加载中 / 失败提示）
+  Widget _buildChapterEndPage(ReaderSettings settings, Color textColor) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+      child: Center(
+        child: _autoAdvancing
+            ? const SizedBox(
+                width: 28,
+                height: 28,
+                child: CircularProgressIndicator(
+                  strokeWidth: 3,
+                  color: AppColors.accentRose,
+                ),
+              )
+            : Text(
+                _autoAdvanceFailed ? '下一章加载失败，请重试' : '正在加载下一章…',
+                style: AppTextStyles.body.copyWith(color: textColor),
+                textAlign: TextAlign.center,
+              ),
       ),
     );
   }
