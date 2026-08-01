@@ -51,6 +51,21 @@ subprojects {
     }
 }
 
+// 部分插件未声明 compileOptions，AGP 默认 Java 8 —— 在 JDK 21 下会触发
+// "源值 8 已过时" 警告（Java 8 已进入弃用通道）。在 javac 执行前，仅将
+// 仍停留在 1.8 的编译任务提升到 11；已显式设置 11/17 的项目保持不变
+// （避免与其 Kotlin jvmTarget 不一致导致构建失败）。
+subprojects {
+    tasks.withType(JavaCompile).configureEach { compileTask ->
+        compileTask.doFirst {
+            if (compileTask.sourceCompatibility == '1.8') {
+                compileTask.sourceCompatibility = '11'
+                compileTask.targetCompatibility = '11'
+            }
+        }
+    }
+}
+
 tasks.register("clean", Delete) {
     delete rootProject.buildDir
 }
