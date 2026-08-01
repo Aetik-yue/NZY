@@ -22,19 +22,22 @@ const _presetIcons = [
   Icons.celebration_rounded,
 ];
 
-/// 添加愿望的底部弹出表单
+/// 添加/编辑愿望的底部弹出表单
+///
+/// [initial] 传入时进入编辑模式（回填并走 update 保存）。
 class AddWishSheet extends ConsumerStatefulWidget {
-  const AddWishSheet({super.key});
+  final Wish? initial;
+  const AddWishSheet({super.key, this.initial});
 
   /// 弹出表单的便捷方法
-  static Future<void> show(BuildContext context) {
+  static Future<void> show(BuildContext context, {Wish? initial}) {
     return showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (_) => const AddWishSheet(),
+      builder: (_) => AddWishSheet(initial: initial),
     );
   }
 
@@ -47,6 +50,23 @@ class _AddWishSheetState extends ConsumerState<AddWishSheet> {
   final _descController = TextEditingController();
   int _selectedIconIndex = 0;
   bool _isSubmitting = false;
+
+  bool get _isEditing => widget.initial != null;
+
+  @override
+  void initState() {
+    super.initState();
+    final initial = widget.initial;
+    if (initial != null) {
+      _titleController.text = initial.title;
+      _descController.text = initial.description;
+      // 匹配预设图标（未命中则用第 0 个）
+      _selectedIconIndex = _presetIcons.indexWhere(
+        (icon) => icon.codePoint == initial.iconCodePoint,
+      );
+      if (_selectedIconIndex < 0) _selectedIconIndex = 0;
+    }
+  }
 
   @override
   void dispose() {
@@ -65,22 +85,30 @@ class _AddWishSheetState extends ConsumerState<AddWishSheet> {
     setState(() => _isSubmitting = true);
 
     try {
-      final wish = Wish()
-        ..title = title
-        ..description = _descController.text.trim()
-        ..iconCodePoint = _presetIcons[_selectedIconIndex].codePoint
-        ..done = false
-        ..createdAt = DateTime.now();
-
-      await ref.read(wishRepositoryProvider).add(wish);
+      final repo = ref.read(wishRepositoryProvider);
+      if (_isEditing) {
+        final wish = widget.initial!
+          ..title = title
+          ..description = _descController.text.trim()
+          ..iconCodePoint = _presetIcons[_selectedIconIndex].codePoint;
+        await repo.update(wish);
+      } else {
+        final wish = Wish()
+          ..title = title
+          ..description = _descController.text.trim()
+          ..iconCodePoint = _presetIcons[_selectedIconIndex].codePoint
+          ..done = false
+          ..createdAt = DateTime.now();
+        await repo.add(wish);
+      }
 
       if (mounted) {
         Navigator.of(context).pop();
-        AppSnackbar.show(context, '愿望已添加 ✨');
+        AppSnackbar.show(context, _isEditing ? '愿望已更新 ✨' : '愿望已添加 ✨');
       }
     } catch (_) {
       if (mounted) {
-        AppSnackbar.show(context, '添加失败，请重试');
+        AppSnackbar.show(context, '保存失败，请重试');
       }
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
@@ -104,7 +132,8 @@ class _AddWishSheetState extends ConsumerState<AddWishSheet> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('添加愿望', style: AppTextStyles.titleMedium),
+                  Text(_isEditing ? '编辑愿望' : '添加愿望',
+                      style: AppTextStyles.titleMedium),
                   IconButton(
                     icon: const Icon(Icons.close),
                     onPressed: () => Navigator.of(context).pop(),

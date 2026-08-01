@@ -2,11 +2,11 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../../app/theme/app_colors.dart';
 import '../../../../data/models/album_photo.dart';
 import '../../../../data/providers/data_providers.dart';
 import '../../../../shared/widgets/app_snackbar.dart';
 import '../../../../shared/widgets/confirm_dialog.dart';
+import 'add_photo_sheet.dart';
 
 /// 照片全屏查看器
 ///
@@ -65,8 +65,23 @@ class _PhotoViewerState extends ConsumerState<PhotoViewer> {
     super.initState();
     // 复制列表，避免修改父组件的不可变列表
     _photos = List.from(widget.photos);
-    _currentIndex = widget.initialIndex.clamp(0, _photos.length - 1);
+    // 空列表防护：clamp(0, -1) 会抛 ArgumentError
+    _currentIndex = _photos.isEmpty ? 0 : widget.initialIndex.clamp(0, _photos.length - 1);
     _pageController = PageController(initialPage: _currentIndex);
+  }
+
+  /// 编辑当前照片（改日期/分类）
+  Future<void> _editCurrent() async {
+    if (_photos.isEmpty) return;
+    final updated = await AddPhotoSheet.show(
+      context,
+      initial: _photos[_currentIndex],
+    );
+    if (!mounted || updated == null) return;
+    // 同步本地列表，保持查看器日期显示一致
+    setState(() {
+      _photos[_currentIndex] = updated;
+    });
   }
 
   @override
@@ -90,9 +105,12 @@ class _PhotoViewerState extends ConsumerState<PhotoViewer> {
     if (!mounted) return;
 
     final photo = _photos[_currentIndex];
+    // 预先捕获仓库实例：撤销回调可能在查看器关闭后才执行，
+    // 直接使用 State 的 ref 会因组件已销毁而报错。
+    final repo = ref.read(albumRepositoryProvider);
 
     try {
-      await ref.read(albumRepositoryProvider).delete(photo.id);
+      await repo.delete(photo.id);
     } catch (e) {
       if (mounted) AppSnackbar.show(context, '删除失败，请重试');
       return;
@@ -102,7 +120,13 @@ class _PhotoViewerState extends ConsumerState<PhotoViewer> {
     widget.onDelete?.call(photo);
 
     if (!mounted) return;
-    AppSnackbar.show(context, '已删除照片');
+    // 删除仅移除数据库记录；图片文件位于应用缓存（image_picker 写入，
+    // 由系统定期清理），撤销时恢复记录即可还原照片。
+    // 注：撤销只恢复数据库（相册网格经流刷新可见），查看器本地列表
+    // 不恢复——删除动作本身已从查看器移除该项，属预期行为。
+    AppSnackbar.showUndo(context, '已删除照片', () async {
+      await repo.add(photo);
+    });
 
     // 更新本地列表
     _photos.removeAt(_currentIndex);
@@ -197,6 +221,11 @@ class _PhotoViewerState extends ConsumerState<PhotoViewer> {
                         ),
                         textAlign: TextAlign.center,
                       ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.edit_outlined,
+                          color: Colors.white),
+                      onPressed: _editCurrent,
                     ),
                     IconButton(
                       icon: const Icon(Icons.delete_outline,

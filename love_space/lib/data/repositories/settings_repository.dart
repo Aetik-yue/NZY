@@ -15,7 +15,13 @@ class SettingsRepository {
       .watch(fireImmediately: true)
       .map((list) => list.isEmpty ? null : list.first);
 
-  /// 保存设置
+  /// 保存设置（幂等：复用已有单例行 id，避免插入重复行）
   Future<void> save(AppSettings settings) =>
-      _isar.writeTxn(() async => _isar.appSettings.put(settings));
+      _isar.writeTxn(() async {
+        final existing = await _isar.appSettings.where().findFirst();
+        if (existing != null) {
+          settings.id = existing.id;
+        }
+        await _isar.appSettings.put(settings);
+      });
 }

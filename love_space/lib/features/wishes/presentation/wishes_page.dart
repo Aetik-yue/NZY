@@ -7,7 +7,9 @@ import '../../../shared/widgets/app_snackbar.dart';
 import '../../../shared/widgets/confirm_dialog.dart';
 import '../../../data/providers/data_providers.dart';
 import '../../../data/models/wish.dart';
+import '../../../data/models/timeline_event.dart';
 import '../../../features/wishes/presentation/widgets/add_wish_sheet.dart';
+import 'wishes_all_page.dart';
 
 /// 愿望清单页
 /// 设计稿未绘制此页，此处提供与整体风格一致的骨架
@@ -113,9 +115,12 @@ class WishesPage extends ConsumerWidget {
           ),
           const SizedBox(height: 20),
           SectionHeader(
-            title: '待实现',
+            title: '进行中',
             actionText: '全部',
-            onAction: () => AppSnackbar.show(context, '即将上线 ⭐'),
+            // 跳转全部愿望页（全部/进行中/已完成 + 已完成回看）
+            onAction: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const WishesAllPage()),
+            ),
           ),
           const SizedBox(height: 14),
           // 愿望列表（动态渲染前 3 条未完成的愿望）
@@ -135,11 +140,34 @@ class _WishList extends ConsumerWidget {
     final wishesAsync = ref.watch(wishesProvider);
     return wishesAsync.when(
       data: (wishes) {
-        final undone = wishes.where((w) => !w.done).take(3).toList();
-        if (undone.isEmpty) {
+        if (wishes.isEmpty) {
+          // 区分「无数据」与「全部完成」
           return const Padding(
             padding: EdgeInsets.symmetric(vertical: 12),
-            child: Text('太棒了！所有愿望都已完成 🎉'),
+            child: Text('还没有愿望，点右上角 ＋ 添加第一个吧'),
+          );
+        }
+        final undone = wishes.where((w) => !w.done).take(3).toList();
+        if (undone.isEmpty) {
+          // 全部完成：引导去全部页回看/取消
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Column(
+              children: [
+                const Text('太棒了！所有愿望都已完成 🎉'),
+                const SizedBox(height: 8),
+                TextButton(
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const WishesAllPage()),
+                  ),
+                  child: Text(
+                    '查看全部愿望',
+                    style: AppTextStyles.label
+                        .copyWith(color: AppColors.accentRose),
+                  ),
+                ),
+              ],
+            ),
           );
         }
         return Column(
@@ -148,8 +176,23 @@ class _WishList extends ConsumerWidget {
               if (i > 0) const SizedBox(height: 12),
               _WishItem(
                 wish: undone[i],
-                onToggle: () =>
-                    ref.read(wishRepositoryProvider).toggleDone(undone[i].id),
+                onToggle: () async {
+                  final wish = undone[i];
+                  try {
+                    await ref
+                        .read(wishRepositoryProvider)
+                        .toggleDone(wish.id);
+                  } catch (e) {
+                    debugPrint('[WishesPage] 切换失败: $e');
+                    if (context.mounted) {
+                      AppSnackbar.show(context, '操作失败，请重试');
+                    }
+                    return;
+                  }
+                  if (!context.mounted) return;
+                  // 完成愿望：庆祝 + 可选记录到时光线
+                  _celebrate(context, ref, wish);
+                },
                 onDelete: () async {
                   final confirmed = await showConfirmDeleteDialog(
                     context,
@@ -183,6 +226,44 @@ class _WishList extends ConsumerWidget {
         child: Text('加载失败'),
       ),
     );
+  }
+
+  /// 完成愿望庆祝：询问是否记录到时光线作为回忆里程碑
+  Future<void> _celebrate(
+    BuildContext context,
+    WidgetRef ref,
+    Wish wish,
+  ) async {
+    final record = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('🎉 愿望完成！'),
+        content: Text('「${wish.title}」已达成，要把这一刻记录进时光线吗？'),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('不用了'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.accentRose,
+            ),
+            child: const Text('记录到时光线'),
+          ),
+        ],
+      ),
+    );
+    if (record != true || !context.mounted) return;
+    await ref.read(timelineRepositoryProvider).add(TimelineEvent()
+      ..date = DateTime.now()
+      ..title = '完成愿望：${wish.title}'
+      ..description = '我们一起完成了这个愿望 ✨'
+      ..dotColorValue = 0xFFFF6B9D);
+    if (context.mounted) AppSnackbar.show(context, '已记录到时光线 💕');
   }
 }
 
@@ -226,7 +307,10 @@ class _WishItem extends StatelessWidget {
                 borderRadius: BorderRadius.circular(14),
               ),
               child: Icon(
-                IconData(wish.iconCodePoint, fontFamily: 'MaterialIcons'),
+                // 愿望图标存的是运行时 codePoint；IconData 的 codePoint 带
+                // @mustBeConst（为图标 tree-shaking 设计），此处必须忽略 lint
+                // ignore: non_const_argument_for_const_parameter
+                IconData(wish.iconCodePoint),
                 color: AppColors.accentRose,
                 size: 22,
               ),

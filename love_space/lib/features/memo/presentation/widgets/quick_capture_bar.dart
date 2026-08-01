@@ -4,6 +4,7 @@ import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_text_styles.dart';
 import '../../../../data/models/memo.dart';
 import '../../../../data/providers/data_providers.dart';
+import '../../../../shared/widgets/app_snackbar.dart';
 
 /// 顶部快速输入栏
 ///
@@ -21,6 +22,9 @@ class _QuickCaptureBarState extends ConsumerState<QuickCaptureBar> {
   final FocusNode _focusNode = FocusNode();
   int _author = 1;
 
+  /// 防重：提交进行中禁止再次提交（快速连按回车）
+  bool _submitting = false;
+
   @override
   void dispose() {
     _controller.dispose();
@@ -30,19 +34,28 @@ class _QuickCaptureBarState extends ConsumerState<QuickCaptureBar> {
 
   Future<void> _submit() async {
     final content = _controller.text.trim();
-    if (content.isEmpty) return;
+    if (content.isEmpty || _submitting) return;
 
-    final repo = ref.read(memoRepositoryProvider);
-    await repo.add(Memo()
-      ..content = content
-      ..author = _author
-      ..isPinned = false
-      ..colorValue = _author == 1 ? 0xFFFF8FB1 : 0xFFFFD1BF
-      ..createdAt = DateTime.now());
+    setState(() => _submitting = true);
+    try {
+      final repo = ref.read(memoRepositoryProvider);
+      await repo.add(Memo()
+        ..content = content
+        ..author = _author
+        ..isPinned = false
+        ..colorValue = _author == 1 ? 0xFFFF8FB1 : 0xFFFFD1BF
+        ..createdAt = DateTime.now());
 
-    _controller.clear();
-    // 保持焦点，方便连续输入
-    _focusNode.requestFocus();
+      if (!mounted) return;
+      _controller.clear();
+      // 保持焦点，方便连续输入
+      _focusNode.requestFocus();
+    } catch (e) {
+      debugPrint('[QuickCaptureBar] 保存失败: $e');
+      if (mounted) AppSnackbar.show(context, '保存失败，请重试');
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
   }
 
   @override

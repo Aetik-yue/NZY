@@ -126,9 +126,9 @@ class SeedService {
   static const String _bqgbbSelectors = '''
 {
   "searchUrl": "/search.php?searchkey={keyword}",
-  "bookLinkSelector": "li a[href*=\\\"/book/\\\"]",
+  "bookLinkSelector": "li a[href*=\\"/book/\\"]",
   "titleSelector": ".details h2",
-  "authorSelector": ".details p a[href*=\\\"/zuozhe/\\\"]",
+  "authorSelector": ".details p a[href*=\\"/zuozhe/\\"]",
   "introSelector": ".intro .p2",
   "chapterListSelector": ".yanqing_list li a",
   "chapterTitleSelector": ".bookname h1",

@@ -14,6 +14,6 @@ class AppSettings {
   /// 在一起的起始日期（归一化为当天 00:00）
   late DateTime togetherSince;
 
-  /// 备忘录数量（暂无 Memo 模型，先以字段暂存）
-  int memoCount = 86;
+  /// 隐私开关：隐藏首页/我的页的「在一起天数」
+  bool hideDaysTogether = false;
 }

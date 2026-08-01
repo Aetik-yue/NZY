@@ -5,6 +5,7 @@ import '../../../../app/theme/app_text_styles.dart';
 import '../../../../data/models/memo.dart';
 import '../../../../data/providers/data_providers.dart';
 import '../../../../shared/widgets/app_snackbar.dart';
+import '../../../../shared/widgets/confirm_dialog.dart';
 import 'widgets/quick_capture_bar.dart';
 import 'widgets/memo_search_bar.dart';
 import 'widgets/tag_filter_chips.dart';
@@ -25,8 +26,10 @@ class MemoPage extends ConsumerWidget {
     final allTags = ref.watch(allTagsProvider);
     final searchQuery = ref.watch(memoSearchProvider);
     final tagFilter = ref.watch(memoTagFilterProvider);
-    final isSearchResult =
-        searchQuery.isNotEmpty || tagFilter != null;
+    final authorFilter = ref.watch(memoAuthorFilterProvider);
+    final isSearchResult = searchQuery.isNotEmpty ||
+        tagFilter != null ||
+        authorFilter != null;
 
     return Scaffold(
       backgroundColor: AppColors.bgPrimary,
@@ -53,6 +56,11 @@ class MemoPage extends ConsumerWidget {
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
               child: MemoSearchBar(),
+            ),
+            // 作者筛选栏（全部 / 越 / 名）
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              child: _AuthorFilterChips(),
             ),
             // 标签筛选栏（有标签时显示）
             if (allTags.isNotEmpty)
@@ -161,6 +169,12 @@ class _MemoList extends StatelessWidget {
   }
 
   Future<void> _delete(BuildContext context, Memo memo) async {
+    // 删除前确认（与其他模块保持一致）
+    final confirmed = await showConfirmDeleteDialog(
+      context,
+      content: '确定要删除这条备忘录吗？',
+    );
+    if (!confirmed || !context.mounted) return;
     final container = _container(context);
     await container.read(memoRepositoryProvider).delete(memo.id);
     if (context.mounted) {
@@ -172,6 +186,57 @@ class _MemoList extends StatelessWidget {
 
   ProviderContainer _container(BuildContext context) {
     return ProviderScope.containerOf(context);
+  }
+}
+
+/// 作者筛选胶囊（全部 / 越 / 名）
+class _AuthorFilterChips extends ConsumerWidget {
+  const _AuthorFilterChips();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final selected = ref.watch(memoAuthorFilterProvider);
+    final options = <(int?, String)>[
+      (null, '全部'),
+      (1, '越'),
+      (2, '名'),
+    ];
+    return SizedBox(
+      height: 34,
+      child: Row(
+        children: [
+          for (final (value, label) in options)
+            GestureDetector(
+              onTap: () =>
+                  ref.read(memoAuthorFilterProvider.notifier).state = value,
+              child: Container(
+                margin: const EdgeInsets.only(right: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: selected == value
+                      ? AppColors.accentRose
+                      : AppColors.bgCard,
+                  borderRadius: BorderRadius.circular(AppColors.radiusPill),
+                  border: selected == value
+                      ? null
+                      : Border.all(color: AppColors.borderSoft),
+                ),
+                child: Text(
+                  label,
+                  style: AppTextStyles.caption.copyWith(
+                    color: selected == value
+                        ? Colors.white
+                        : AppColors.textSecondary,
+                    fontWeight:
+                        selected == value ? FontWeight.w600 : FontWeight.w400,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
   }
 }
 

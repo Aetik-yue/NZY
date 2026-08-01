@@ -2,12 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_text_styles.dart';
+import '../../../core/utils/date_utils.dart';
+import '../../../data/models/check_in.dart';
 import '../../../shared/widgets/section_header.dart';
 import '../../../shared/widgets/app_snackbar.dart';
 import '../../../shared/widgets/confirm_dialog.dart';
 import '../../../data/providers/data_providers.dart';
 import '../../../shared/widgets/pill_nav_bar.dart';
 import 'widgets/add_timeline_sheet.dart';
+import 'checkin_history_page.dart';
+import 'timeline_all_page.dart';
 
 /// 首页 · 时光
 /// 还原设计稿：问候区 → 纪念日主卡片 → 今日打卡 → 快捷入口 → 时间轴
@@ -44,6 +48,8 @@ class _GreetingHeader extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final greeting = ref.watch(greetingProvider);
     final days = ref.watch(daysTogetherProvider);
+    // 隐私开关：隐藏在一起天数
+    final hideDays = ref.watch(appSettingsProvider).valueOrNull?.hideDaysTogether ?? false;
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -53,7 +59,8 @@ class _GreetingHeader extends ConsumerWidget {
           children: [
             Text(greeting, style: AppTextStyles.titleLarge),
             const SizedBox(height: 4),
-            Text('今天是你们相伴的第 $days 天', style: AppTextStyles.caption),
+            Text(hideDays ? '今天也是爱你们的一天 💕' : '今天是你们相伴的第 $days 天',
+                style: AppTextStyles.caption),
           ],
         ),
         const _CoupleAvatars(),
@@ -188,28 +195,67 @@ class _AnniversaryHeroCard extends ConsumerWidget {
 }
 
 /// 今日打卡卡
-class _CheckinCard extends ConsumerWidget {
+class _CheckinCard extends ConsumerStatefulWidget {
   const _CheckinCard();
 
-  Future<void> _handleCheckin(BuildContext context, WidgetRef ref) async {
-    final repository = ref.read(checkinRepositoryProvider);
-    final hasChecked = await repository.hasCheckedInToday();
-    if (!context.mounted) return;
+  @override
+  ConsumerState<_CheckinCard> createState() => _CheckinCardState();
+}
 
-    if (hasChecked) {
-      AppSnackbar.show(context, '今天已经打卡过了哦 💕');
-      return;
-    }
+class _CheckinCardState extends ConsumerState<_CheckinCard> {
+  /// 防连点：打卡进行中禁止再次点击
+  bool _busy = false;
 
-    await repository.checkInToday();
-    if (context.mounted) {
+  bool _isTodayChecked(List<CheckIn> checkins) {
+    final today = DateUtilsX.today();
+    return checkins.any((c) =>
+        c.date.year == today.year &&
+        c.date.month == today.month &&
+        c.date.day == today.day);
+  }
+
+  Future<void> _handleCheckin() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      final repository = ref.read(checkinRepositoryProvider);
+      if (await repository.hasCheckedInToday()) {
+        if (!mounted) return;
+        // 已打卡：提供撤销入口
+        AppSnackbar.showUndo(context, '今天已经打卡过了 💕', () async {
+          final today = DateUtilsX.today();
+          final checkins = await repository.getAll();
+          final todayCheckin = checkins
+              .where((c) =>
+                  c.date.year == today.year &&
+                  c.date.month == today.month &&
+                  c.date.day == today.day)
+              .firstOrNull;
+          if (todayCheckin != null) {
+            await repository.delete(todayCheckin.id);
+          }
+        });
+        return;
+      }
+
+      await repository.checkInToday();
+      if (!mounted) return;
       AppSnackbar.show(context, '打卡成功！连续加油 💪');
+    } catch (e) {
+      debugPrint('[HomePage] 打卡失败: $e');
+      if (mounted) AppSnackbar.show(context, '打卡失败，请重试');
+    } finally {
+      if (mounted) setState(() => _busy = false);
     }
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final streak = ref.watch(checkinStreakProvider);
+    final checkinsAsync = ref.watch(checkinsProvider);
+    final checkedToday = checkinsAsync.valueOrNull != null &&
+        _isTodayChecked(checkinsAsync.valueOrNull!);
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -230,21 +276,37 @@ class _CheckinCard extends ConsumerWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('今日说爱你', style: AppTextStyles.titleSmall),
+              Text(checkedToday ? '今日已打卡' : '今日说爱你',
+                  style: AppTextStyles.titleSmall),
               const SizedBox(height: 4),
-              Text('连续打卡 $streak 天，继续加油', style: AppTextStyles.caption),
+              // 点击查看打卡历史
+              GestureDetector(
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const CheckinHistoryPage()),
+                ),
+                child: Text('连续打卡 $streak 天，点击查看历史 ›',
+                    style: AppTextStyles.caption.copyWith(
+                      color: AppColors.accentRose,
+                    )),
+              ),
             ],
           ),
-          // 心形打卡按钮
+          // 打卡按钮
           GestureDetector(
-            onTap: () => _handleCheckin(context, ref),
+            onTap: _busy ? null : _handleCheckin,
             child: Container(
               width: 64,
               height: 64,
-              decoration: const BoxDecoration(
-                gradient: AppColors.pinkButtonGradient,
+              decoration: BoxDecoration(
+                gradient: checkedToday
+                    ? null
+                    : AppColors.pinkButtonGradient,
+                color: checkedToday ? AppColors.bgCard : null,
                 shape: BoxShape.circle,
-                boxShadow: [
+                border: checkedToday
+                    ? Border.all(color: AppColors.accentRose, width: 2)
+                    : null,
+                boxShadow: const [
                   BoxShadow(
                     color: Color(0x66FF6B9D),
                     blurRadius: 16,
@@ -253,7 +315,22 @@ class _CheckinCard extends ConsumerWidget {
                   ),
                 ],
               ),
-              child: const Icon(Icons.favorite, color: Colors.white, size: 28),
+              child: _busy
+                  ? const SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: AppColors.accentRose,
+                      ),
+                    )
+                  : Icon(
+                      checkedToday ? Icons.check_rounded : Icons.favorite,
+                      color: checkedToday
+                          ? AppColors.accentRose
+                          : Colors.white,
+                      size: 28,
+                    ),
             ),
           ),
         ],
@@ -353,7 +430,10 @@ class _TimelineSection extends ConsumerWidget {
         SectionHeader(
           title: '我们的时光',
           actionText: '全部',
-          onAction: () => AppSnackbar.show(context, '即将上线 📅'),
+          // 跳转全量时光线页（按年月分组）
+          onAction: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const TimelineAllPage()),
+          ),
           // 添加入口（表单此前为死代码，无任何调用点）
           trailing: IconButton(
             icon: const Icon(Icons.add_circle_rounded,
@@ -402,26 +482,31 @@ class _TimelineSection extends ConsumerWidget {
                   ),
                 );
               }
+              // 首页只展示最新 5 条，其余进全量页
+              final visible =
+                  events.length > 5 ? events.sublist(0, 5) : events;
               return Column(
                 children: [
-                  for (var i = 0; i < events.length; i++) ...[
+                  for (var i = 0; i < visible.length; i++) ...[
                     if (i > 0) const SizedBox(height: 18),
                     _TimelineItem(
-                      date: _formatDate(events[i].date),
-                      title: events[i].title,
-                      desc: events[i].description,
-                      dotColor: Color(events[i].dotColorValue),
-                      showLine: i < events.length - 1,
+                      date: _formatDate(visible[i].date),
+                      title: visible[i].title,
+                      desc: visible[i].description,
+                      dotColor: Color(visible[i].dotColorValue),
+                      showLine: i < visible.length - 1,
+                      onEdit: () =>
+                          AddTimelineSheet.show(context, initial: visible[i]),
                       onDelete: () async {
                         final confirmed = await showConfirmDeleteDialog(
                           context,
                           content: '确定要删除这条时光记录吗？',
                         );
                         if (confirmed && context.mounted) {
-                          final eventToDelete = events[i];
+                          final eventToDelete = visible[i];
                           await ref
                               .read(timelineRepositoryProvider)
-                              .delete(events[i].id);
+                              .delete(visible[i].id);
                           if (context.mounted) {
                             AppSnackbar.showUndo(context, '时光已删除', () async {
                               await ref
@@ -431,6 +516,22 @@ class _TimelineSection extends ConsumerWidget {
                           }
                         }
                       },
+                    ),
+                  ],
+                  if (events.length > visible.length) ...[
+                    const SizedBox(height: 12),
+                    Center(
+                      child: TextButton(
+                        onPressed: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                              builder: (_) => const TimelineAllPage()),
+                        ),
+                        child: Text(
+                          '查看全部 ${events.length} 条',
+                          style: AppTextStyles.caption
+                              .copyWith(color: AppColors.accentRose),
+                        ),
+                      ),
                     ),
                   ],
                 ],
@@ -463,6 +564,7 @@ class _TimelineItem extends StatelessWidget {
   final String desc;
   final Color dotColor;
   final bool showLine;
+  final VoidCallback? onEdit;
   final VoidCallback? onDelete;
 
   const _TimelineItem({
@@ -471,13 +573,52 @@ class _TimelineItem extends StatelessWidget {
     required this.desc,
     required this.dotColor,
     required this.showLine,
+    this.onEdit,
     this.onDelete,
   });
+
+  /// 长按弹操作单（编辑 / 删除）
+  void _showActions(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.edit_rounded,
+                  color: AppColors.textSecondary),
+              title: const Text('编辑'),
+              onTap: () {
+                Navigator.of(context).pop();
+                onEdit?.call();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete_outline,
+                  color: AppColors.accentRose),
+              title: const Text('删除'),
+              onTap: () {
+                Navigator.of(context).pop();
+                onDelete?.call();
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onLongPress: onDelete,
+      onLongPress: onDelete == null && onEdit == null
+          ? null
+          : () => _showActions(context),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

@@ -8,7 +8,6 @@ class Seed {
   static const partner1Name = '严浩睿';
   static const partner2Name = '倪子越';
   static const checkinStreak = 128;
-  static const memoCount = 0;
 
   /// 在一起的起始日期（硬编码 2025-10-16）
   static DateTime get togetherSince => DateTime(2025, 10, 16);
@@ -17,8 +16,7 @@ class Seed {
   static AppSettings settings() => AppSettings()
     ..partner1Name = partner1Name
     ..partner2Name = partner2Name
-    ..togetherSince = togetherSince
-    ..memoCount = memoCount;
+    ..togetherSince = togetherSince;
 
   /// 种子时间轴事件
   static List<TimelineEvent> timelineEvents() => [

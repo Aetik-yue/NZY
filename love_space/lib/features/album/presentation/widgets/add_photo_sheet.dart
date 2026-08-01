@@ -15,19 +15,26 @@ const _categories = [
   (PhotoCategory.daily, '日常', Icons.wb_sunny_rounded),
 ];
 
-/// 添加照片的底部弹出表单
+/// 添加/编辑照片的底部弹出表单
+///
+/// [initial] 传入时进入编辑模式（回填并走 update 保存），
+/// 编辑成功后 pop 返回更新后的 [AlbumPhoto]。
 class AddPhotoSheet extends ConsumerStatefulWidget {
-  const AddPhotoSheet({super.key});
+  final AlbumPhoto? initial;
+  const AddPhotoSheet({super.key, this.initial});
 
-  /// 弹出表单的便捷方法
-  static Future<void> show(BuildContext context) {
-    return showModalBottomSheet(
+  /// 弹出表单的便捷方法；编辑模式下返回更新后的照片
+  static Future<AlbumPhoto?> show(
+    BuildContext context, {
+    AlbumPhoto? initial,
+  }) {
+    return showModalBottomSheet<AlbumPhoto>(
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (_) => const AddPhotoSheet(),
+      builder: (_) => AddPhotoSheet(initial: initial),
     );
   }
 
@@ -51,11 +58,22 @@ class _AddPhotoSheetState extends ConsumerState<AddPhotoSheet> {
     [Color(0xFFFF8FB1), Color(0xFFFF6B9D)],
   ];
 
+  bool get _isEditing => widget.initial != null;
+
   @override
   void initState() {
     super.initState();
-    // 随机渐变色，让每张照片视觉有区别
-    _gradientIndex = DateTime.now().millisecondsSinceEpoch % _gradients.length;
+    final initial = widget.initial;
+    if (initial != null) {
+      // 编辑模式：回填
+      _imagePath = initial.filePath;
+      _selectedCategory = initial.category;
+      _selectedDate = initial.date;
+      _gradientIndex = initial.gradientIndex;
+    } else {
+      // 随机渐变色，让每张照片视觉有区别
+      _gradientIndex = DateTime.now().millisecondsSinceEpoch % _gradients.length;
+    }
   }
 
   Future<void> _pickImage() async {
@@ -88,21 +106,34 @@ class _AddPhotoSheetState extends ConsumerState<AddPhotoSheet> {
     setState(() => _isSubmitting = true);
 
     try {
-      final photo = AlbumPhoto()
-        ..date = _selectedDate
-        ..category = _selectedCategory
-        ..filePath = _imagePath
-        ..gradientIndex = _gradientIndex;
+      final repo = ref.read(albumRepositoryProvider);
+      if (_isEditing) {
+        final photo = widget.initial!
+          ..date = _selectedDate
+          ..category = _selectedCategory
+          ..gradientIndex = _gradientIndex;
+        await repo.update(photo);
+        if (mounted) {
+          Navigator.of(context).pop(photo); // 返回更新后的照片
+          AppSnackbar.show(context, '照片已更新 📷');
+        }
+      } else {
+        final photo = AlbumPhoto()
+          ..date = _selectedDate
+          ..category = _selectedCategory
+          ..filePath = _imagePath
+          ..gradientIndex = _gradientIndex;
 
-      await ref.read(albumRepositoryProvider).add(photo);
+        await repo.add(photo);
 
-      if (mounted) {
-        Navigator.of(context).pop();
-        AppSnackbar.show(context, '照片已添加 📷');
+        if (mounted) {
+          Navigator.of(context).pop();
+          AppSnackbar.show(context, '照片已添加 📷');
+        }
       }
     } catch (_) {
       if (mounted) {
-        AppSnackbar.show(context, '添加失败，请重试');
+        AppSnackbar.show(context, '保存失败，请重试');
       }
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
@@ -126,7 +157,8 @@ class _AddPhotoSheetState extends ConsumerState<AddPhotoSheet> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('添加照片', style: AppTextStyles.titleMedium),
+                  Text(_isEditing ? '编辑照片' : '添加照片',
+                      style: AppTextStyles.titleMedium),
                   IconButton(
                     icon: const Icon(Icons.close),
                     onPressed: () => Navigator.of(context).pop(),

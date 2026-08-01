@@ -17,10 +17,10 @@ const AppSettingsSchema = CollectionSchema(
   name: r'AppSettings',
   id: -5633561779022347008,
   properties: {
-    r'memoCount': PropertySchema(
+    r'hideDaysTogether': PropertySchema(
       id: 0,
-      name: r'memoCount',
-      type: IsarType.long,
+      name: r'hideDaysTogether',
+      type: IsarType.bool,
     ),
     r'partner1Name': PropertySchema(
       id: 1,
@@ -69,7 +69,7 @@ void _appSettingsSerialize(
   List<int> offsets,
   Map<Type, List<int>> allOffsets,
 ) {
-  writer.writeLong(offsets[0], object.memoCount);
+  writer.writeBool(offsets[0], object.hideDaysTogether);
   writer.writeString(offsets[1], object.partner1Name);
   writer.writeString(offsets[2], object.partner2Name);
   writer.writeDateTime(offsets[3], object.togetherSince);
@@ -82,8 +82,8 @@ AppSettings _appSettingsDeserialize(
   Map<Type, List<int>> allOffsets,
 ) {
   final object = AppSettings();
+  object.hideDaysTogether = reader.readBool(offsets[0]);
   object.id = id;
-  object.memoCount = reader.readLong(offsets[0]);
   object.partner1Name = reader.readString(offsets[1]);
   object.partner2Name = reader.readString(offsets[2]);
   object.togetherSince = reader.readDateTime(offsets[3]);
@@ -98,7 +98,7 @@ P _appSettingsDeserializeProp<P>(
 ) {
   switch (propertyId) {
     case 0:
-      return (reader.readLong(offset)) as P;
+      return (reader.readBool(offset)) as P;
     case 1:
       return (reader.readString(offset)) as P;
     case 2:
@@ -203,6 +203,16 @@ extension AppSettingsQueryWhere
 
 extension AppSettingsQueryFilter
     on QueryBuilder<AppSettings, AppSettings, QFilterCondition> {
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+      hideDaysTogetherEqualTo(bool value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'hideDaysTogether',
+        value: value,
+      ));
+    });
+  }
+
   QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition> idEqualTo(
       Id value) {
     return QueryBuilder.apply(this, (query) {
@@ -248,62 +258,6 @@ extension AppSettingsQueryFilter
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.between(
         property: r'id',
-        lower: lower,
-        includeLower: includeLower,
-        upper: upper,
-        includeUpper: includeUpper,
-      ));
-    });
-  }
-
-  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
-      memoCountEqualTo(int value) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'memoCount',
-        value: value,
-      ));
-    });
-  }
-
-  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
-      memoCountGreaterThan(
-    int value, {
-    bool include = false,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.greaterThan(
-        include: include,
-        property: r'memoCount',
-        value: value,
-      ));
-    });
-  }
-
-  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
-      memoCountLessThan(
-    int value, {
-    bool include = false,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.lessThan(
-        include: include,
-        property: r'memoCount',
-        value: value,
-      ));
-    });
-  }
-
-  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
-      memoCountBetween(
-    int lower,
-    int upper, {
-    bool includeLower = true,
-    bool includeUpper = true,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.between(
-        property: r'memoCount',
         lower: lower,
         includeLower: includeLower,
         upper: upper,
@@ -649,15 +603,17 @@ extension AppSettingsQueryLinks
 
 extension AppSettingsQuerySortBy
     on QueryBuilder<AppSettings, AppSettings, QSortBy> {
-  QueryBuilder<AppSettings, AppSettings, QAfterSortBy> sortByMemoCount() {
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+      sortByHideDaysTogether() {
     return QueryBuilder.apply(this, (query) {
-      return query.addSortBy(r'memoCount', Sort.asc);
+      return query.addSortBy(r'hideDaysTogether', Sort.asc);
     });
   }
 
-  QueryBuilder<AppSettings, AppSettings, QAfterSortBy> sortByMemoCountDesc() {
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+      sortByHideDaysTogetherDesc() {
     return QueryBuilder.apply(this, (query) {
-      return query.addSortBy(r'memoCount', Sort.desc);
+      return query.addSortBy(r'hideDaysTogether', Sort.desc);
     });
   }
 
@@ -703,6 +659,20 @@ extension AppSettingsQuerySortBy
 
 extension AppSettingsQuerySortThenBy
     on QueryBuilder<AppSettings, AppSettings, QSortThenBy> {
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+      thenByHideDaysTogether() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'hideDaysTogether', Sort.asc);
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+      thenByHideDaysTogetherDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'hideDaysTogether', Sort.desc);
+    });
+  }
+
   QueryBuilder<AppSettings, AppSettings, QAfterSortBy> thenById() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'id', Sort.asc);
@@ -712,18 +682,6 @@ extension AppSettingsQuerySortThenBy
   QueryBuilder<AppSettings, AppSettings, QAfterSortBy> thenByIdDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'id', Sort.desc);
-    });
-  }
-
-  QueryBuilder<AppSettings, AppSettings, QAfterSortBy> thenByMemoCount() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addSortBy(r'memoCount', Sort.asc);
-    });
-  }
-
-  QueryBuilder<AppSettings, AppSettings, QAfterSortBy> thenByMemoCountDesc() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addSortBy(r'memoCount', Sort.desc);
     });
   }
 
@@ -769,9 +727,10 @@ extension AppSettingsQuerySortThenBy
 
 extension AppSettingsQueryWhereDistinct
     on QueryBuilder<AppSettings, AppSettings, QDistinct> {
-  QueryBuilder<AppSettings, AppSettings, QDistinct> distinctByMemoCount() {
+  QueryBuilder<AppSettings, AppSettings, QDistinct>
+      distinctByHideDaysTogether() {
     return QueryBuilder.apply(this, (query) {
-      return query.addDistinctBy(r'memoCount');
+      return query.addDistinctBy(r'hideDaysTogether');
     });
   }
 
@@ -804,9 +763,9 @@ extension AppSettingsQueryProperty
     });
   }
 
-  QueryBuilder<AppSettings, int, QQueryOperations> memoCountProperty() {
+  QueryBuilder<AppSettings, bool, QQueryOperations> hideDaysTogetherProperty() {
     return QueryBuilder.apply(this, (query) {
-      return query.addPropertyName(r'memoCount');
+      return query.addPropertyName(r'hideDaysTogether');
     });
   }
 

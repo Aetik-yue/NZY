@@ -3,9 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_text_styles.dart';
 import '../../../../data/crawler/crawler_result.dart';
+import '../../../../data/models/novel.dart';
 import '../../../../data/providers/data_providers.dart';
 import '../../../../data/repositories/crawl_repository.dart';
 import '../../../../shared/widgets/app_snackbar.dart';
+import '../novel_detail_page.dart';
 import 'crawl_progress_sheet.dart';
 
 /// 添加小说底部面板
@@ -38,6 +40,9 @@ class _AddNovelSheetState extends ConsumerState<AddNovelSheet> {
   bool _isSearching = false;
   String? _errorMessage;
   bool _isAdding = false;
+
+  /// 去重命中：已在书架的小说（添加成功后跳转详情）
+  Novel? _duplicateNovel;
 
   // ──── 分类浏览状态 ────
   int _tabIndex = 0; // 0=搜索 1=分类浏览
@@ -169,6 +174,9 @@ class _AddNovelSheetState extends ConsumerState<AddNovelSheet> {
         state: 'success',
         message: '完成',
       );
+    } on NovelAlreadyExistsException catch (e) {
+      // 已在书架：记录命中，关闭面板后提示并跳转详情
+      _onDuplicate(e);
     } on CancelledException {
       // 用户主动取消
     } catch (e) {
@@ -184,11 +192,33 @@ class _AddNovelSheetState extends ConsumerState<AddNovelSheet> {
     final ok = await sheetFuture;
     if (!mounted) return;
 
-    if (ok == true) {
+    if (_duplicateNovel != null) {
+      _handleDuplicate(_duplicateNovel!, navigator);
+    } else if (ok == true) {
       navigator.pop(); // 关闭添加面板（进度面板已自动关闭）
       AppSnackbar.show(navigator.context, '已添加《${book.title}》');
     }
     if (mounted) setState(() => _isAdding = false);
+  }
+
+  /// 去重命中：记录命中的书，并让进度面板以「已在书架中」状态关闭
+  void _onDuplicate(NovelAlreadyExistsException e) {
+    _duplicateNovel = e.novel;
+    if (mounted) {
+      ref.read(crawlStatusProvider.notifier).state = const CrawlStatus(
+        state: 'failed',
+        message: '已在书架中',
+      );
+    }
+  }
+
+  /// 已在书架：关闭添加面板、提示并跳转详情
+  void _handleDuplicate(Novel dup, NavigatorState navigator) {
+    navigator.pop(); // 关闭添加面板（进度面板已自动关闭）
+    AppSnackbar.show(navigator.context, '《${dup.title}》已在书架中');
+    navigator.push(
+      MaterialPageRoute(builder: (_) => NovelDetailPage(novelId: dup.id)),
+    );
   }
 
   /// 添加小说到书架
@@ -234,6 +264,9 @@ class _AddNovelSheetState extends ConsumerState<AddNovelSheet> {
         state: 'success',
         message: '完成',
       );
+    } on NovelAlreadyExistsException catch (e) {
+      // 已在书架：记录命中，关闭面板后提示并跳转详情
+      _onDuplicate(e);
     } on CancelledException {
       // 用户主动取消，不显示错误
     } catch (e) {
@@ -249,7 +282,9 @@ class _AddNovelSheetState extends ConsumerState<AddNovelSheet> {
     final ok = await sheetFuture;
     if (!mounted) return;
 
-    if (ok == true) {
+    if (_duplicateNovel != null) {
+      _handleDuplicate(_duplicateNovel!, navigator);
+    } else if (ok == true) {
       // 关闭添加面板（进度面板已自动关闭）
       navigator.pop();
       AppSnackbar.show(navigator.context, '已添加《${result.title}》');
@@ -336,6 +371,9 @@ class _AddNovelSheetState extends ConsumerState<AddNovelSheet> {
         state: 'success',
         message: '完成',
       );
+    } on NovelAlreadyExistsException catch (e) {
+      // 已在书架：记录命中，关闭面板后提示并跳转详情
+      _onDuplicate(e);
     } on CancelledException {
       // 用户主动取消
     } catch (e) {
@@ -351,7 +389,9 @@ class _AddNovelSheetState extends ConsumerState<AddNovelSheet> {
     final ok = await sheetFuture;
     if (!mounted) return;
 
-    if (ok == true) {
+    if (_duplicateNovel != null) {
+      _handleDuplicate(_duplicateNovel!, navigator);
+    } else if (ok == true) {
       // 关闭添加面板（进度面板已自动关闭）
       navigator.pop();
       AppSnackbar.show(navigator.context, '已添加小说');

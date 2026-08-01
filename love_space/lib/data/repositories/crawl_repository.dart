@@ -124,6 +124,12 @@ class CrawlRepository {
       final config = await configRepository.getOrCreate();
       final crawler = _createCrawler(source, config);
 
+      // 1.5 去重：同一源站 URL 已在书架则拒绝重复添加
+      final existing = await novelRepository.findBySourceUrl(sourceUrl);
+      if (existing != null) {
+        throw NovelAlreadyExistsException(existing);
+      }
+
       // 2. 抓取书籍详情
       _checkCancelled();
       onProgress?.call('正在获取书籍详情...', 0, 0);
@@ -277,15 +283,25 @@ class CrawlRepository {
         return 0;
       }
 
-      // 抓取新章节正文
-      final startIndex = existingChapters.length;
+      // 用源站规范顺序重排已有章节索引（处理源站中段插章/删章导致的错乱）
+      await _renumberChaptersToCanonical(
+        detail.chapters,
+        existingChapters,
+      );
+
+      // 抓取新章节正文（chapterIndex = 源站规范序列中的真实位置）
       final newChapters = <NovelChapter>[];
-      for (var i = 0; i < newRefs.length; i++) {
+      var fetchedCount = 0;
+      for (var i = 0; i < detail.chapters.length; i++) {
+        final ref = detail.chapters[i];
+        if (ref.sourceId.isEmpty || existingIds.contains(ref.sourceId)) {
+          continue;
+        }
         _checkCancelled();
-        final ref = newRefs[i];
+        fetchedCount++;
         onProgress?.call(
-          '正在抓取新章节 ${i + 1}/${newRefs.length}',
-          i + 1,
+          '正在抓取新章节 $fetchedCount/${newRefs.length}',
+          fetchedCount,
           newRefs.length,
         );
 
@@ -302,7 +318,7 @@ class CrawlRepository {
 
         newChapters.add(NovelChapter()
           ..novelId = novelId
-          ..chapterIndex = startIndex + i
+          ..chapterIndex = i
           ..title = ref.title
           ..content = content
           ..sourceChapterId = ref.sourceId
@@ -367,6 +383,53 @@ class CrawlRepository {
   }
 
   // ──────── 私有方法 ────────
+
+  /// 按源站规范顺序重排已有章节的 chapterIndex
+  ///
+  /// 源站中段插章/删章后，既有章节的 index 会与规范顺序错位，导致
+  /// 阅读器排序错乱。此方法将每个已有章节的 index 校正为其在源站
+  /// 序列中的真实位置；源站已删除的章节（无对应条目）顺延到末尾，
+  /// 保持相对顺序，避免与新章节的索引碰撞。
+  Future<void> _renumberChaptersToCanonical(
+    List<ChapterRef> canonical,
+    List<NovelChapter> existing,
+  ) async {
+    final indexBySourceId = <String, int>{};
+    for (var i = 0; i < canonical.length; i++) {
+      if (canonical[i].sourceId.isNotEmpty) {
+        indexBySourceId[canonical[i].sourceId] = i;
+      }
+    }
+
+    final toUpdate = <NovelChapter>[];
+    final unmapped = <NovelChapter>[];
+    for (final ch in existing) {
+      final sid = ch.sourceChapterId;
+      final canonicalIndex = (sid != null) ? indexBySourceId[sid] : null;
+      if (canonicalIndex != null) {
+        if (ch.chapterIndex != canonicalIndex) {
+          ch.chapterIndex = canonicalIndex;
+          toUpdate.add(ch);
+        }
+      } else {
+        unmapped.add(ch);
+      }
+    }
+
+    // 源站已删除的章节：顺延到规范序列末尾，避免索引碰撞
+    if (unmapped.isNotEmpty) {
+      unmapped.sort((a, b) => a.chapterIndex.compareTo(b.chapterIndex));
+      var tailIndex = canonical.length;
+      for (final ch in unmapped) {
+        ch.chapterIndex = tailIndex++;
+        toUpdate.add(ch);
+      }
+    }
+
+    if (toUpdate.isNotEmpty) {
+      await novelChapterRepository.addAll(toUpdate);
+    }
+  }
 
   /// 创建爬虫实例
   BaseCrawler _createCrawler(NovelSource source, CrawlConfig config) {
@@ -438,4 +501,12 @@ class CancelledException implements Exception {
   const CancelledException();
   @override
   String toString() => '爬取操作已取消';
+}
+
+/// 小说已在书架中时抛出的异常（携带已存在的条目，供 UI 跳转详情）
+class NovelAlreadyExistsException implements Exception {
+  const NovelAlreadyExistsException(this.novel);
+  final Novel novel;
+  @override
+  String toString() => '《${novel.title}》已在书架中';
 }

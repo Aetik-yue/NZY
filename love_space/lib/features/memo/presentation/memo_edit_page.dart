@@ -5,6 +5,7 @@ import '../../../../app/theme/app_text_styles.dart';
 import '../../../../data/models/memo.dart';
 import '../../../../data/providers/data_providers.dart';
 import '../../../../shared/widgets/app_snackbar.dart';
+import '../../../../shared/widgets/confirm_dialog.dart';
 
 /// 备忘录编辑/新建页
 ///
@@ -25,12 +26,27 @@ class _MemoEditPageState extends ConsumerState<MemoEditPage> {
   bool _isEditing = false;
   bool _loaded = false;
 
+  // 加载时的原始内容（用于未保存修改检测）
+  String _originalContent = '';
+  int _originalAuthor = 1;
+  int _originalColor = 0xFFFF8FB1;
+
   static const _presetColors = [
     0xFFFF6B9D, // accentRose
     0xFFFF8FB1, // accentPink
     0xFFFFD1BF, // accentPeach
     0xFFB57DBA, // accentMauve
   ];
+
+  /// 是否存在未保存的修改
+  bool get _hasChanges {
+    if (!_isEditing) {
+      return _controller.text.trim().isNotEmpty;
+    }
+    return _controller.text != _originalContent ||
+        _selectedAuthor != _originalAuthor ||
+        _selectedColor != _originalColor;
+  }
 
   @override
   void initState() {
@@ -47,14 +63,22 @@ class _MemoEditPageState extends ConsumerState<MemoEditPage> {
   Future<void> _loadMemo() async {
     final repo = ref.read(memoRepositoryProvider);
     final memo = await repo.getById(widget.memoId!);
-    if (memo != null && mounted) {
-      setState(() {
-        _controller.text = memo.content;
-        _selectedAuthor = memo.author;
-        _selectedColor = memo.colorValue;
-        _loaded = true;
-      });
+    if (!mounted) return;
+    if (memo == null) {
+      // 条目已被删除：提示并返回，避免页面永久卡在加载态
+      AppSnackbar.show(context, '内容已不存在');
+      Navigator.of(context).pop();
+      return;
     }
+    setState(() {
+      _controller.text = memo.content;
+      _selectedAuthor = memo.author;
+      _selectedColor = memo.colorValue;
+      _originalContent = memo.content;
+      _originalAuthor = memo.author;
+      _originalColor = memo.colorValue;
+      _loaded = true;
+    });
   }
 
   @override
@@ -74,12 +98,18 @@ class _MemoEditPageState extends ConsumerState<MemoEditPage> {
 
     if (_isEditing) {
       final memo = await repo.getById(widget.memoId!);
-      if (memo != null) {
-        memo.content = content;
-        memo.colorValue = _selectedColor;
-        memo.updatedAt = now;
-        await repo.update(memo);
+      if (memo == null) {
+        // 条目已被删除：提示并返回，不静默丢弃内容
+        if (mounted) {
+          AppSnackbar.show(context, '内容已不存在，无法保存');
+          Navigator.of(context).pop();
+        }
+        return;
       }
+      memo.content = content;
+      memo.colorValue = _selectedColor;
+      memo.updatedAt = now;
+      await repo.update(memo);
     } else {
       await repo.add(Memo()
         ..content = content
@@ -92,9 +122,67 @@ class _MemoEditPageState extends ConsumerState<MemoEditPage> {
     if (mounted) Navigator.of(context).pop();
   }
 
+  /// 删除当前备忘录（确认 + 撤销）
+  Future<void> _deleteMemo() async {
+    final confirmed = await showConfirmDeleteDialog(
+      context,
+      content: '确定要删除这条备忘录吗？',
+    );
+    if (!confirmed || !mounted) return;
+    final repo = ref.read(memoRepositoryProvider);
+    final memo = await repo.getById(widget.memoId!);
+    if (!mounted) return;
+    if (memo == null) {
+      AppSnackbar.show(context, '内容已不存在');
+      Navigator.of(context).pop();
+      return;
+    }
+    await repo.delete(memo.id);
+    if (!mounted) return;
+    Navigator.of(context).pop();
+    AppSnackbar.showUndo(context, '已删除', () async {
+      await repo.add(memo);
+    });
+  }
+
+  /// 拦截返回：有未保存修改时询问
+  Future<void> _handlePopInvoked(bool didPop) async {
+    if (didPop || !_hasChanges) return;
+    final leave = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('放弃修改？'),
+        content: const Text('当前内容尚未保存，确定要离开吗？'),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('继续编辑'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.accentRose,
+            ),
+            child: const Text('放弃'),
+          ),
+        ],
+      ),
+    );
+    if (leave == true && mounted) {
+      Navigator.of(context).pop();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return PopScope(
+      // 有未保存修改时拦截返回，弹确认
+      canPop: !_hasChanges,
+      onPopInvokedWithResult: (didPop, _) => _handlePopInvoked(didPop),
+      child: Scaffold(
       backgroundColor: AppColors.bgPrimary,
       appBar: AppBar(
         backgroundColor: AppColors.bgPrimary,
@@ -102,12 +190,20 @@ class _MemoEditPageState extends ConsumerState<MemoEditPage> {
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new,
               size: 20, color: AppColors.textPrimary),
-          onPressed: () => Navigator.of(context).pop(),
+          // 必须用 maybePop：强制 pop 会绕过 PopScope 的未保存拦截
+          onPressed: () => Navigator.of(context).maybePop(),
         ),
         title: Text(_isEditing ? '编辑备忘录' : '新建备忘录',
             style: AppTextStyles.titleMedium),
         centerTitle: true,
         actions: [
+          if (_isEditing)
+            IconButton(
+              icon: const Icon(Icons.delete_outline,
+                  color: AppColors.accentRose),
+              tooltip: '删除',
+              onPressed: _deleteMemo,
+            ),
           TextButton(
             onPressed: _save,
             child: Text(
@@ -205,7 +301,6 @@ class _MemoEditPageState extends ConsumerState<MemoEditPage> {
                     ),
                     const SizedBox(height: 16),
                     // 输入框
-    // 输入框
                     Expanded(
                       child: TextField(
                         controller: _controller,
@@ -213,6 +308,8 @@ class _MemoEditPageState extends ConsumerState<MemoEditPage> {
                         maxLines: null,
                         expands: true,
                         textAlignVertical: TextAlignVertical.top,
+                        // 触发重建以更新 PopScope.canPop（未保存拦截）
+                        onChanged: (_) => setState(() {}),
                         decoration: InputDecoration(
                           hintText: '记录你的想法...#标签',
                           hintStyle: AppTextStyles.body.copyWith(
@@ -251,6 +348,7 @@ class _MemoEditPageState extends ConsumerState<MemoEditPage> {
               ),
             )
           : const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+      ),
     );
   }
 }

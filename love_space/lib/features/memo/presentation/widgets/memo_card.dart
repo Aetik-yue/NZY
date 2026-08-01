@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_text_styles.dart';
+import '../../../../core/utils/tag_utils.dart';
 import '../../../../data/models/memo.dart';
 
 /// 备忘录卡片
@@ -162,7 +163,7 @@ class _HighlightText extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final spans = <TextSpan>[];
-    final regex = RegExp(r'#(\S+)');
+    final regex = memoTagRegex; // 与筛选/提取共用同一正则
     var lastEnd = 0;
 
     for (final match in regex.allMatches(content)) {

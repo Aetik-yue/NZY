@@ -16,6 +16,8 @@ import '../repositories/memo_repository.dart';
 import '../../core/utils/greeting.dart';
 import '../../core/utils/date_utils.dart';
 import '../../core/utils/streak.dart';
+import '../../core/utils/tag_utils.dart';
+import '../../core/constants/seed_data.dart';
 import '../models/wish.dart';
 import '../models/timeline_event.dart';
 import '../models/app_settings.dart';
@@ -83,11 +85,17 @@ final greetingProvider = Provider<String>((ref) {
   return Greeting.now();
 });
 
-/// 在一起天数
+/// 在一起天数（第 1 天起，边界归一化）
+///
+/// - 设置缺失：取种子默认起始日（正常启动后种子必然存在）
+/// - 起始日当天：第 1 天
+/// - togetherSince 在未来：返回 0（不显示负数）
 final daysTogetherProvider = Provider<int>((ref) {
   final settings = ref.watch(appSettingsProvider).valueOrNull;
-  if (settings == null) return 0;
-  return DateUtilsX.daysBetween(DateUtilsX.today(), settings.togetherSince);
+  final since = settings?.togetherSince ?? Seed.togetherSince;
+  final days = DateUtilsX.daysBetween(DateUtilsX.today(), since);
+  if (days < 0) return 0;
+  return days + 1;
 });
 
 /// 相册照片总数
@@ -318,15 +326,18 @@ final memoTagFilterProvider = StateProvider<String?>((ref) => null);
 final memoAuthorFilterProvider = StateProvider<int?>((ref) => null);
 
 /// 过滤后的备忘录（搜索 + 标签 + 作者）
+///
+/// 搜索词先 trim（避免尾随空格搜不到）；标签按独立标签精确匹配
+/// （选「旅行」不会误命中「#旅行计划」）。
 final filteredMemosProvider = Provider<List<Memo>>((ref) {
   final memos = ref.watch(memosProvider).valueOrNull ?? [];
-  final query = ref.watch(memoSearchProvider).toLowerCase();
+  final query = ref.watch(memoSearchProvider).trim().toLowerCase();
   final tag = ref.watch(memoTagFilterProvider);
   final author = ref.watch(memoAuthorFilterProvider);
 
   return memos.where((m) {
     if (author != null && m.author != author) return false;
-    if (tag != null && !m.content.contains('#$tag')) return false;
+    if (tag != null && !contentHasTag(m.content, tag)) return false;
     if (query.isNotEmpty && !m.content.toLowerCase().contains(query)) {
       return false;
     }
@@ -342,11 +353,8 @@ final memoCountProvider = Provider<int>((ref) =>
 final allTagsProvider = Provider<List<String>>((ref) {
   final memos = ref.watch(memosProvider).valueOrNull ?? [];
   final tags = <String>{};
-  final regex = RegExp(r'#(\S+)');
   for (final m in memos) {
-    for (final match in regex.allMatches(m.content)) {
-      tags.add(match.group(1)!);
-    }
+    tags.addAll(extractMemoTags(m.content));
   }
   return tags.toList()..sort();
 });

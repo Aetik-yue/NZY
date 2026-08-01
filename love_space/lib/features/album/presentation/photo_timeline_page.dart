@@ -487,8 +487,7 @@ class _TimelineTrack extends StatelessWidget {
 /// 照片网格（2 列）
 class _PhotoGrid extends StatelessWidget {
   final List<AlbumPhoto> photos;
-  final int startIndex;
-  const _PhotoGrid({required this.photos, this.startIndex = 0});
+  const _PhotoGrid({required this.photos});
 
   static const _gradients = [
     [Color(0xFFFFBFD0), Color(0xFFFF8FB1)],
@@ -575,11 +574,12 @@ class _PhotoThumb extends StatelessWidget {
                 ],
               ),
             ),
-            // 真实照片
+            // 真实照片（缩略图降采样解码，避免原图内存开销）
             if (photo.filePath != null)
               Image.file(
                 File(photo.filePath!),
                 fit: BoxFit.cover,
+                cacheWidth: 400,
                 errorBuilder: (_, __, ___) => const SizedBox.shrink(),
               ),
               // 日期文字

@@ -5,6 +5,7 @@ import '../../../app/theme/app_text_styles.dart';
 import '../../../data/providers/data_providers.dart';
 import '../../../shared/widgets/app_snackbar.dart';
 import '../../memo/presentation/memo_page.dart';
+import 'settings_page.dart';
 
 /// 我的页
 /// 还原设计稿：渐变头部 → 统计行 → 音乐卡 → 功能卡（小说/备忘录/设置）
@@ -43,6 +44,8 @@ class _ProfileHeader extends ConsumerWidget {
         final names = settings != null
             ? '${settings.partner1Name} & ${settings.partner2Name}'
             : '小桃 & 阿树';
+        // 隐私开关：隐藏在一起天数
+        final hideDays = settings?.hideDaysTogether ?? false;
         return Container(
           width: double.infinity,
           padding: const EdgeInsets.all(24),
@@ -98,7 +101,7 @@ class _ProfileHeader extends ConsumerWidget {
                     fontSize: 20,
                   )),
               const SizedBox(height: 4),
-              Text('在一起 $days 天 · 这是我们的空间',
+              Text(hideDays ? '这是我们的空间 💕' : '在一起 $days 天 · 这是我们的空间',
                   style: AppTextStyles.caption.copyWith(
                     color: Colors.white.withValues(alpha: 0.85),
                   )),
@@ -271,7 +274,7 @@ class _FunctionCards extends ConsumerWidget {
       _FuncCard(
         icon: Icons.sticky_note_2_rounded,
         title: '备忘录',
-        sub: '${memoCount} 条记录',
+        sub: '$memoCount 条记录',
         bg: AppColors.accentPeach,
         iconColor: AppColors.accentCoral,
         onTap: () => Navigator.of(context).push(
@@ -284,7 +287,10 @@ class _FunctionCards extends ConsumerWidget {
         sub: '纪念日 & 隐私',
         bg: AppColors.bgBlush,
         iconColor: AppColors.textTertiary,
-        onTap: () => AppSnackbar.show(context, '即将上线 ⚙️'),
+        // 设置页：昵称 / 起始日期 / 隐私开关
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const SettingsPage()),
+        ),
       ),
     ];
     return Row(

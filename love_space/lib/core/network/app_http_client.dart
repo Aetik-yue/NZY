@@ -150,7 +150,7 @@ class AppHttpClient {
     debugPrint('[AppHttpClient] ${isPost ? "POST" : "GET"} $url');
 
     // 构建请求体：GBK 编码时将值先用 GBK 编码再 URL 编码
-    final String? encodedBody = isPost ? _encodeBody(body!, gbkBody) : null;
+    final String? encodedBody = isPost ? _encodeBody(body, gbkBody) : null;
 
     final response = isPost
         ? await _client

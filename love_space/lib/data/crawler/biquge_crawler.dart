@@ -36,10 +36,6 @@ class BiqugeCrawler implements BaseCrawler {
   final AppHttpClient _httpClient;
   final ContentCleaner _contentCleaner;
 
-  /// 选择器配置（从 source.selectors JSON 解析，此处使用默认值）
-  static const String _defaultSearchPath = '/modules/article/search.php';
-  static const String _searchParam = 'searchkey';
-
   @override
   String get sourceKey => source.key;
 
@@ -98,9 +94,9 @@ class BiqugeCrawler implements BaseCrawler {
   /// 依赖搜索引擎对目标站的索引，效果因站而异。
   Future<List<SearchResult>> _searchViaEngine(String keyword) async {
     final host = Uri.parse(baseUrl).host;
-    // 转义 host 中的正则元字符（如 .）
+    // 转义 host 中的正则元字符（如 .）；注意不能用 raw string，否则 $hostPattern 不参与插值
     final hostPattern = RegExp.escape(host);
-    final bookRe = RegExp(r'https?://[^/]*$hostPattern/book/(\d+)/?');
+    final bookRe = RegExp('https?://[^/]*$hostPattern/book/(\\d+)/?');
 
     final engines = [
       'https://www.bing.com/search?q=',
@@ -156,7 +152,7 @@ class BiqugeCrawler implements BaseCrawler {
     final urlCandidates = [
       '$baseUrl/fenlei/${categoryId}_$page/',
       '$baseUrl/fenlei/${categoryId}_$page.html',
-      '$baseUrl/fenlei/${categoryId}/$page.html',
+      '$baseUrl/fenlei/$categoryId/$page.html',
       '$baseUrl/fenlei/lastupdate_${categoryId}_0_0_$page.html',
     ];
 
@@ -332,10 +328,11 @@ class BiqugeCrawler implements BaseCrawler {
       ));
     }
 
-    // 1. 抓取目录分页（ml_1 ~ ml_5）补充详情页未覆盖的章节
-    //    仅当详情页存在 ml 目录链接时才抓分页
-    if (tocLink.isNotEmpty && bookId != null) {
-      for (var page = 1; page <= 5; page++) {
+    // 1. 抓取目录分页补充详情页未覆盖的章节（仅当详情页存在目录链接时）
+    //    不设固定页数上限：长篇小说（数百章）需要抓全，靠
+    //    「连续 2 页无新章节」终止；100 页仅是防病态站点的安全上限。
+    if (tocLink.isNotEmpty) {
+      for (var page = 1; page <= 100; page++) {
         final tocUrl = '$baseUrl/book/$bookId/${tocPrefix}_$page.html';
         try {
           final html = await _httpClient.get(tocUrl);

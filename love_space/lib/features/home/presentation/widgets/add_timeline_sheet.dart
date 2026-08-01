@@ -14,19 +14,22 @@ const _presetColors = [
   Color(0xFFB57DBA),
 ];
 
-/// 添加时间轴事件的底部弹出表单
+/// 添加/编辑时间轴事件的底部弹出表单
+///
+/// [initial] 传入时进入编辑模式（回填并走 update 保存）。
 class AddTimelineSheet extends ConsumerStatefulWidget {
-  const AddTimelineSheet({super.key});
+  final TimelineEvent? initial;
+  const AddTimelineSheet({super.key, this.initial});
 
   /// 弹出表单的便捷方法
-  static Future<void> show(BuildContext context) {
+  static Future<void> show(BuildContext context, {TimelineEvent? initial}) {
     return showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (_) => const AddTimelineSheet(),
+      builder: (_) => AddTimelineSheet(initial: initial),
     );
   }
 
@@ -37,9 +40,29 @@ class AddTimelineSheet extends ConsumerStatefulWidget {
 class _AddTimelineSheetState extends ConsumerState<AddTimelineSheet> {
   final _titleController = TextEditingController();
   final _descController = TextEditingController();
-  DateTime _selectedDate = DateTime.now();
+  late DateTime _selectedDate;
   int _selectedColorIndex = 0;
   bool _isSubmitting = false;
+
+  bool get _isEditing => widget.initial != null;
+
+  @override
+  void initState() {
+    super.initState();
+    final initial = widget.initial;
+    if (initial != null) {
+      _selectedDate = initial.date;
+      _titleController.text = initial.title;
+      _descController.text = initial.description;
+      // 匹配预设颜色（未命中则用第 0 个）
+      _selectedColorIndex = _presetColors.indexWhere(
+        (c) => c.toARGB32() == initial.dotColorValue,
+      );
+      if (_selectedColorIndex < 0) _selectedColorIndex = 0;
+    } else {
+      _selectedDate = DateTime.now();
+    }
+  }
 
   @override
   void dispose() {
@@ -73,21 +96,31 @@ class _AddTimelineSheetState extends ConsumerState<AddTimelineSheet> {
     setState(() => _isSubmitting = true);
 
     try {
-      final event = TimelineEvent()
-        ..date = _selectedDate
-        ..title = title
-        ..description = _descController.text.trim()
-        ..dotColorValue = _presetColors[_selectedColorIndex].toARGB32();
-
-      await ref.read(timelineRepositoryProvider).add(event);
+      final repo = ref.read(timelineRepositoryProvider);
+      if (_isEditing) {
+        // 编辑模式：复用原条目 id，走 update
+        final event = widget.initial!
+          ..date = _selectedDate
+          ..title = title
+          ..description = _descController.text.trim()
+          ..dotColorValue = _presetColors[_selectedColorIndex].toARGB32();
+        await repo.update(event);
+      } else {
+        final event = TimelineEvent()
+          ..date = _selectedDate
+          ..title = title
+          ..description = _descController.text.trim()
+          ..dotColorValue = _presetColors[_selectedColorIndex].toARGB32();
+        await repo.add(event);
+      }
 
       if (mounted) {
         Navigator.of(context).pop();
-        AppSnackbar.show(context, '时光已记录 💕');
+        AppSnackbar.show(context, _isEditing ? '时光已更新 💕' : '时光已记录 💕');
       }
     } catch (_) {
       if (mounted) {
-        AppSnackbar.show(context, '添加失败，请重试');
+        AppSnackbar.show(context, '保存失败，请重试');
       }
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
@@ -111,7 +144,8 @@ class _AddTimelineSheetState extends ConsumerState<AddTimelineSheet> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('记录时光', style: AppTextStyles.titleMedium),
+                  Text(_isEditing ? '编辑时光' : '记录时光',
+                      style: AppTextStyles.titleMedium),
                   IconButton(
                     icon: const Icon(Icons.close),
                     onPressed: () => Navigator.of(context).pop(),

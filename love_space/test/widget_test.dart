@@ -53,8 +53,7 @@ void main() {
               ..partner2Name = '阿树'
               ..togetherSince = DateUtilsX.today().subtract(
                 const Duration(days: 365),
-              )
-              ..memoCount = 86),
+              )),
           ),
           // 书架小说
           novelsProvider.overrideWith((ref) => Stream.value([])),

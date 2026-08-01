@@ -18,6 +18,12 @@ class NovelRepository {
   /// 按 id 查询小说
   Future<Novel?> getById(Id id) => _isar.novels.get(id);
 
+  /// 按源站详情页 URL 查询（添加小说时去重）
+  Future<Novel?> findBySourceUrl(String sourceUrl) => _isar.novels
+      .filter()
+      .sourceUrlEqualTo(sourceUrl)
+      .findFirst();
+
   /// 新增小说
   Future<void> add(Novel novel) =>
       _isar.writeTxn(() async => _isar.novels.put(novel));
