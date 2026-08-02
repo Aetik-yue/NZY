@@ -43,6 +43,9 @@ class _MusicPlayerPageState extends ConsumerState<MusicPlayerPage>
     )..repeat();
     // 页面打开才监听扫描结果：权限/扫描仅在真正打开播放页时触发。
     // MiniPlayerBar 与 profile 卡只 watch musicPlayerProvider，启动与切 tab 不弹权限框。
+    // fireImmediately: true —— musicLibraryProvider 是非 autoDispose FutureProvider，
+    // 扫描结果缓存终生；若首次打开时扫描未完成就收起 sheet，重开时 provider 已是
+    // AsyncData 不再重发通知，故需立即回调缓存值，配合去重注入歌单，避免播放器成死角。
     _librarySub = ref.listenManual<AsyncValue<List<MusicSong>>>(
       musicLibraryProvider,
       (_, next) {
@@ -54,6 +57,7 @@ class _MusicPlayerPageState extends ConsumerState<MusicPlayerPage>
         }
         controller.setPlaylist(songs);
       },
+      fireImmediately: true,
     );
   }
 
