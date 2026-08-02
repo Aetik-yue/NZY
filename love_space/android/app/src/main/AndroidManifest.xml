@@ -3,6 +3,11 @@
     <uses-permission android:name="android.permission.CAMERA"/>
     <!-- 读取相册权限（Android 14+） -->
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
+    <!-- 音乐：扫描设备音频库（Android 13+） -->
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
+    <!-- 音乐：扫描设备音频库（Android 12 及以下） -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
     <application
         android:label="love_space"
         android:name="${applicationName}"

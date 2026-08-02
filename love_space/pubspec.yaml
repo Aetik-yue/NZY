@@ -37,6 +37,10 @@ dependencies:
   # 图片选择
   image_picker: ^1.1.2
 
+  # 音乐播放
+  just_audio: ^0.9.43
+  on_audio_query: ^2.9.0
+
   # 小说爬虫
   http: ^1.2.1
   html: ^0.15.4
