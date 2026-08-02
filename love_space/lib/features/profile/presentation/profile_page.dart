@@ -5,6 +5,9 @@ import '../../../app/theme/app_text_styles.dart';
 import '../../../data/providers/data_providers.dart';
 import '../../../shared/widgets/app_snackbar.dart';
 import '../../memo/presentation/memo_page.dart';
+import '../../music/presentation/music_player_page.dart';
+import '../../music/providers/music_player_provider.dart';
+import '../../music/providers/music_library_provider.dart';
 import 'settings_page.dart';
 
 /// 我的页
@@ -192,11 +195,22 @@ class _StatsRow extends ConsumerWidget {
 }
 
 /// 音乐迷你播放卡
-class _MusicCard extends StatelessWidget {
+class _MusicCard extends ConsumerWidget {
   const _MusicCard();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // 读取播放器状态与歌单数量，文案随当前曲目动态变化
+    final playerState = ref.watch(musicPlayerProvider);
+    final libraryAsync = ref.watch(musicLibraryProvider);
+    final count = libraryAsync.valueOrNull?.length ?? 0;
+    final current = playerState.currentSong;
+    final sub = count == 0
+        ? '还没有音乐'
+        : (current != null
+            ? '$count 首 · 正在播放「${current.title}」'
+            : '$count 首 · 点击播放');
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -232,12 +246,12 @@ class _MusicCard extends StatelessWidget {
                 Text('我们的歌单',
                     style: AppTextStyles.titleSmall.copyWith(fontSize: 14)),
                 const SizedBox(height: 4),
-                Text('32 首 · 正在播放"小幸运"', style: AppTextStyles.label),
+                Text(sub, style: AppTextStyles.label),
               ],
             ),
           ),
           GestureDetector(
-            onTap: () => AppSnackbar.show(context, '即将上线 🎵'),
+            onTap: () => MusicPlayerPage.show(context),
             child: Container(
               width: 40,
               height: 40,

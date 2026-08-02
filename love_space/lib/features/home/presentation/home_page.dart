@@ -9,6 +9,7 @@ import '../../../shared/widgets/app_snackbar.dart';
 import '../../../shared/widgets/confirm_dialog.dart';
 import '../../../data/providers/data_providers.dart';
 import '../../../shared/widgets/pill_nav_bar.dart';
+import '../../music/presentation/music_player_page.dart';
 import 'widgets/add_timeline_sheet.dart';
 import 'checkin_history_page.dart';
 import 'timeline_all_page.dart';
@@ -363,7 +364,7 @@ class _QuickActions extends ConsumerWidget {
         icon: Icons.music_note_rounded,
         label: '音乐',
         bg: AppColors.accentPinkSoft,
-        onTap: () => AppSnackbar.show(context, '即将上线 🎵'),
+        onTap: () => MusicPlayerPage.show(context),
       ),
       _QuickAction(
         icon: Icons.menu_book_rounded,
