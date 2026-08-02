@@ -115,6 +115,17 @@ void main() {
     expect(container.read(musicPlayerProvider).isPlaying, true);
   });
 
+  test('歌单非空但未选歌（currentIndex=-1）时 togglePlay 直接播第一首', () async {
+    final ctrl = container.read(musicPlayerProvider.notifier);
+    ctrl.setPlaylist([_song(1), _song(2)]);
+    expect(container.read(musicPlayerProvider).currentIndex, -1);
+    expect(container.read(musicPlayerProvider).isPlaying, false);
+    await ctrl.togglePlay();
+    final state = container.read(musicPlayerProvider);
+    expect(state.currentIndex, 0); // selectSong(0) 生效
+    expect(state.isPlaying, true);
+  });
+
   test('next 末首回第一首；previous 首首回末首', () async {
     final ctrl = container.read(musicPlayerProvider.notifier);
     ctrl.setPlaylist([_song(1), _song(2), _song(3)]);

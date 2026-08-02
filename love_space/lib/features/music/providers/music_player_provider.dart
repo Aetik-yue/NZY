@@ -196,7 +196,13 @@ class MusicPlayerController extends Notifier<MusicPlayerState> {
   }
 
   Future<void> togglePlay() async {
-    if (state.currentIndex < 0) return;
+    // 首次打开播放页且歌单已注入但从未选歌（currentIndex==-1）时，
+    // 点播放键直接播第一首；歌单为空则仍直接返回
+    if (state.currentIndex < 0) {
+      if (state.playlist.isEmpty) return;
+      await selectSong(0);
+      return;
+    }
     if (state.isPlaying) {
       await _backend.pause();
     } else {
