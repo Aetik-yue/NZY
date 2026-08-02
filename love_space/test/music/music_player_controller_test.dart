@@ -18,7 +18,9 @@ MusicSong _song(int id, {String? uri, Duration? dur}) => MusicSong(
 /// 可控测试后端
 ///
 /// - [breakUrl]：标记某 URI 的 setUrl 必定失败（模拟 URI 失效）
-/// - [manualSetUrl]：为 true 时 setUrl 挂起，由测试手动 complete，用于模拟慢 setUrl
+/// - [manualSetUrl]：为 true 时所有 setUrl 挂起由测试手动 complete（坏 URI 也走
+///   completer，便于模拟"慢失败"），用于构造 auto-advance 与用户点击的并发窗口
+/// - [setUrlCalls]：按顺序记录所有 setUrl 的 URI，用于断言不重复 setUrl
 /// - [playedUrls]：记录实际成功 play 过的 URI（按顺序），用于验证最终播放对象
 class ControllableBackend extends FakeAudioBackend {
   ControllableBackend({this.manualSetUrl = false});
@@ -26,6 +28,7 @@ class ControllableBackend extends FakeAudioBackend {
   final bool manualSetUrl;
   final Set<String> _broken = {};
   final List<Completer<void>> setUrlCompleters = [];
+  final List<String> setUrlCalls = [];
   final List<String> playedUrls = [];
   String? _activeUrl;
 
@@ -34,7 +37,14 @@ class ControllableBackend extends FakeAudioBackend {
 
   @override
   Future<void> setUrl(String url) {
+    setUrlCalls.add(url);
     if (_broken.contains(url)) {
+      if (manualSetUrl) {
+        // 手动模式下坏 URI 也挂起，由测试决定何时失败（模拟慢失败）
+        final completer = Completer<void>();
+        setUrlCompleters.add(completer);
+        return completer.future;
+      }
       return Future<void>.error(Exception('bad uri: $url'));
     }
     _activeUrl = url;
@@ -228,5 +238,42 @@ void main() {
     expect(state.isLoading, false);
     expect(state.isPlaying, false);
     expect(backend.playedUrls, isEmpty); // 全程未成功 play
+  });
+
+  test('auto-advance 与用户快速点同一曲目：合并加载、不重复 setUrl、用户点击胜出', () async {
+    final backend = ControllableBackend(manualSetUrl: true);
+    backend.breakUrl('file:///song2.mp3'); // song2 慢失败
+    final container = _containerWith(backend);
+    addTearDown(container.dispose);
+    addTearDown(backend.dispose);
+
+    final ctrl = container.read(musicPlayerProvider.notifier);
+    // song1(0) 正常、song2(1) 坏、song3(2) 正常
+    ctrl.setPlaylist([_song(1), _song(2), _song(3)]);
+
+    // 用户点坏曲目 song2：setUrl 挂起（模拟慢失败）
+    final clickB = ctrl.selectSong(1);
+    expect(backend.setUrlCalls, ['file:///song2.mp3']);
+
+    // song2 失败 -> 触发 auto-advance -> 开始加载 song3
+    backend.setUrlCompleters[0].completeError(Exception('bad uri'));
+    await Future<void>.delayed(Duration.zero);
+    await Future<void>.delayed(Duration.zero);
+    expect(backend.setUrlCalls, ['file:///song2.mp3', 'file:///song3.mp3']);
+
+    // 用户在 auto-advance 加载 song3 的窗口内点 song3：应合并（复用同一 Future），
+    // 不重复 setUrl
+    final clickC = ctrl.selectSong(2);
+    expect(backend.setUrlCalls.where((u) => u == 'file:///song3.mp3').length, 1);
+
+    // 完成 song3 加载
+    backend.setUrlCompleters[1].complete();
+    await expectLater(clickB, throwsA(isA<MusicPlaybackException>()));
+    await clickC;
+
+    final state = container.read(musicPlayerProvider);
+    expect(state.currentIndex, 2); // 用户点击的 song3 被播放，未被 auto-advance 抢走
+    expect(backend.playedUrls, ['file:///song3.mp3']); // 只实际播放一次 song3
+    expect(backend.setUrlCalls.where((u) => u == 'file:///song3.mp3').length, 1);
   });
 }

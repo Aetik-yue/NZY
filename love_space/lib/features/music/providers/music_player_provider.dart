@@ -84,6 +84,12 @@ class MusicPlayerController extends Notifier<MusicPlayerState> {
   // 防止快速连点时较早的 setUrl 晚完成导致 play(A) 而 UI 显示 B。
   int _requestSeq = 0;
 
+  // 在途加载的曲目索引与 Future：auto-advance 与用户点击可能并发加载同一曲目，
+  // 按 index 合并（复用同一个 Future、不重复 setUrl），保证用户的点击始终拥有该曲目，
+  // 避免 auto-advance 的第二次 ++_requestSeq 把用户请求标记为 stale 后静默丢弃。
+  int? _pendingIndex;
+  Future<void>? _pendingLoad;
+
   @override
   MusicPlayerState build() {
     ref.onDispose(_dispose);
@@ -119,18 +125,39 @@ class MusicPlayerController extends Notifier<MusicPlayerState> {
     if (!song.isPlayable) return;
     try {
       await _loadAndPlay(index, song);
-    } catch (_) {
-      // 失败：回滚（currentIndex 仅在成功时更新，此处未动）+ 自动跳下一首
+    } on MusicPlaybackException {
+      // 播放失败（URI 失效等）：回滚 + 自动跳下一首，并重新抛出供调用点提示
       await _autoAdvance(index);
-      rethrow; // 调用点据此提示「该曲目无法播放」
+      rethrow;
     }
+    // 其它异常（编程错误）不拦截：原样向上抛，避免被 auto-advance 掩盖真实 bug
+  }
+
+  /// 加载并播放指定曲目（带同曲目在途合并）
+  ///
+  /// 若同一曲目已有在途加载（用户点击与 auto-advance 并发命中同一 index），
+  /// 直接复用该 Future，不重复 setUrl，避免对同一 AudioPlayer 二次 setUrl 导致
+  /// 用户点击被 auto-advance 的请求序号覆盖而静默丢弃。
+  Future<void> _loadAndPlay(int index, MusicSong song) {
+    if (_pendingIndex == index && _pendingLoad != null) {
+      return _pendingLoad!;
+    }
+    _pendingIndex = index;
+    final future = _doLoadAndPlay(index, song).whenComplete(() {
+      if (_pendingIndex == index) {
+        _pendingIndex = null;
+        _pendingLoad = null;
+      }
+    });
+    _pendingLoad = future;
+    return future;
   }
 
   /// 底层加载并播放：设置 isLoading -> setUrl -> play -> 成功后置 currentIndex
   ///
   /// 带请求序号保护：期间有更新的切歌请求时丢弃本次结果（不播放、不更新状态）。
   /// 失败抛 [MusicPlaybackException]，失败时不清除最新请求的加载态。
-  Future<void> _loadAndPlay(int index, MusicSong song) async {
+  Future<void> _doLoadAndPlay(int index, MusicSong song) async {
     final seq = ++_requestSeq;
     _subscribeStreams();
     state = state.copyWith(isLoading: true, position: Duration.zero);
