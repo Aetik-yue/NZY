@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/music_song.dart';
 import 'audio_backend.dart';
+import 'music_library_provider.dart';
 
 /// 播放器状态
 class MusicPlayerState {
@@ -63,6 +64,13 @@ class MusicPlayerController extends Notifier<MusicPlayerState> {
   @override
   MusicPlayerState build() {
     ref.onDispose(_dispose);
+    // 监听扫描结果，自动注入歌单（仅在歌单为空时注入，避免覆盖用户手动选择）
+    ref.listen<AsyncValue<List<MusicSong>>>(musicLibraryProvider, (_, async) {
+      final songs = async.valueOrNull;
+      if (songs != null && songs.isNotEmpty && state.playlist.isEmpty) {
+        setPlaylist(songs);
+      }
+    });
     return const MusicPlayerState();
   }
 
