@@ -5,6 +5,7 @@ import '../../features/home/presentation/home_page.dart';
 import '../../features/album/presentation/album_page.dart';
 import '../../features/wishes/presentation/wishes_page.dart';
 import '../../features/novel/presentation/novel_page.dart';
+import '../../features/music/presentation/widgets/mini_player_bar.dart';
 import '../../features/profile/presentation/profile_page.dart';
 import '../widgets/pill_nav_bar.dart';
 
@@ -33,7 +34,13 @@ class MainShell extends ConsumerWidget {
         ),
       ),
       extendBody: true,
-      bottomNavigationBar: const PillNavBar(),
+      bottomNavigationBar: const Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          MiniPlayerBar(),
+          PillNavBar(),
+        ],
+      ),
     );
   }
 }
