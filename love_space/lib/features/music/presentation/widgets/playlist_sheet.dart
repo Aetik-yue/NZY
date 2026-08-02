@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_text_styles.dart';
+import '../../../../shared/widgets/app_snackbar.dart';
 import '../../providers/music_player_provider.dart';
 
 /// 歌曲列表弹层
@@ -77,9 +78,23 @@ class PlaylistSheet extends ConsumerWidget {
                         style: AppTextStyles.caption,
                         maxLines: 1,
                       ),
-                      onTap: () => ref
-                          .read(musicPlayerProvider.notifier)
-                          .selectSong(i),
+                      onTap: () async {
+                        try {
+                          await ref
+                              .read(musicPlayerProvider.notifier)
+                              .selectSong(i);
+                        } on MusicPlaybackException {
+                          // 播放失败已自动跳下一首，仅提示当前曲目无法播放
+                          if (context.mounted) {
+                            AppSnackbar.show(
+                                context, MusicPlaybackException.feedbackMessage);
+                          }
+                        } catch (_) {
+                          if (context.mounted) {
+                            AppSnackbar.show(context, '播放失败');
+                          }
+                        }
+                      },
                     );
                   },
                 ),

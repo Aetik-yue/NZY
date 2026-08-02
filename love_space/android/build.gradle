@@ -52,15 +52,40 @@ subprojects {
 }
 
 // 部分插件未声明 compileOptions，AGP 默认 Java 8 —— 在 JDK 21 下会触发
-// "源值 8 已过时" 警告（Java 8 已进入弃用通道）。在 javac 执行前，仅将
-// 仍停留在 1.8 的编译任务提升到 11；已显式设置 11/17 的项目保持不变
-// （避免与其 Kotlin jvmTarget 不一致导致构建失败）。
-subprojects {
-    tasks.withType(JavaCompile).configureEach { compileTask ->
-        compileTask.doFirst {
-            if (compileTask.sourceCompatibility == '1.8') {
-                compileTask.sourceCompatibility = '11'
-                compileTask.targetCompatibility = '11'
+// "源值 8 已过时" 警告（Java 8 已进入弃用通道）。
+// 注意：不能把有真实 Java 源码的模块 source/target 从 8 升到 11 —— JDK 21 的
+// javac 在 source>=9 时切出 legacy 模式并忽略 -bootclasspath 里的 android.jar，
+// 导致 audio_session 等纯 Java 插件的 android.* 无法解析而编译失败（仅在 clean
+// 全量重编译时暴露，增量构建因复用旧产物而侥幸通过）。
+// 须在 gradle.projectsEvaluated（全部模块配置完成后）读取最终值并覆盖，
+// AGP 在 project afterEvaluate 时尚未 finalize compileOptions（过早读取会得到
+// 默认 21 或抛 "not yet finalized"）。
+//
+// 规则（仅针对最终仍停留在 Java 8 的 javac 任务；显式设置 11/17/21 的项目保持不变）：
+// - 有真实 Java 源码：保持 legacy 1.8（bootclasspath 生效），
+//   用 -Xlint:-options 屏蔽 "源值 8 已过时" 弃用警告；
+// - 纯 Kotlin 模块（无 .java）：Java target 对齐 Kotlin jvmTarget（JDK 21 下默认 21），
+//   避免 AGP "Java/Kotlin JVM target 不一致" 检查失败。
+gradle.projectsEvaluated {
+    subprojects { proj ->
+        def android = proj.extensions.findByName("android")
+        if (android == null) return
+        def hasJavaSrc =
+            proj.fileTree('src/main/java').files.any { it.name.endsWith('.java') }
+        proj.tasks.matching { it.name.contains('WithJavac') }.all { t ->
+            def java8 = t.sourceCompatibility == '1.8' || t.targetCompatibility == '1.8'
+            if (hasJavaSrc) {
+                if (java8) {
+                    t.options.compilerArgs += ['-Xlint:-options']
+                }
+            } else if (java8) {
+                def kotlinJvm = proj.tasks
+                    .findAll { it.name.endsWith('Kotlin') && it.hasProperty('kotlinOptions') }
+                    .collect { it.kotlinOptions?.jvmTarget }
+                    .find { it != null }
+                def target = kotlinJvm ?: '21'
+                t.sourceCompatibility = target
+                t.targetCompatibility = target
             }
         }
     }

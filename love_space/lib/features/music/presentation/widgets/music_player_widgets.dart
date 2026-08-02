@@ -116,6 +116,11 @@ class MusicControls extends ConsumerWidget {
           onPressed: () async {
             try {
               await ctrl.previous();
+            } on MusicPlaybackException {
+              if (context.mounted) {
+                AppSnackbar.show(
+                    context, MusicPlaybackException.feedbackMessage);
+              }
             } catch (_) {
               if (context.mounted) AppSnackbar.show(context, '切换失败');
             }
@@ -123,7 +128,13 @@ class MusicControls extends ConsumerWidget {
         ),
         const SizedBox(width: 24),
         GestureDetector(
-          onTap: () => ctrl.togglePlay(),
+          onTap: () async {
+            try {
+              await ctrl.togglePlay();
+            } catch (_) {
+              if (context.mounted) AppSnackbar.show(context, '播放失败');
+            }
+          },
           child: Container(
             width: 72,
             height: 72,
@@ -153,6 +164,11 @@ class MusicControls extends ConsumerWidget {
           onPressed: () async {
             try {
               await ctrl.next();
+            } on MusicPlaybackException {
+              if (context.mounted) {
+                AppSnackbar.show(
+                    context, MusicPlaybackException.feedbackMessage);
+              }
             } catch (_) {
               if (context.mounted) AppSnackbar.show(context, '切换失败');
             }

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_text_styles.dart';
+import '../../../../shared/widgets/app_snackbar.dart';
 import '../../models/music_song.dart';
 import '../../providers/music_player_provider.dart';
 import '../music_player_page.dart';
@@ -58,8 +59,13 @@ class MiniPlayerBar extends ConsumerWidget {
               ),
             ),
             GestureDetector(
-              onTap: () =>
-                  ref.read(musicPlayerProvider.notifier).togglePlay(),
+              onTap: () async {
+                try {
+                  await ref.read(musicPlayerProvider.notifier).togglePlay();
+                } catch (_) {
+                  if (context.mounted) AppSnackbar.show(context, '播放失败');
+                }
+              },
               child: Container(
                 width: 36,
                 height: 36,

@@ -43,13 +43,14 @@ class JustAudioBackend implements AudioBackend {
 
   /// 初始化：将 just_audio 的 positionStream 与 processingStateStream 桥接到本接口
   ///
-  /// processingState == completed 时发完成事件，并 seek 到起点以便下一首能正常播放。
+  /// processingState == completed 时发完成事件。不在此处手动 seek：
+  /// 切下一首时 controller.next() -> setUrl 本身会重置到开头，且避免与
+  /// controller 的 setUrl 并发竞争（seek 也可能在播放器忙碌时抛异常）。
   void init() {
     _posSub = _player.positionStream.listen(_positionController.add);
     _stateSub = _player.processingStateStream.listen((processingState) {
       if (processingState == ProcessingState.completed) {
         _completedController.add(null);
-        _player.seek(Duration.zero); // 重置以便下一首
       }
     });
   }
