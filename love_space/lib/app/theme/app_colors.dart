@@ -71,6 +71,16 @@ class AppColors {
     colors: [Color(0xFFFF8FB1), Color(0xFFFFB5CC)],
   );
 
+  /// 音乐封面渐变组（无封面图时按 id 取模占位）
+  static const coverGradients = <LinearGradient>[
+    LinearGradient(colors: [Color(0xFFFFBFD0), Color(0xFFFF8FB1)]),
+    LinearGradient(colors: [Color(0xFFFFD1BF), Color(0xFFFFB5A1)]),
+    LinearGradient(colors: [Color(0xFFFFB5CC), Color(0xFFFFD4E0)]),
+    LinearGradient(colors: [Color(0xFFFFBFCC), Color(0xFFFFA1B5)]),
+    LinearGradient(colors: [Color(0xFFFFE0D4), Color(0xFFFFB5CC)]),
+    LinearGradient(colors: [Color(0xFFFF8FB1), Color(0xFFFF6B9D)]),
+  ];
+
   // ──────── 圆角（Primitives）────────
   static const radiusCard = 24.0;
   static const radiusButton = 50.0;
