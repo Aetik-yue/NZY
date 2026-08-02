@@ -8,6 +8,9 @@ import 'package:love_space/data/models/timeline_event.dart';
 import 'package:love_space/data/models/app_settings.dart';
 import 'package:love_space/data/models/reader_settings.dart';
 import 'package:love_space/core/utils/date_utils.dart';
+import 'package:love_space/features/music/providers/audio_backend.dart';
+import 'package:love_space/features/music/providers/music_player_provider.dart';
+import 'package:love_space/features/music/providers/music_library_provider.dart';
 import 'package:love_space/shared/widgets/pill_nav_bar.dart';
 
 void main() {
@@ -74,6 +77,10 @@ void main() {
           memosProvider.overrideWith((ref) => Stream.value([])),
           // 备忘录总数
           memoCountProvider.overrideWithValue(0),
+          // 音乐：Fake 后端 + 空歌单，避免 audioBackendProvider 抛
+          // UnimplementedError 与 musicLibraryProvider 触发原生库
+          audioBackendProvider.overrideWithValue(FakeAudioBackend()),
+          musicLibraryProvider.overrideWith((ref) async => []),
         ],
         child: const LoveSpaceApp(),
       ),
