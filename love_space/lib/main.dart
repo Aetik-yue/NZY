@@ -8,6 +8,8 @@ import 'app/app.dart';
 import 'data/database/isar_provider.dart';
 import 'data/database/seed_service.dart';
 import 'data/repositories/novel_repository.dart';
+import 'features/music/providers/just_audio_backend.dart';
+import 'features/music/providers/music_player_provider.dart';
 
 /// 以越之名 · 情侣恋爱空间
 /// 入口
@@ -24,10 +26,14 @@ void main() async {
   // 每次启动恢复异常中断的爬取状态（进程被杀导致的卡死 crawling / 半成品）
   await NovelRepository(isar).recoverInterruptedCrawls();
 
+  // 音乐播放后端：just_audio 实例，提前 init 挂接事件流
+  final audioBackend = JustAudioBackend()..init();
+
   runApp(
     ProviderScope(
       overrides: [
         isarProvider.overrideWithValue(isar),
+        audioBackendProvider.overrideWithValue(audioBackend),
       ],
       child: const LoveSpaceApp(),
     ),
