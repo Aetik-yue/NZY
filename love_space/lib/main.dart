@@ -26,14 +26,16 @@ void main() async {
   // 每次启动恢复异常中断的爬取状态（进程被杀导致的卡死 crawling / 半成品）
   await NovelRepository(isar).recoverInterruptedCrawls();
 
-  // 音乐播放后端：just_audio 实例，提前 init 挂接事件流
-  final audioBackend = JustAudioBackend()..init();
-
   runApp(
     ProviderScope(
       overrides: [
         isarProvider.overrideWithValue(isar),
-        audioBackendProvider.overrideWithValue(audioBackend),
+        // 音乐播放后端：just_audio 实例，ref.onDispose 确保 ProviderScope 重建时释放
+        audioBackendProvider.overrideWith((ref) {
+          final backend = JustAudioBackend()..init();
+          ref.onDispose(backend.dispose);
+          return backend;
+        }),
       ],
       child: const LoveSpaceApp(),
     ),
