@@ -7,7 +7,6 @@ import '../../../shared/widgets/app_snackbar.dart';
 import '../../memo/presentation/memo_page.dart';
 import '../../music/presentation/music_player_page.dart';
 import '../../music/providers/music_player_provider.dart';
-import '../../music/providers/music_library_provider.dart';
 import 'settings_page.dart';
 
 /// 我的页
@@ -200,13 +199,13 @@ class _MusicCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // 读取播放器状态与歌单数量，文案随当前曲目动态变化
+    // 只读播放器状态；不 watch musicLibraryProvider，
+    // 避免打开「我的」tab 触发权限请求与扫描
     final playerState = ref.watch(musicPlayerProvider);
-    final libraryAsync = ref.watch(musicLibraryProvider);
-    final count = libraryAsync.valueOrNull?.length ?? 0;
+    final count = playerState.playlist.length;
     final current = playerState.currentSong;
     final sub = count == 0
-        ? '还没有音乐'
+        ? '还没有音乐 · 点击播放'
         : (current != null
             ? '$count 首 · 正在播放「${current.title}」'
             : '$count 首 · 点击播放');

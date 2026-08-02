@@ -5,7 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/music_song.dart';
 import 'audio_backend.dart';
-import 'music_library_provider.dart';
 
 /// 播放失败异常（URI 失效 / 引擎异常等）
 ///
@@ -93,13 +92,9 @@ class MusicPlayerController extends Notifier<MusicPlayerState> {
   @override
   MusicPlayerState build() {
     ref.onDispose(_dispose);
-    // 监听扫描结果，自动注入歌单（仅在歌单为空时注入，避免覆盖用户手动选择）
-    ref.listen<AsyncValue<List<MusicSong>>>(musicLibraryProvider, (_, async) {
-      final songs = async.valueOrNull;
-      if (songs != null && songs.isNotEmpty && state.playlist.isEmpty) {
-        setPlaylist(songs);
-      }
-    });
+    // 注意：此处不再自动监听 musicLibraryProvider。
+    // 歌单由播放页显式注入（见 music_player_page.dart 的 listenManual），
+    // 避免 MiniPlayerBar 常驻导致 controller 在启动即 build、进而触发权限请求。
     return const MusicPlayerState();
   }
 
