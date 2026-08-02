@@ -179,9 +179,12 @@ class MusicControls extends ConsumerWidget {
   }
 }
 
-/// 空状态（无本地音乐）
+/// 空状态（无本地音乐 / 扫描失败兜底）
 class MusicEmptyState extends StatelessWidget {
-  const MusicEmptyState({super.key});
+  /// 非空时显示「重新扫描」按钮：
+  /// 真无音乐可手动重扫，扫描失败兜底成空态后也能重试恢复
+  final VoidCallback? onRetry;
+  const MusicEmptyState({super.key, this.onRetry});
 
   @override
   Widget build(BuildContext context) {
@@ -198,6 +201,16 @@ class MusicEmptyState extends StatelessWidget {
           Text('请将音乐文件放入设备后重试',
               style: AppTextStyles.caption
                   .copyWith(color: AppColors.textOnPink)),
+          if (onRetry != null) ...[
+            const SizedBox(height: 24),
+            FilledButton(
+              onPressed: onRetry,
+              style: FilledButton.styleFrom(backgroundColor: AppColors.bgCard),
+              child: Text('重新扫描',
+                  style: AppTextStyles.body
+                      .copyWith(color: AppColors.accentRose)),
+            ),
+          ],
         ],
       ),
     );

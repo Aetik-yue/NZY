@@ -104,7 +104,8 @@ class _MusicPlayerPageState extends ConsumerState<MusicPlayerPage>
                     onRetry: () => ref.refresh(musicLibraryProvider))
                 : Center(child: Text('加载失败', style: AppTextStyles.body)),
             data: (songs) => songs.isEmpty
-                ? const MusicEmptyState()
+                ? MusicEmptyState(
+                    onRetry: () => ref.refresh(musicLibraryProvider))
                 : _playerContent(state),
           ),
         ),
