@@ -213,10 +213,8 @@ class _MusicCard extends ConsumerWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFFFFD4E0), Color(0xFFFFA1C6)],
-        ),
-        borderRadius: BorderRadius.circular(24),
+        gradient: AppColors.musicCardGradient,
+        borderRadius: BorderRadius.circular(AppColors.radiusCard),
         boxShadow: const [
           BoxShadow(
             color: AppColors.shadowCard,
@@ -233,17 +231,17 @@ class _MusicCard extends ConsumerWidget {
             height: 48,
             decoration: BoxDecoration(
               gradient: AppColors.pinkButtonGradient,
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(AppColors.radiusSm),
             ),
-            child: const Icon(Icons.music_note, color: Colors.white, size: 24),
+            child: const Icon(Icons.music_note,
+                color: AppColors.textOnPink, size: 24),
           ),
           const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('我们的歌单',
-                    style: AppTextStyles.titleSmall.copyWith(fontSize: 14)),
+                Text('我们的歌单', style: AppTextStyles.titleXs),
                 const SizedBox(height: 4),
                 Text(sub, style: AppTextStyles.label),
               ],
@@ -255,7 +253,7 @@ class _MusicCard extends ConsumerWidget {
               width: 40,
               height: 40,
               decoration: const BoxDecoration(
-                color: Colors.white,
+                color: AppColors.bgCard,
                 shape: BoxShape.circle,
               ),
               child: const Icon(Icons.play_arrow,

@@ -7,6 +7,12 @@ import '../../../../shared/widgets/app_snackbar.dart';
 import '../../models/music_song.dart';
 import '../../providers/music_player_provider.dart';
 
+/// 控制区切歌图标尺寸
+const _kControlIconSize = 48.0;
+
+/// 主播放按钮直径
+const _kPlayButtonSize = 72.0;
+
 /// 大封面（有图用图，无图渐变占位），用于全屏播放页
 class MusicBigCover extends StatelessWidget {
   final MusicSong? song;
@@ -112,7 +118,7 @@ class MusicControls extends ConsumerWidget {
       children: [
         IconButton(
           icon: const Icon(Icons.skip_previous_rounded,
-              size: 48, color: AppColors.textOnPink),
+              size: _kControlIconSize, color: AppColors.textOnPink),
           onPressed: () async {
             try {
               await ctrl.previous();
@@ -136,8 +142,8 @@ class MusicControls extends ConsumerWidget {
             }
           },
           child: Container(
-            width: 72,
-            height: 72,
+            width: _kPlayButtonSize,
+            height: _kPlayButtonSize,
             decoration: const BoxDecoration(
               gradient: AppColors.pinkButtonGradient,
               shape: BoxShape.circle,
@@ -160,7 +166,7 @@ class MusicControls extends ConsumerWidget {
         const SizedBox(width: 24),
         IconButton(
           icon: const Icon(Icons.skip_next_rounded,
-              size: 48, color: AppColors.textOnPink),
+              size: _kControlIconSize, color: AppColors.textOnPink),
           onPressed: () async {
             try {
               await ctrl.next();

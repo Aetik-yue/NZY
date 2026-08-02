@@ -38,6 +38,14 @@ class AppTextStyles {
         fontFamily: cjkFontFamily,
       );
 
+  /// 卡片小标题（音乐卡标题）14px Bold
+  static TextStyle get titleXs => const TextStyle(
+        fontSize: 14,
+        fontWeight: FontWeight.w700,
+        color: AppColors.textPrimary,
+        fontFamily: cjkFontFamily,
+      );
+
   // ──────── 正文 ────────
   /// 正文 14px Regular
   static TextStyle get body => const TextStyle(

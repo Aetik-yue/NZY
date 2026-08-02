@@ -71,6 +71,11 @@ class AppColors {
     colors: [Color(0xFFFF8FB1), Color(0xFFFFB5CC)],
   );
 
+  /// 音乐迷你播放卡渐变（樱花粉 → 柔玫瑰粉）
+  static const musicCardGradient = LinearGradient(
+    colors: [Color(0xFFFFD4E0), Color(0xFFFFA1C6)],
+  );
+
   /// 音乐封面渐变组（无封面图时按 id 取模占位）
   static const coverGradients = <LinearGradient>[
     LinearGradient(colors: [Color(0xFFFFBFD0), Color(0xFFFF8FB1)]),

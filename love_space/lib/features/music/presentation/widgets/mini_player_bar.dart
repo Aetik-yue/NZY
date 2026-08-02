@@ -25,7 +25,7 @@ class MiniPlayerBar extends ConsumerWidget {
       behavior: HitTestBehavior.opaque,
       child: Container(
         margin: const EdgeInsets.fromLTRB(12, 0, 12, 4),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
           color: AppColors.bgCard,
           borderRadius: BorderRadius.circular(AppColors.radiusPill),

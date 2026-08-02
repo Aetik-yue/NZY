@@ -19,7 +19,7 @@ class PlaylistSheet extends ConsumerWidget {
       isScrollControlled: true,
       backgroundColor: AppColors.bgPrimary,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppColors.radiusCard)),
       ),
       builder: (_) => DraggableScrollableSheet(
         initialChildSize: 0.7,
@@ -40,12 +40,12 @@ class PlaylistSheet extends ConsumerWidget {
       children: [
         // 顶部拖拽指示条
         Container(
-          margin: const EdgeInsets.only(top: 10),
+          margin: const EdgeInsets.only(top: 12),
           width: 40,
           height: 4,
           decoration: BoxDecoration(
             color: AppColors.textTertiary,
-            borderRadius: BorderRadius.circular(2),
+            borderRadius: BorderRadius.circular(AppColors.radiusXs),
           ),
         ),
         Padding(

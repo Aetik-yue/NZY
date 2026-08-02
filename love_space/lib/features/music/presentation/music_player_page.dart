@@ -124,10 +124,10 @@ class _MusicPlayerPageState extends ConsumerState<MusicPlayerPage>
           child: Container(
             width: 40,
             height: 4,
-            margin: const EdgeInsets.only(top: 10),
+            margin: const EdgeInsets.only(top: 12),
             decoration: BoxDecoration(
               color: AppColors.textOnPink.withValues(alpha: 0.5),
-              borderRadius: BorderRadius.circular(2),
+              borderRadius: BorderRadius.circular(AppColors.radiusXs),
             ),
           ),
         ),
