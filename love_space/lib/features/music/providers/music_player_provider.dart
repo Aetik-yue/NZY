@@ -89,10 +89,10 @@ class MusicPlayerController extends Notifier<MusicPlayerState> {
   int? _pendingIndex;
   Future<void>? _pendingLoad;
 
-  // 已实际 setUrl 加载成功的曲目索引；null = 当前曲从未加载。
+  // 已实际 setUrl 加载成功的曲目 ID（按歌曲身份记忆：索引会随歌单重注入漂移）。
   // setPlaylist 只自动选中不播放，togglePlay 需区分「恢复播放」与「先加载再播放」：
   // just_audio 无源时 play() 仅置 playing 标志不发声，直接 play 会「假播放」。
-  int? _loadedIndex;
+  int? _loadedSongId;
 
   @override
   MusicPlayerState build() {
@@ -112,14 +112,26 @@ class MusicPlayerController extends Notifier<MusicPlayerState> {
 
   /// 注入扫描到的歌单
   ///
-  /// 未选过歌（currentIndex == -1）且歌单非空时自动选中第一首（只选中不播放），
-  /// 避免播放页打开后标题/封面空白占位；已选过歌则保持当前曲不变。
+  /// 未选过歌（currentIndex == -1）且歌单非空时自动选中首个可播曲目（只选中不播放），
+  /// 避免播放页打开后标题/封面空白占位或指向无 URI 的不可播曲目；
+  /// 已选过歌则保持当前曲不变。
   void setPlaylist(List<MusicSong> songs) {
-    // 新歌单注入：无论是否保留 currentIndex，曲目都未在本会话加载过，
-    // 播放键需先加载（见 togglePlay）
-    _loadedIndex = null;
+    // 重注入使在途加载的请求作废：递增请求序号，防止旧请求完成时用新歌单盖章旧结果
+    _requestSeq++;
+    // 仅当 currentIndex 不再指向已加载的同一首曲目时才失去加载记忆：
+    // 「暂停 → 歌单重注入（同曲原位）→ 恢复」应直接续播，不重复 setUrl、不重置进度
+    if (state.currentIndex < 0 ||
+        state.currentIndex >= songs.length ||
+        songs[state.currentIndex].id != _loadedSongId) {
+      _loadedSongId = null;
+    }
     if (state.currentIndex < 0 && songs.isNotEmpty) {
-      state = state.copyWith(playlist: songs, currentIndex: 0);
+      final firstPlayable = songs.indexWhere((s) => s.isPlayable);
+      state = state.copyWith(
+        playlist: songs,
+        // 全部不可播时仍回退第一首（UI 有展示），播放由 selectSong 的 isPlayable 守卫兜底
+        currentIndex: firstPlayable < 0 ? 0 : firstPlayable,
+      );
     } else {
       state = state.copyWith(playlist: songs);
     }
@@ -181,7 +193,7 @@ class MusicPlayerController extends Notifier<MusicPlayerState> {
         isLoading: false,
         position: Duration.zero,
       );
-      _loadedIndex = index;
+      _loadedSongId = song.id;
     } catch (e) {
       if (seq != _requestSeq) return; // 过期请求的失败忽略，交由最新请求处理
       state = state.copyWith(isLoading: false);
@@ -226,7 +238,8 @@ class MusicPlayerController extends Notifier<MusicPlayerState> {
     // 当前曲只是被 setPlaylist 自动选中、从未 setUrl 加载（只选中不播放）时，
     // 直接 play() 无源无效（just_audio 无源 play 仅置 playing 标志、不发声），
     // 需先 selectSong 完成加载再播放
-    if (_loadedIndex != state.currentIndex) {
+    final song = state.currentSong;
+    if (song == null || song.id != _loadedSongId) {
       await selectSong(state.currentIndex);
       return;
     }

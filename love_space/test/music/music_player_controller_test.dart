@@ -311,4 +311,35 @@ void main() {
     ctrl.setPlaylist([_song(1), _song(2), _song(3)]); // 重扫注入
     expect(container.read(musicPlayerProvider).currentIndex, 2);
   });
+
+  test('暂停后歌单重注入：同曲保留加载记忆，恢复续播且不重复 setUrl', () async {
+    final backend = ControllableBackend();
+    final container = _containerWith(backend);
+    addTearDown(container.dispose);
+    addTearDown(backend.dispose);
+
+    final ctrl = container.read(musicPlayerProvider.notifier);
+    ctrl.setPlaylist([_song(1), _song(2), _song(3)]);
+    await ctrl.selectSong(2);
+    await ctrl.seekTo(const Duration(seconds: 5));
+    await ctrl.togglePlay(); // 暂停
+    expect(container.read(musicPlayerProvider).isPlaying, false);
+
+    ctrl.setPlaylist([_song(1), _song(2), _song(3), _song(4)]); // 重注入：原曲仍在 index 2
+    await ctrl.togglePlay(); // 恢复播放
+    final state = container.read(musicPlayerProvider);
+    expect(state.currentIndex, 2);
+    expect(state.isPlaying, true);
+    expect(state.position, const Duration(seconds: 5)); // 续播位置，未被重置为 0
+    expect(backend.setUrlCalls, ['file:///song3.mp3']); // 恢复未重复 setUrl
+  });
+
+  test('setPlaylist 自动选中首个可播曲目（首首无 URI 时跳过）', () {
+    final ctrl = container.read(musicPlayerProvider.notifier);
+    // uri 传空串（_song 助手的 ?? 默认只对 null 生效），isPlayable 为 false
+    ctrl.setPlaylist([_song(1, uri: ''), _song(2)]);
+    final state = container.read(musicPlayerProvider);
+    expect(state.currentIndex, 1);
+    expect(state.isPlaying, false); // 只选中不播放
+  });
 }
