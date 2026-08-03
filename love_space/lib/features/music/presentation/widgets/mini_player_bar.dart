@@ -42,6 +42,8 @@ class MiniPlayerBar extends ConsumerWidget {
           children: [
             _Cover(song: song, size: 36),
             const SizedBox(width: 10),
+            _EqualizerBars(playing: state.isPlaying),
+            const SizedBox(width: 8),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -112,6 +114,89 @@ class _Cover extends StatelessWidget {
               borderRadius: BorderRadius.circular(size * 0.3),
               child: Image.memory(song.coverBytes!, fit: BoxFit.cover),
             ),
+    );
+  }
+}
+
+/// 播放中等化器动效（3 条竖线跳动；暂停时静止半透明）
+class _EqualizerBars extends StatefulWidget {
+  final bool playing;
+  const _EqualizerBars({required this.playing});
+
+  @override
+  State<_EqualizerBars> createState() => _EqualizerBarsState();
+}
+
+class _EqualizerBarsState extends State<_EqualizerBars>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<double> _a;
+  late final Animation<double> _b;
+  late final Animation<double> _c;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 700),
+    )..repeat(reverse: true);
+    _a = Tween(begin: 0.3, end: 1.0)
+        .animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));
+    _b = Tween(begin: 1.0, end: 0.3)
+        .animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));
+    _c = Tween(begin: 0.6, end: 0.9)
+        .animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));
+  }
+
+  @override
+  void didUpdateWidget(_EqualizerBars oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.playing && !_ctrl.isAnimating) {
+      _ctrl.repeat(reverse: true);
+    } else if (!widget.playing && _ctrl.isAnimating) {
+      _ctrl.stop();
+      _ctrl.value = 0.5; // 静止在中间高度
+    }
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _ctrl,
+      builder: (context, _) {
+        const barHeight = 14.0;
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            _bar(_a.value * barHeight),
+            const SizedBox(width: 2),
+            _bar(_b.value * barHeight),
+            const SizedBox(width: 2),
+            _bar(_c.value * barHeight),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _bar(double height) {
+    return Container(
+      width: 3,
+      height: height.clamp(4, 14),
+      decoration: BoxDecoration(
+        color: widget.playing
+            ? AppColors.accentRose
+            : AppColors.textTertiary,
+        borderRadius: BorderRadius.circular(AppColors.radiusXs),
+      ),
     );
   }
 }
