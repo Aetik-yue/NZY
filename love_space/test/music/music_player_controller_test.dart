@@ -115,15 +115,22 @@ void main() {
     expect(container.read(musicPlayerProvider).isPlaying, true);
   });
 
-  test('歌单非空但未选歌（currentIndex=-1）时 togglePlay 直接播第一首', () async {
+  test('歌单自动选中第一首后，点播放键直接播放第一首', () async {
+    final backend = ControllableBackend();
+    final container = _containerWith(backend);
+    addTearDown(container.dispose);
+    addTearDown(backend.dispose);
+
     final ctrl = container.read(musicPlayerProvider.notifier);
     ctrl.setPlaylist([_song(1), _song(2)]);
-    expect(container.read(musicPlayerProvider).currentIndex, -1);
-    expect(container.read(musicPlayerProvider).isPlaying, false);
+    expect(container.read(musicPlayerProvider).currentIndex, 0); // 自动选中第一首
+    expect(container.read(musicPlayerProvider).isPlaying, false); // 只选中不播放
     await ctrl.togglePlay();
     final state = container.read(musicPlayerProvider);
-    expect(state.currentIndex, 0); // selectSong(0) 生效
+    expect(state.currentIndex, 0);
     expect(state.isPlaying, true);
+    // 先 setUrl 加载再 play，而非无源假播放（只置 playing 标志、不发声）
+    expect(backend.playedUrls, ['file:///song1.mp3']);
   });
 
   test('next 末首回第一首；previous 首首回末首', () async {
@@ -245,7 +252,8 @@ void main() {
       throwsA(isA<MusicPlaybackException>()),
     );
     final state = container.read(musicPlayerProvider);
-    expect(state.currentIndex, -1); // 未成功选中任何曲目
+    // setPlaylist 已自动选中第一首（只选中不播放），但未成功播放任何曲目
+    expect(state.currentIndex, 0);
     expect(state.isLoading, false);
     expect(state.isPlaying, false);
     expect(backend.playedUrls, isEmpty); // 全程未成功 play
@@ -286,5 +294,21 @@ void main() {
     expect(state.currentIndex, 2); // 用户点击的 song3 被播放，未被 auto-advance 抢走
     expect(backend.playedUrls, ['file:///song3.mp3']); // 只实际播放一次 song3
     expect(backend.setUrlCalls.where((u) => u == 'file:///song3.mp3').length, 1);
+  });
+
+  test('setPlaylist 未选过歌时自动选中第一首（不播放）', () {
+    final ctrl = container.read(musicPlayerProvider.notifier);
+    ctrl.setPlaylist([_song(1), _song(2)]);
+    final state = container.read(musicPlayerProvider);
+    expect(state.currentIndex, 0);
+    expect(state.isPlaying, false); // 只选中不播放
+  });
+
+  test('setPlaylist 已选过歌时不覆盖 currentIndex', () async {
+    final ctrl = container.read(musicPlayerProvider.notifier);
+    ctrl.setPlaylist([_song(1), _song(2), _song(3)]);
+    await ctrl.selectSong(2);
+    ctrl.setPlaylist([_song(1), _song(2), _song(3)]); // 重扫注入
+    expect(container.read(musicPlayerProvider).currentIndex, 2);
   });
 }

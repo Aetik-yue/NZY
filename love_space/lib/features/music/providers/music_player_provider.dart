@@ -89,6 +89,11 @@ class MusicPlayerController extends Notifier<MusicPlayerState> {
   int? _pendingIndex;
   Future<void>? _pendingLoad;
 
+  // 已实际 setUrl 加载成功的曲目索引；null = 当前曲从未加载。
+  // setPlaylist 只自动选中不播放，togglePlay 需区分「恢复播放」与「先加载再播放」：
+  // just_audio 无源时 play() 仅置 playing 标志不发声，直接 play 会「假播放」。
+  int? _loadedIndex;
+
   @override
   MusicPlayerState build() {
     ref.onDispose(_dispose);
@@ -106,8 +111,18 @@ class MusicPlayerController extends Notifier<MusicPlayerState> {
   }
 
   /// 注入扫描到的歌单
+  ///
+  /// 未选过歌（currentIndex == -1）且歌单非空时自动选中第一首（只选中不播放），
+  /// 避免播放页打开后标题/封面空白占位；已选过歌则保持当前曲不变。
   void setPlaylist(List<MusicSong> songs) {
-    state = state.copyWith(playlist: songs);
+    // 新歌单注入：无论是否保留 currentIndex，曲目都未在本会话加载过，
+    // 播放键需先加载（见 togglePlay）
+    _loadedIndex = null;
+    if (state.currentIndex < 0 && songs.isNotEmpty) {
+      state = state.copyWith(playlist: songs, currentIndex: 0);
+    } else {
+      state = state.copyWith(playlist: songs);
+    }
   }
 
   /// 选择并播放指定曲目
@@ -166,6 +181,7 @@ class MusicPlayerController extends Notifier<MusicPlayerState> {
         isLoading: false,
         position: Duration.zero,
       );
+      _loadedIndex = index;
     } catch (e) {
       if (seq != _requestSeq) return; // 过期请求的失败忽略，交由最新请求处理
       state = state.copyWith(isLoading: false);
@@ -196,8 +212,8 @@ class MusicPlayerController extends Notifier<MusicPlayerState> {
   }
 
   Future<void> togglePlay() async {
-    // 首次打开播放页且歌单已注入但从未选歌（currentIndex==-1）时，
-    // 点播放键直接播第一首；歌单为空则仍直接返回
+    // 歌单为空则仍直接返回；从未选中时兜底播第一首
+    //（setPlaylist 已自动选中，此分支实际为防御）
     if (state.currentIndex < 0) {
       if (state.playlist.isEmpty) return;
       await selectSong(0);
@@ -205,9 +221,16 @@ class MusicPlayerController extends Notifier<MusicPlayerState> {
     }
     if (state.isPlaying) {
       await _backend.pause();
-    } else {
-      await _backend.play();
+      return;
     }
+    // 当前曲只是被 setPlaylist 自动选中、从未 setUrl 加载（只选中不播放）时，
+    // 直接 play() 无源无效（just_audio 无源 play 仅置 playing 标志、不发声），
+    // 需先 selectSong 完成加载再播放
+    if (_loadedIndex != state.currentIndex) {
+      await selectSong(state.currentIndex);
+      return;
+    }
+    await _backend.play();
   }
 
   Future<void> next() async {
