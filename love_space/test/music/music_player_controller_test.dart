@@ -342,4 +342,62 @@ void main() {
     expect(state.currentIndex, 1);
     expect(state.isPlaying, false); // 只选中不播放
   });
+
+  test('togglePlayMode 三态循环切换', () {
+    final ctrl = container.read(musicPlayerProvider.notifier);
+    expect(container.read(musicPlayerProvider).playMode, PlayMode.sequence);
+    ctrl.togglePlayMode();
+    expect(container.read(musicPlayerProvider).playMode, PlayMode.shuffle);
+    ctrl.togglePlayMode();
+    expect(container.read(musicPlayerProvider).playMode, PlayMode.repeatOne);
+    ctrl.togglePlayMode();
+    expect(container.read(musicPlayerProvider).playMode, PlayMode.sequence);
+  });
+
+  test('next 在顺序模式下循环到下一首', () async {
+    final ctrl = container.read(musicPlayerProvider.notifier);
+    ctrl.setPlaylist([_song(1), _song(2), _song(3)]);
+    await ctrl.selectSong(2); // 末首
+    await ctrl.next();
+    expect(container.read(musicPlayerProvider).currentIndex, 0);
+  });
+
+  test('next 在单曲模式下仍切下一首（手动切歌不受模式影响）', () async {
+    final ctrl = container.read(musicPlayerProvider.notifier);
+    ctrl.setPlaylist([_song(1), _song(2)]);
+    await ctrl.selectSong(0);
+    ctrl.togglePlayMode(); // sequence -> shuffle
+    ctrl.togglePlayMode(); // shuffle -> repeatOne
+    await ctrl.next();
+    expect(container.read(musicPlayerProvider).currentIndex, 1);
+  });
+
+  test('next 在随机模式下取合法且非当前的曲目', () async {
+    final ctrl = container.read(musicPlayerProvider.notifier);
+    ctrl.setPlaylist([_song(1), _song(2), _song(3), _song(4)]);
+    await ctrl.selectSong(0);
+    ctrl.togglePlayMode(); // shuffle
+    // 每次 next 不得切回上一首（当前曲），但回到更早的曲目是合法的
+    var prev = 0;
+    for (var i = 0; i < 10; i++) {
+      await ctrl.next();
+      final idx = container.read(musicPlayerProvider).currentIndex;
+      expect(idx, inInclusiveRange(0, 3));
+      expect(idx, isNot(prev)); // 随机不会切回上一首
+      prev = idx;
+    }
+  });
+
+  test('单曲循环播完重播当前（position 归零且继续播放）', () async {
+    final ctrl = container.read(musicPlayerProvider.notifier);
+    ctrl.setPlaylist([_song(1, dur: const Duration(milliseconds: 500))]);
+    backend.setDuration(const Duration(milliseconds: 500));
+    await ctrl.selectSong(0);
+    ctrl.togglePlayMode();
+    ctrl.togglePlayMode(); // repeatOne
+    await Future.delayed(const Duration(milliseconds: 800)); // 触发 completed
+    final state = container.read(musicPlayerProvider);
+    expect(state.currentIndex, 0); // 仍当前曲
+    expect(state.position, Duration.zero); // 重播归零
+  });
 }

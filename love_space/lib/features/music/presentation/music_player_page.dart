@@ -7,7 +7,6 @@ import '../models/music_song.dart';
 import '../providers/music_library_provider.dart';
 import '../providers/music_player_provider.dart';
 import 'widgets/music_player_widgets.dart';
-import 'widgets/playlist_sheet.dart';
 
 /// 全屏音乐播放页（网易云风格）
 ///
@@ -119,7 +118,7 @@ class _MusicPlayerPageState extends ConsumerState<MusicPlayerPage>
     );
   }
 
-  /// 播放器主体内容：收起条 + 歌名 + 旋转封面 + 进度 + 控制 + 列表按钮
+  /// 播放器主体内容：收起条 + 歌名 + 旋转封面 + 进度 + 控制（含列表入口）
   Widget _playerContent(MusicPlayerState state) {
     final song = state.currentSong;
     return GestureDetector(
@@ -197,15 +196,8 @@ class _MusicPlayerPageState extends ConsumerState<MusicPlayerPage>
             // 进度条
             MusicProgressRow(state: state),
             const SizedBox(height: 8),
-            // 控制区
+            // 控制区（含播放模式 / 列表入口）
             MusicControls(state: state),
-            const SizedBox(height: 8),
-            // 列表按钮
-            IconButton(
-              icon: const Icon(Icons.queue_music_rounded,
-                  color: AppColors.textOnPink),
-              onPressed: () => PlaylistSheet.show(context),
-            ),
             const SizedBox(height: 8),
           ],
         ),

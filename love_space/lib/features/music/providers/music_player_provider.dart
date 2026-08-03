@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -24,6 +25,9 @@ class MusicPlaybackException implements Exception {
   String toString() => 'MusicPlaybackException(index: $index, cause: $cause)';
 }
 
+/// 播放模式
+enum PlayMode { sequence, shuffle, repeatOne }
+
 /// 播放器状态
 class MusicPlayerState {
   final List<MusicSong> playlist;
@@ -32,6 +36,7 @@ class MusicPlayerState {
   final Duration position;
   final Duration? duration;
   final bool isLoading; // setUrl 期间
+  final PlayMode playMode;
 
   const MusicPlayerState({
     this.playlist = const [],
@@ -40,6 +45,7 @@ class MusicPlayerState {
     this.position = Duration.zero,
     this.duration,
     this.isLoading = false,
+    this.playMode = PlayMode.sequence,
   });
 
   MusicPlayerState copyWith({
@@ -49,6 +55,7 @@ class MusicPlayerState {
     Duration? position,
     Duration? duration,
     bool? isLoading,
+    PlayMode? playMode,
   }) =>
       MusicPlayerState(
         playlist: playlist ?? this.playlist,
@@ -57,6 +64,7 @@ class MusicPlayerState {
         position: position ?? this.position,
         duration: duration ?? this.duration,
         isLoading: isLoading ?? this.isLoading,
+        playMode: playMode ?? this.playMode,
       );
 
   MusicSong? get currentSong =>
@@ -93,6 +101,8 @@ class MusicPlayerController extends Notifier<MusicPlayerState> {
   // setPlaylist 只自动选中不播放，togglePlay 需区分「恢复播放」与「先加载再播放」：
   // just_audio 无源时 play() 仅置 playing 标志不发声，直接 play 会「假播放」。
   int? _loadedSongId;
+
+  final _random = Random();
 
   @override
   MusicPlayerState build() {
@@ -246,10 +256,35 @@ class MusicPlayerController extends Notifier<MusicPlayerState> {
     await _backend.play();
   }
 
+  /// 循环切换播放模式（顺序 -> 随机 -> 单曲 -> 顺序）
+  void togglePlayMode() {
+    state = state.copyWith(
+      playMode: PlayMode
+          .values[(state.playMode.index + 1) % PlayMode.values.length],
+    );
+  }
+
   Future<void> next() async {
     if (state.playlist.isEmpty) return;
-    final nextIdx = (state.currentIndex + 1) % state.playlist.length;
-    await selectSong(nextIdx);
+    final len = state.playlist.length;
+    final idx = state.currentIndex < 0 ? 0 : state.currentIndex;
+    switch (state.playMode) {
+      case PlayMode.repeatOne:
+        // 手动点下一首仍切下一首（网易云行为）；播完自动切歌才重播当前
+        await selectSong((idx + 1) % len);
+      case PlayMode.shuffle:
+        if (len <= 1) {
+          await selectSong(0);
+          return;
+        }
+        var r = _random.nextInt(len);
+        while (r == idx) {
+          r = _random.nextInt(len);
+        }
+        await selectSong(r);
+      case PlayMode.sequence:
+        await selectSong((idx + 1) % len);
+    }
   }
 
   Future<void> previous() async {
@@ -286,9 +321,17 @@ class MusicPlayerController extends Notifier<MusicPlayerState> {
     });
   }
 
-  /// 一首播完自动切下一首；失败已被 selectSong 内部兜底，此处仅记录
+  /// 一首播完自动切下一首；单曲循环模式重播当前；失败已被 selectSong 内部兜底
   Future<void> _onTrackCompleted() async {
     try {
+      if (state.playMode == PlayMode.repeatOne &&
+          state.currentIndex >= 0) {
+        // 单曲循环：seek 回开头并继续播放
+        await _backend.seek(Duration.zero);
+        await _backend.play();
+        state = state.copyWith(position: Duration.zero);
+        return;
+      }
       await next();
     } catch (e) {
       debugPrint('自动切歌失败: $e');

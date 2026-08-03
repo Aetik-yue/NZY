@@ -6,6 +6,7 @@ import '../../../../app/theme/app_text_styles.dart';
 import '../../../../shared/widgets/app_snackbar.dart';
 import '../../models/music_song.dart';
 import '../../providers/music_player_provider.dart';
+import 'playlist_sheet.dart';
 
 /// 控制区切歌图标尺寸
 const _kControlIconSize = 48.0;
@@ -105,7 +106,7 @@ class MusicProgressRow extends ConsumerWidget {
   }
 }
 
-/// 播放控制区（上一首 / 播放暂停 / 下一首）
+/// 播放控制区（模式 / 上一首 / 播放暂停 / 下一首 / 列表）
 class MusicControls extends ConsumerWidget {
   final MusicPlayerState state;
   const MusicControls({super.key, required this.state});
@@ -116,6 +117,33 @@ class MusicControls extends ConsumerWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
+        // 播放模式切换
+        IconButton(
+          icon: Icon(
+            switch (state.playMode) {
+              PlayMode.sequence => Icons.repeat_rounded,
+              PlayMode.shuffle => Icons.shuffle_rounded,
+              PlayMode.repeatOne => Icons.repeat_one_rounded,
+            },
+            size: 28,
+            // 顺序是默认模式，图标弱化；随机/单曲为激活态高亮
+            color: state.playMode == PlayMode.sequence
+                ? AppColors.textOnPink
+                : AppColors.accentRose,
+          ),
+          onPressed: () {
+            ctrl.togglePlayMode();
+            final mode = ref.read(musicPlayerProvider).playMode;
+            if (context.mounted) {
+              AppSnackbar.show(context, switch (mode) {
+                PlayMode.sequence => '顺序播放',
+                PlayMode.shuffle => '随机播放',
+                PlayMode.repeatOne => '单曲循环',
+              });
+            }
+          },
+        ),
+        const SizedBox(width: 8),
         IconButton(
           icon: const Icon(Icons.skip_previous_rounded,
               size: _kControlIconSize, color: AppColors.textOnPink),
@@ -179,6 +207,13 @@ class MusicControls extends ConsumerWidget {
               if (context.mounted) AppSnackbar.show(context, '切换失败');
             }
           },
+        ),
+        const SizedBox(width: 8),
+        // 歌曲列表（原页面底部按钮移入）
+        IconButton(
+          icon: const Icon(Icons.queue_music_rounded,
+              size: 28, color: AppColors.textOnPink),
+          onPressed: () => PlaylistSheet.show(context),
         ),
       ],
     );
