@@ -30,8 +30,9 @@ class MusicPlayerPage extends ConsumerStatefulWidget {
 }
 
 class _MusicPlayerPageState extends ConsumerState<MusicPlayerPage>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late final AnimationController _rotateCtrl;
+  late final AnimationController _slideCtrl; // 下滑位移（0=原位，1=移出屏外）
   late final ProviderSubscription<AsyncValue<List<MusicSong>>> _librarySub;
 
   @override
@@ -41,6 +42,10 @@ class _MusicPlayerPageState extends ConsumerState<MusicPlayerPage>
       vsync: this,
       duration: const Duration(seconds: 20),
     )..repeat();
+    _slideCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 250),
+    );
     // 页面打开才监听扫描结果：权限/扫描仅在真正打开播放页时触发。
     // MiniPlayerBar 与 profile 卡只 watch musicPlayerProvider，启动与切 tab 不弹权限框。
     // fireImmediately: true —— musicLibraryProvider 是非 autoDispose FutureProvider，
@@ -65,6 +70,7 @@ class _MusicPlayerPageState extends ConsumerState<MusicPlayerPage>
   void dispose() {
     _librarySub.close();
     _rotateCtrl.dispose();
+    _slideCtrl.dispose();
     super.dispose();
   }
 
@@ -116,54 +122,80 @@ class _MusicPlayerPageState extends ConsumerState<MusicPlayerPage>
   /// 播放器主体内容：收起条 + 歌名 + 旋转封面 + 进度 + 控制 + 列表按钮
   Widget _playerContent(MusicPlayerState state) {
     final song = state.currentSong;
-    return Column(
-      children: [
-        // 顶部收起条
-        GestureDetector(
-          onTap: () => Navigator.of(context).pop(),
-          child: Container(
-            width: 40,
-            height: 4,
-            margin: const EdgeInsets.only(top: 12),
-            decoration: BoxDecoration(
-              color: AppColors.textOnPink.withValues(alpha: 0.5),
-              borderRadius: BorderRadius.circular(AppColors.radiusXs),
+    return GestureDetector(
+      // 下滑手势：跟随手指向下位移，松手超阈值收起、否则回弹
+      onVerticalDragUpdate: (details) {
+        if (details.delta.dy > 0 && _slideCtrl.value < 1) {
+          _slideCtrl.value += details.delta.dy /
+              MediaQuery.of(context).size.height;
+        }
+      },
+      onVerticalDragEnd: (details) {
+        final velocity = details.primaryVelocity ?? 0;
+        if (_slideCtrl.value > 0.25 || velocity > 800) {
+          Navigator.of(context).pop();
+        } else {
+          _slideCtrl.animateBack(0); // 回弹原位
+        }
+      },
+      child: SlideTransition(
+        position: Tween<Offset>(
+          begin: Offset.zero,
+          end: const Offset(0, 1.2),
+        ).animate(CurvedAnimation(
+          parent: _slideCtrl,
+          curve: Curves.easeOut,
+        )),
+        child: Column(
+          children: [
+            // 顶部收起条
+            GestureDetector(
+              onTap: () => Navigator.of(context).pop(),
+              child: Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(top: 12),
+                decoration: BoxDecoration(
+                  color: AppColors.textOnPink.withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(AppColors.radiusXs),
+                ),
+              ),
             ),
-          ),
-        ),
-        const SizedBox(height: 16),
-        Text(song?.title ?? '',
-            style: AppTextStyles.titleLarge
-                .copyWith(color: AppColors.textOnPink),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis),
-        Text(song?.artist ?? '',
-            style: AppTextStyles.caption
-                .copyWith(color: AppColors.textOnPink)),
-        const SizedBox(height: 24),
-        // 大封面（旋转）
-        Expanded(
-          child: Center(
-            child: RotationTransition(
-              turns: _rotateCtrl,
-              child: MusicBigCover(song: song),
+            const SizedBox(height: 16),
+            Text(song?.title ?? '',
+                style: AppTextStyles.titleLarge
+                    .copyWith(color: AppColors.textOnPink),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis),
+            Text(song?.artist ?? '',
+                style: AppTextStyles.caption
+                    .copyWith(color: AppColors.textOnPink)),
+            const SizedBox(height: 24),
+            // 大封面（旋转）
+            Expanded(
+              child: Center(
+                child: RotationTransition(
+                  turns: _rotateCtrl,
+                  child: MusicBigCover(song: song),
+                ),
+              ),
             ),
-          ),
+            // 进度条
+            MusicProgressRow(state: state),
+            const SizedBox(height: 8),
+            // 控制区
+            MusicControls(state: state),
+            const SizedBox(height: 8),
+            // 列表按钮
+            IconButton(
+              icon: const Icon(Icons.queue_music_rounded,
+                  color: AppColors.textOnPink),
+              onPressed: () => PlaylistSheet.show(context),
+            ),
+            const SizedBox(height: 8),
+          ],
         ),
-        // 进度条
-        MusicProgressRow(state: state),
-        const SizedBox(height: 8),
-        // 控制区
-        MusicControls(state: state),
-        const SizedBox(height: 8),
-        // 列表按钮
-        IconButton(
-          icon: const Icon(Icons.queue_music_rounded,
-              color: AppColors.textOnPink),
-          onPressed: () => PlaylistSheet.show(context),
-        ),
-        const SizedBox(height: 8),
-      ],
+      ),
     );
   }
 }
