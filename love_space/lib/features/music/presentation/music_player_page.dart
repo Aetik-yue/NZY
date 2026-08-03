@@ -124,27 +124,28 @@ class _MusicPlayerPageState extends ConsumerState<MusicPlayerPage>
     return GestureDetector(
       // 下滑手势：跟随手指向下位移，松手超阈值收起、否则回弹
       onVerticalDragUpdate: (details) {
-        if (details.delta.dy > 0 && _slideCtrl.value < 1) {
-          _slideCtrl.value += details.delta.dy /
-              MediaQuery.of(context).size.height;
-        }
+        // 双向跟手：上下都跟随，clamp 到 [0,1] 防止越界
+        _slideCtrl.value =
+            (_slideCtrl.value +
+                    details.delta.dy / MediaQuery.of(context).size.height)
+                .clamp(0.0, 1.0);
       },
       onVerticalDragEnd: (details) {
         final velocity = details.primaryVelocity ?? 0;
         if (_slideCtrl.value > 0.25 || velocity > 800) {
-          Navigator.of(context).pop();
+          // 先滑出屏幕再收起，观感更顺
+          _slideCtrl.animateTo(1).then((_) {
+            if (context.mounted) Navigator.of(context).pop();
+          });
         } else {
-          _slideCtrl.animateBack(0); // 回弹原位
+          _slideCtrl.animateBack(0, curve: Curves.easeOut);
         }
       },
       child: SlideTransition(
         position: Tween<Offset>(
           begin: Offset.zero,
           end: const Offset(0, 1.2),
-        ).animate(CurvedAnimation(
-          parent: _slideCtrl,
-          curve: Curves.easeOut,
-        )),
+        ).animate(_slideCtrl), // 线性跟手，回弹由 animateBack 的 curve 提供
         child: Column(
           children: [
             // 顶部收起条

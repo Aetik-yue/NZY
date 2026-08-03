@@ -140,7 +140,10 @@ class _EqualizerBarsState extends State<_EqualizerBars>
     _ctrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 700),
-    )..repeat(reverse: true);
+    );
+    if (widget.playing) {
+      _ctrl.repeat(reverse: true);
+    }
     _a = Tween(begin: 0.3, end: 1.0)
         .animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));
     _b = Tween(begin: 1.0, end: 0.3)
