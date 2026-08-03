@@ -400,4 +400,30 @@ void main() {
     expect(state.currentIndex, 0); // 仍当前曲
     expect(state.position, Duration.zero); // 重播归零
   });
+
+  test('shuffle 模式失败跳歌也随机：自动跳到非当前的可播曲目', () async {
+    final backend = ControllableBackend();
+    backend.breakUrl('file:///song2.mp3'); // 当前曲的下一首不可播
+    final container = _containerWith(backend);
+    addTearDown(container.dispose);
+    addTearDown(backend.dispose);
+
+    final ctrl = container.read(musicPlayerProvider.notifier);
+    ctrl.setPlaylist([_song(1), _song(2), _song(3)]);
+    ctrl.togglePlayMode(); // shuffle
+    await ctrl.selectSong(0); // 正常播 song1
+
+    // 点坏曲目 song2：失败后 auto-advance 在 shuffle 下随机尝试 song1/song3，
+    // 找到可播曲目即停（不死循环），不会落在失败的 song2
+    await expectLater(
+      ctrl.selectSong(1),
+      throwsA(isA<MusicPlaybackException>()),
+    );
+    final state = container.read(musicPlayerProvider);
+    expect(state.currentIndex, isNot(1)); // 不指向失败曲目
+    expect(state.currentIndex, inInclusiveRange(0, 2));
+    expect(state.isLoading, false);
+    expect(state.isPlaying, true); // 已继续播放
+    expect(backend.playedUrls, isNot(contains('file:///song2.mp3')));
+  });
 }

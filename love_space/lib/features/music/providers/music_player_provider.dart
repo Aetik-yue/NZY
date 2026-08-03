@@ -215,10 +215,15 @@ class MusicPlayerController extends Notifier<MusicPlayerState> {
   Future<void> _autoAdvance(int fromIndex) async {
     final len = state.playlist.length;
     if (len <= 1) return; // 没有可跳的下一首
-    var idx = (fromIndex + 1) % len;
-    var tried = 0;
-    // 从下一首起逐个尝试，回到 fromIndex 或试满一圈即停
-    while (tried < len && idx != fromIndex) {
+    // 候选：从 fromIndex 起的一圈顺序索引（不含自身）
+    final candidates = <int>[];
+    for (var i = 1; i < len; i++) {
+      candidates.add((fromIndex + i) % len);
+    }
+    if (state.playMode == PlayMode.shuffle) {
+      candidates.shuffle(_random); // 随机模式下失败跳歌也随机
+    }
+    for (final idx in candidates) {
       final song = state.playlist[idx];
       if (song.isPlayable) {
         try {
@@ -228,8 +233,6 @@ class MusicPlayerController extends Notifier<MusicPlayerState> {
           // 这首也失败，继续下一首
         }
       }
-      tried++;
-      idx = (idx + 1) % len;
     }
   }
 
@@ -326,11 +329,15 @@ class MusicPlayerController extends Notifier<MusicPlayerState> {
     try {
       if (state.playMode == PlayMode.repeatOne &&
           state.currentIndex >= 0) {
-        // 单曲循环：seek 回开头并继续播放
-        await _backend.seek(Duration.zero);
-        await _backend.play();
-        state = state.copyWith(position: Duration.zero);
-        return;
+        // 单曲循环：seek 回开头并继续播放；seek 失败（文件被删等）回退切下一首
+        try {
+          await _backend.seek(Duration.zero);
+          await _backend.play();
+          state = state.copyWith(position: Duration.zero);
+          return;
+        } catch (e) {
+          debugPrint('单曲循环重播失败，切下一首: $e');
+        }
       }
       await next();
     } catch (e) {
