@@ -162,21 +162,35 @@ class _MusicPlayerPageState extends ConsumerState<MusicPlayerPage>
               ),
             ),
             const SizedBox(height: 16),
-            Text(song?.title ?? '',
-                style: AppTextStyles.titleLarge
-                    .copyWith(color: AppColors.textOnPink),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis),
-            Text(song?.artist ?? '',
-                style: AppTextStyles.caption
-                    .copyWith(color: AppColors.textOnPink)),
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 300),
+              child: Text(song?.title ?? '',
+                  key: ValueKey<int?>(song?.id),
+                  style: AppTextStyles.titleLarge
+                      .copyWith(color: AppColors.textOnPink),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis),
+            ),
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 300),
+              child: Text(song?.artist ?? '',
+                  key: ValueKey<int?>(song?.id),
+                  style: AppTextStyles.caption
+                      .copyWith(color: AppColors.textOnPink)),
+            ),
             const SizedBox(height: 24),
             // 大封面（旋转）
             Expanded(
               child: Center(
                 child: RotationTransition(
                   turns: _rotateCtrl,
-                  child: MusicBigCover(song: song),
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 300),
+                    child: MusicBigCover(
+                      key: ValueKey<int?>(song?.id),
+                      song: song,
+                    ),
+                  ),
                 ),
               ),
             ),
