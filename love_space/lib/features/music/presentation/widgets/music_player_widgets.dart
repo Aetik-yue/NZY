@@ -59,37 +59,59 @@ class MusicBigCover extends StatelessWidget {
   }
 }
 
-/// 进度条行（Slider + 时间标签）
-class MusicProgressRow extends ConsumerWidget {
+/// 进度条行（Slider + 时间标签），拖动中仅预览、松手才 seek
+class MusicProgressRow extends ConsumerStatefulWidget {
   final MusicPlayerState state;
   const MusicProgressRow({super.key, required this.state});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final total = state.duration?.inSeconds ?? 0;
-    final pos = state.position.inSeconds.clamp(0, total > 0 ? total : 0);
+  ConsumerState<MusicProgressRow> createState() => _MusicProgressRowState();
+}
+
+class _MusicProgressRowState extends ConsumerState<MusicProgressRow> {
+  /// 拖动中的预览值（0..1），null = 未拖动
+  double? _dragValue;
+
+  @override
+  Widget build(BuildContext context) {
+    final total = widget.state.duration?.inSeconds ?? 0;
+    // 拖动中显示预览位置，否则显示播放位置
+    final seconds = _dragValue != null
+        ? _dragValue! * total
+        : widget.state.position.inSeconds.clamp(0, total > 0 ? total : 0);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Column(
         children: [
           Slider(
-            value: total > 0 ? pos / total : 0,
+            value: total > 0 ? seconds / total : 0,
             min: 0,
             max: 1,
             activeColor: AppColors.accentRose,
             // duration 为 0/null 时禁用拖拽
             onChanged: total > 0
-                ? (v) => ref.read(musicPlayerProvider.notifier).seekTo(
-                    Duration(seconds: (v * total).round()))
+                ? (v) => setState(() => _dragValue = v) // 拖动中不 seek
+                : null,
+            onChangeStart: total > 0
+                ? (_) => setState(() =>
+                    _dragValue = (widget.state.position.inSeconds / total)
+                        .clamp(0.0, 1.0))
+                : null,
+            onChangeEnd: total > 0
+                ? (v) {
+                    setState(() => _dragValue = null);
+                    ref.read(musicPlayerProvider.notifier).seekTo(
+                        Duration(seconds: (v * total).round()));
+                  }
                 : null,
           ),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(_fmt(state.position),
+              Text(_fmt(Duration(seconds: seconds.round())),
                   style: AppTextStyles.caption
                       .copyWith(color: AppColors.textOnPink)),
-              Text(_fmt(state.duration ?? Duration.zero),
+              Text(_fmt(widget.state.duration ?? Duration.zero),
                   style: AppTextStyles.caption
                       .copyWith(color: AppColors.textOnPink)),
             ],
