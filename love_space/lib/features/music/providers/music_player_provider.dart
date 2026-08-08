@@ -298,16 +298,18 @@ class MusicPlayerController extends Notifier<MusicPlayerState> {
 
   /// 隐藏迷你播放条（暂停播放，保留当前曲与进度）
   ///
-  /// 用户滑动关闭迷你条时调用：pause 后端 + 置 isHidden。
+  /// 用户滑动关闭迷你条时调用：同步置 isHidden（避免 await pause 期间重建闪烁，
+  /// 此时 _dragX 已重置而 isHidden 未置会跳回完全不透明居中），再后台 pause。
   /// currentIndex/position/_loadedSongId 保留，下次打开播放页 showPlayer 恢复，
-  /// togglePlay 续播不重载（_loadedSongId 仍匹配）。
+  /// togglePlay 续播不重载（_loadedSongId 仍匹配）。playingStream 监听器会单独
+  /// 置 isPlaying=false（copyWith 幂等，无冲突）。
   Future<void> hidePlayer() async {
+    state = state.copyWith(isHidden: true, isPlaying: false);
     try {
       await _backend.pause();
     } catch (e) {
       debugPrint('隐藏播放器暂停失败: $e');
     }
-    state = state.copyWith(isHidden: true, isPlaying: false);
   }
 
   /// 恢复迷你播放条显示（打开播放页时调用）

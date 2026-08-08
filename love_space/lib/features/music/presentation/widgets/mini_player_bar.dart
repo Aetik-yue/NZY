@@ -77,6 +77,9 @@ class _MiniPlayerBarState extends ConsumerState<MiniPlayerBar>
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () => MusicPlayerPage.show(context),
+      // 回弹期间再次抓取（超 slop 被识别为新拖拽）时立即停止弹簧：
+      // 否则 listener 仍按 _springFrom 插值 _dragX，与 dragUpdate 累加冲突致逐帧跳动
+      onHorizontalDragStart: (_) => _springCtrl.stop(),
       onHorizontalDragUpdate: _onHorizontalDragUpdate,
       onHorizontalDragEnd: _onHorizontalDragEnd,
       child: Transform.translate(
