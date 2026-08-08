@@ -177,8 +177,10 @@ class _PhotoTimelinePageState extends ConsumerState<PhotoTimelinePage> {
                     ),
                   );
                 },
-                loading: () => const Center(child: CircularProgressIndicator()),
-                error: (e, _) => Center(child: Text('加载失败：$e')),
+                loading: () => const Center(
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+                error: (_, __) => const Center(child: Text('加载失败')),
               ),
             ),
           ],
@@ -489,15 +491,6 @@ class _PhotoGrid extends StatelessWidget {
   final List<AlbumPhoto> photos;
   const _PhotoGrid({required this.photos});
 
-  static const _gradients = [
-    [Color(0xFFFFBFD0), Color(0xFFFF8FB1)],
-    [Color(0xFFFFD1BF), Color(0xFFFFB5A1)],
-    [Color(0xFFFFB5CC), Color(0xFFFFD4E0)],
-    [Color(0xFFFFBFCC), Color(0xFFFFA1B5)],
-    [Color(0xFFFFE0D4), Color(0xFFFFB5CC)],
-    [Color(0xFFFF8FB1), Color(0xFFFF6B9D)],
-  ];
-
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
@@ -513,8 +506,9 @@ class _PhotoGrid extends StatelessWidget {
                 width: width,
                 child: _PhotoThumb(
                   photo: photos[i],
-                  gradient:
-                      _gradients[photos[i].gradientIndex % _gradients.length],
+                  gradient: AppColors.coverGradients[photos[i].gradientIndex %
+                          AppColors.coverGradients.length]
+                      .colors,
                   onTap: () => PhotoViewer.show(
                     context,
                     photos: photos,

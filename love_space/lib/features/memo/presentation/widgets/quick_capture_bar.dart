@@ -43,7 +43,9 @@ class _QuickCaptureBarState extends ConsumerState<QuickCaptureBar> {
         ..content = content
         ..author = _author
         ..isPinned = false
-        ..colorValue = _author == 1 ? 0xFFFF8FB1 : 0xFFFFD1BF
+        ..colorValue = _author == 1
+            ? AppColors.accentPink.toARGB32()
+            : AppColors.accentPeach.toARGB32()
         ..createdAt = DateTime.now());
 
       if (!mounted) return;
@@ -82,9 +84,7 @@ class _QuickCaptureBarState extends ConsumerState<QuickCaptureBar> {
               child: Center(
                 child: Text(
                   _author == 1 ? '越' : '名',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
+                  style: AppTextStyles.onPink.copyWith(
                     fontWeight: FontWeight.w600,
                   ),
                 ),

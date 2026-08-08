@@ -23,6 +23,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   bool _hideDays = false;
   bool _loaded = false;
 
+  /// 防重：保存进行中禁止再次提交
+  bool _saving = false;
+
   @override
   void initState() {
     super.initState();
@@ -67,26 +70,35 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       AppSnackbar.show(context, '昵称不能为空');
       return;
     }
-    final repo = ref.read(settingsRepositoryProvider);
-    // 复用已有单例行，避免插入重复行；显式 if/else 避免级联优先级误读
-    final existing = await repo.get();
-    if (existing != null) {
-      existing
-        ..partner1Name = name1
-        ..partner2Name = name2
-        ..togetherSince = _togetherSince ?? existing.togetherSince
-        ..hideDaysTogether = _hideDays;
-      await repo.save(existing);
-    } else {
-      final settings = AppSettings()
-        ..partner1Name = name1
-        ..partner2Name = name2
-        ..togetherSince = _togetherSince ?? DateTime.now();
-      await repo.save(settings);
+    if (_saving) return;
+    setState(() => _saving = true);
+    try {
+      final repo = ref.read(settingsRepositoryProvider);
+      // 复用已有单例行，避免插入重复行；显式 if/else 避免级联优先级误读
+      final existing = await repo.get();
+      if (existing != null) {
+        existing
+          ..partner1Name = name1
+          ..partner2Name = name2
+          ..togetherSince = _togetherSince ?? existing.togetherSince
+          ..hideDaysTogether = _hideDays;
+        await repo.save(existing);
+      } else {
+        final settings = AppSettings()
+          ..partner1Name = name1
+          ..partner2Name = name2
+          ..togetherSince = _togetherSince ?? DateTime.now();
+        await repo.save(settings);
+      }
+      if (!mounted) return;
+      AppSnackbar.show(context, '设置已保存 💕');
+      Navigator.of(context).pop();
+    } catch (e) {
+      debugPrint('[SettingsPage] 保存失败: $e');
+      if (mounted) AppSnackbar.show(context, '保存失败，请重试');
+    } finally {
+      if (mounted) setState(() => _saving = false);
     }
-    if (!mounted) return;
-    AppSnackbar.show(context, '设置已保存 💕');
-    Navigator.of(context).pop();
   }
 
   @override

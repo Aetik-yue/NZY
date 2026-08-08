@@ -31,11 +31,12 @@ class _MemoEditPageState extends ConsumerState<MemoEditPage> {
   int _originalAuthor = 1;
   int _originalColor = 0xFFFF8FB1;
 
-  static const _presetColors = [
-    0xFFFF6B9D, // accentRose
-    0xFFFF8FB1, // accentPink
-    0xFFFFD1BF, // accentPeach
-    0xFFB57DBA, // accentMauve
+  // 存库需要 int 值（Color.value 已弃用，用 toARGB32 转换）
+  static final _presetColors = [
+    AppColors.accentRose.toARGB32(), // 玫瑰粉
+    AppColors.accentPink.toARGB32(), // 柔粉
+    AppColors.accentPeach.toARGB32(), // 桃色
+    AppColors.accentMauve.toARGB32(), // 锦葵紫
   ];
 
   /// 是否存在未保存的修改
@@ -87,39 +88,53 @@ class _MemoEditPageState extends ConsumerState<MemoEditPage> {
     super.dispose();
   }
 
+  /// 防重：保存进行中禁止再次提交
+  bool _saving = false;
+
   Future<void> _save() async {
     final content = _controller.text.trim();
     if (content.isEmpty) {
       AppSnackbar.show(context, '请输入内容');
       return;
     }
-    final repo = ref.read(memoRepositoryProvider);
-    final now = DateTime.now();
+    if (_saving) return;
+    setState(() => _saving = true);
+    try {
+      final repo = ref.read(memoRepositoryProvider);
+      final now = DateTime.now();
 
-    if (_isEditing) {
-      final memo = await repo.getById(widget.memoId!);
-      if (memo == null) {
-        // 条目已被删除：提示并返回，不静默丢弃内容
-        if (mounted) {
-          AppSnackbar.show(context, '内容已不存在，无法保存');
-          Navigator.of(context).pop();
+      if (_isEditing) {
+        final memo = await repo.getById(widget.memoId!);
+        if (memo == null) {
+          // 条目已被删除：提示并返回，不静默丢弃内容
+          if (mounted) {
+            AppSnackbar.show(context, '内容已不存在，无法保存');
+            Navigator.of(context).pop();
+          }
+          return;
         }
-        return;
+        memo.content = content;
+        memo.colorValue = _selectedColor;
+        memo.updatedAt = now;
+        await repo.update(memo);
+      } else {
+        await repo.add(Memo()
+          ..content = content
+          ..author = _selectedAuthor
+          ..isPinned = false
+          ..colorValue = _selectedColor
+          ..createdAt = now);
       }
-      memo.content = content;
-      memo.colorValue = _selectedColor;
-      memo.updatedAt = now;
-      await repo.update(memo);
-    } else {
-      await repo.add(Memo()
-        ..content = content
-        ..author = _selectedAuthor
-        ..isPinned = false
-        ..colorValue = _selectedColor
-        ..createdAt = now);
-    }
 
-    if (mounted) Navigator.of(context).pop();
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      AppSnackbar.show(context, _isEditing ? '已保存' : '备忘录已添加 ✨');
+    } catch (e) {
+      debugPrint('[MemoEditPage] 保存失败: $e');
+      if (mounted) AppSnackbar.show(context, '保存失败，请重试');
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
   }
 
   /// 删除当前备忘录（确认 + 撤销）
@@ -137,12 +152,21 @@ class _MemoEditPageState extends ConsumerState<MemoEditPage> {
       Navigator.of(context).pop();
       return;
     }
-    await repo.delete(memo.id);
-    if (!mounted) return;
-    Navigator.of(context).pop();
-    AppSnackbar.showUndo(context, '已删除', () async {
-      await repo.add(memo);
-    });
+    try {
+      await repo.delete(memo.id);
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      AppSnackbar.showUndo(context, '已删除', () async {
+        try {
+          await repo.add(memo);
+        } catch (e) {
+          debugPrint('[MemoEditPage] 撤销删除失败: $e');
+        }
+      });
+    } catch (e) {
+      debugPrint('[MemoEditPage] 删除失败: $e');
+      if (mounted) AppSnackbar.show(context, '删除失败，请重试');
+    }
   }
 
   /// 拦截返回：有未保存修改时询问
@@ -254,11 +278,10 @@ class _MemoEditPageState extends ConsumerState<MemoEditPage> {
                                   child: Center(
                                     child: Text(
                                       author == 1 ? '越' : '名',
-                                      style: TextStyle(
+                                      style: AppTextStyles.body.copyWith(
                                         color: _selectedAuthor == author
                                             ? Colors.white
                                             : AppColors.textSecondary,
-                                        fontSize: 16,
                                         fontWeight: FontWeight.w600,
                                       ),
                                     ),

@@ -6,9 +6,9 @@ import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_text_styles.dart';
 import '../../../data/providers/data_providers.dart';
 import '../../../data/models/album_photo.dart';
-import '../../../features/album/presentation/widgets/add_photo_sheet.dart';
-import '../../../features/album/presentation/widgets/photo_viewer.dart';
-import '../../../features/album/presentation/photo_timeline_page.dart';
+import 'photo_timeline_page.dart';
+import 'widgets/add_photo_sheet.dart';
+import 'widgets/photo_viewer.dart';
 
 /// 相册页
 /// 还原设计稿：标题+统计+添加 → 筛选 chip → 九宫格照片
@@ -66,16 +66,6 @@ class AlbumPage extends ConsumerWidget {
   }
 }
 
-/// 预设渐变色（与原来保持一致的 6 组）
-const _photoGradients = [
-  [Color(0xFFFFBFD0), Color(0xFFFF8FB1)],
-  [Color(0xFFFFD1BF), Color(0xFFFFB5A1)],
-  [Color(0xFFFFB5CC), Color(0xFFFFD4E0)],
-  [Color(0xFFFFBFCC), Color(0xFFFFA1B5)],
-  [Color(0xFFFFE0D4), Color(0xFFFFB5CC)],
-  [Color(0xFFFF8FB1), Color(0xFFFF6B9D)],
-];
-
 class _AddButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
@@ -89,7 +79,7 @@ class _AddButton extends StatelessWidget {
           shape: BoxShape.circle,
           boxShadow: [
             BoxShadow(
-              color: Color(0x59FF6B9D),
+              color: AppColors.shadowPinkStrong,
               blurRadius: 16,
               offset: Offset(0, 6),
               spreadRadius: -2,
@@ -219,8 +209,10 @@ class _PhotoGrid extends ConsumerWidget {
           itemCount: photos.length,
           itemBuilder: (context, index) {
             final photo = photos[index];
-            final gradient =
-                _photoGradients[photo.gradientIndex % _photoGradients.length];
+            // 统一使用设计令牌中的封面渐变（音乐封面同源）
+            final gradient = AppColors.coverGradients[
+                    photo.gradientIndex % AppColors.coverGradients.length]
+                .colors;
             return GestureDetector(
               onTap: () => PhotoViewer.show(
                 context,

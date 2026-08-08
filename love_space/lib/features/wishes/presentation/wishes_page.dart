@@ -8,7 +8,7 @@ import '../../../shared/widgets/confirm_dialog.dart';
 import '../../../data/providers/data_providers.dart';
 import '../../../data/models/wish.dart';
 import '../../../data/models/timeline_event.dart';
-import '../../../features/wishes/presentation/widgets/add_wish_sheet.dart';
+import 'widgets/add_wish_sheet.dart';
 import 'wishes_all_page.dart';
 
 /// 愿望清单页
@@ -47,7 +47,7 @@ class WishesPage extends ConsumerWidget {
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: Color(0x59FF6B9D),
+                        color: AppColors.shadowPinkStrong,
                         blurRadius: 16,
                         offset: Offset(0, 6),
                         spreadRadius: -2,
@@ -66,10 +66,10 @@ class WishesPage extends ConsumerWidget {
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
               gradient: AppColors.headerGradient,
-              borderRadius: BorderRadius.circular(24),
+              borderRadius: BorderRadius.circular(AppColors.radiusCard),
               boxShadow: const [
                 BoxShadow(
-                  color: Color(0x33FF6B8F),
+                  color: AppColors.shadowPinkMedium,
                   blurRadius: 24,
                   offset: Offset(0, 8),
                   spreadRadius: -4,
@@ -132,11 +132,19 @@ class WishesPage extends ConsumerWidget {
 }
 
 /// 愿望列表（动态渲染前 3 条未完成的愿望）
-class _WishList extends ConsumerWidget {
+class _WishList extends ConsumerStatefulWidget {
   const _WishList();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_WishList> createState() => _WishListState();
+}
+
+class _WishListState extends ConsumerState<_WishList> {
+  /// 防连点：正在切换状态的愿望 id
+  int? _busyWishId;
+
+  @override
+  Widget build(BuildContext context) {
     final wishesAsync = ref.watch(wishesProvider);
     return wishesAsync.when(
       data: (wishes) {
@@ -178,6 +186,9 @@ class _WishList extends ConsumerWidget {
                 wish: undone[i],
                 onToggle: () async {
                   final wish = undone[i];
+                  // 防连点：切换进行中时忽略重复点击
+                  if (_busyWishId == wish.id) return;
+                  setState(() => _busyWishId = wish.id);
                   try {
                     await ref
                         .read(wishRepositoryProvider)
@@ -188,28 +199,14 @@ class _WishList extends ConsumerWidget {
                       AppSnackbar.show(context, '操作失败，请重试');
                     }
                     return;
+                  } finally {
+                    if (mounted) setState(() => _busyWishId = null);
                   }
                   if (!context.mounted) return;
                   // 完成愿望：庆祝 + 可选记录到时光线
                   _celebrate(context, ref, wish);
                 },
-                onDelete: () async {
-                  final confirmed = await showConfirmDeleteDialog(
-                    context,
-                    content: '确定要删除这个愿望吗？',
-                  );
-                  if (confirmed && context.mounted) {
-                    final wishToDelete = undone[i];
-                    await ref.read(wishRepositoryProvider).delete(undone[i].id);
-                    if (context.mounted) {
-                      AppSnackbar.showUndo(context, '愿望已删除', () async {
-                        await ref
-                            .read(wishRepositoryProvider)
-                            .add(wishToDelete);
-                      });
-                    }
-                  }
-                },
+                onLongPress: () => _showActions(context, undone[i]),
               ),
             ],
           ],
@@ -226,6 +223,66 @@ class _WishList extends ConsumerWidget {
         child: Text('加载失败'),
       ),
     );
+  }
+
+  /// 长按操作单：编辑 / 删除
+  Future<void> _showActions(BuildContext context, Wish wish) async {
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 8),
+            ListTile(
+              leading: const Icon(Icons.edit_outlined,
+                  color: AppColors.accentRose),
+              title: const Text('编辑愿望'),
+              onTap: () => Navigator.of(ctx).pop('edit'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete_outline,
+                  color: AppColors.accentRose),
+              title: const Text('删除愿望'),
+              onTap: () => Navigator.of(ctx).pop('delete'),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (!context.mounted) return;
+    switch (action) {
+      case 'edit':
+        await AddWishSheet.show(context, initial: wish);
+      case 'delete':
+        await _delete(context, wish);
+    }
+  }
+
+  Future<void> _delete(BuildContext context, Wish wish) async {
+    final confirmed = await showConfirmDeleteDialog(
+      context,
+      content: '确定要删除这个愿望吗？',
+    );
+    if (!confirmed || !context.mounted) return;
+    try {
+      await ref.read(wishRepositoryProvider).delete(wish.id);
+      if (!context.mounted) return;
+      AppSnackbar.showUndo(context, '愿望已删除', () async {
+        try {
+          await ref.read(wishRepositoryProvider).add(wish);
+        } catch (e) {
+          debugPrint('[WishesPage] 撤销删除失败: $e');
+        }
+      });
+    } catch (e) {
+      debugPrint('[WishesPage] 删除失败: $e');
+      if (context.mounted) AppSnackbar.show(context, '删除失败，请重试');
+    }
   }
 
   /// 完成愿望庆祝：询问是否记录到时光线作为回忆里程碑
@@ -258,31 +315,36 @@ class _WishList extends ConsumerWidget {
       ),
     );
     if (record != true || !context.mounted) return;
-    await ref.read(timelineRepositoryProvider).add(TimelineEvent()
-      ..date = DateTime.now()
-      ..title = '完成愿望：${wish.title}'
-      ..description = '我们一起完成了这个愿望 ✨'
-      ..dotColorValue = 0xFFFF6B9D);
-    if (context.mounted) AppSnackbar.show(context, '已记录到时光线 💕');
+    try {
+      await ref.read(timelineRepositoryProvider).add(TimelineEvent()
+        ..date = DateTime.now()
+        ..title = '完成愿望：${wish.title}'
+        ..description = '我们一起完成了这个愿望 ✨'
+        ..dotColorValue = AppColors.accentRose.toARGB32());
+      if (context.mounted) AppSnackbar.show(context, '已记录到时光线 💕');
+    } catch (e) {
+      debugPrint('[WishesPage] 记录时光线失败: $e');
+      if (context.mounted) AppSnackbar.show(context, '记录失败，请重试');
+    }
   }
 }
 
 class _WishItem extends StatelessWidget {
   final Wish wish;
   final VoidCallback onToggle;
-  final VoidCallback onDelete;
+  final VoidCallback onLongPress;
 
   const _WishItem({
     required this.wish,
     required this.onToggle,
-    required this.onDelete,
+    required this.onLongPress,
   });
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onToggle,
-      onLongPress: onDelete,
+      onLongPress: onLongPress,
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(

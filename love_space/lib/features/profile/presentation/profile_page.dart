@@ -3,10 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_text_styles.dart';
 import '../../../data/providers/data_providers.dart';
-import '../../../shared/widgets/app_snackbar.dart';
+import '../../../shared/widgets/pill_nav_bar.dart';
 import '../../memo/presentation/memo_page.dart';
 import '../../music/presentation/music_player_page.dart';
 import '../../music/providers/music_player_provider.dart';
+import 'all_features_page.dart';
 import 'settings_page.dart';
 
 /// 我的页
@@ -27,6 +28,8 @@ class ProfilePage extends ConsumerWidget {
           _MusicCard(),
           SizedBox(height: 12),
           _FunctionCards(),
+          SizedBox(height: 12),
+          _AllFeaturesEntry(),
         ],
       ),
     );
@@ -53,10 +56,10 @@ class _ProfileHeader extends ConsumerWidget {
           padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
             gradient: AppColors.headerGradient,
-            borderRadius: BorderRadius.circular(28),
+            borderRadius: BorderRadius.circular(AppColors.radiusCard),
             boxShadow: const [
               BoxShadow(
-                color: Color(0x33FF6B8F),
+                color: AppColors.shadowPinkMedium,
                 blurRadius: 24,
                 offset: Offset(0, 8),
                 spreadRadius: -4,
@@ -66,7 +69,7 @@ class _ProfileHeader extends ConsumerWidget {
           child: Column(
             children: [
               // 情侣头像 + 心形
-              const SizedBox(
+              SizedBox(
                 width: 130,
                 height: 64,
                 child: Stack(
@@ -75,23 +78,19 @@ class _ProfileHeader extends ConsumerWidget {
                     // 女友头像（左）
                     Positioned(
                       left: 0,
-                      child: _Avatar(LinearGradient(
-                        colors: [Color(0xFFFFB5CC), Color(0xFFFF8FB1)],
-                      )),
+                      child: _Avatar(AppColors.avatarGradients[0]),
                     ),
                     // 我的头像（右）
                     Positioned(
                       left: 56,
-                      child: _Avatar(LinearGradient(
-                        colors: [Color(0xFFFFD1BF), Color(0xFFFFA1A1)],
-                      )),
+                      child: _Avatar(AppColors.avatarGradients[1]),
                     ),
                     // 中间心形
-                    Positioned(
+                    const Positioned(
                       left: 45,
                       top: 21,
-                      child:
-                          Icon(Icons.favorite, color: Colors.white, size: 24),
+                      child: Icon(Icons.favorite,
+                          color: Colors.white, size: 24),
                     ),
                   ],
                 ),
@@ -164,7 +163,7 @@ class _StatsRow extends ConsumerWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.bgCard,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(AppColors.radiusCard),
         boxShadow: const [
           BoxShadow(
             color: AppColors.shadowCard,
@@ -273,14 +272,16 @@ class _FunctionCards extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final memoCount = ref.watch(memoCountProvider);
+    final novelCount = ref.watch(novelsProvider).valueOrNull?.length ?? 0;
     final cards = [
       _FuncCard(
         icon: Icons.menu_book_rounded,
         title: '小说',
-        sub: '共读 12 本',
+        sub: novelCount > 0 ? '共读 $novelCount 本' : '一起读书吧',
         bg: AppColors.accentPinkSoft,
         iconColor: AppColors.accentRose,
-        onTap: () => AppSnackbar.show(context, '即将上线 📖'),
+        // 小说已是底部 Tab，直接切换
+        onTap: () => ref.read(currentTabProvider.notifier).state = NavTab.novel,
       ),
       _FuncCard(
         icon: Icons.sticky_note_2_rounded,
@@ -317,6 +318,49 @@ class _FunctionCards extends ConsumerWidget {
   }
 }
 
+/// 全部功能入口行（三级入口：低频/长尾功能聚合）
+class _AllFeaturesEntry extends StatelessWidget {
+  const _AllFeaturesEntry();
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const AllFeaturesPage()),
+      ),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: AppColors.bgCard,
+          borderRadius: BorderRadius.circular(AppColors.radiusCard),
+          boxShadow: const [
+            BoxShadow(
+              color: AppColors.shadowCard,
+              blurRadius: 16,
+              offset: Offset(0, 4),
+              spreadRadius: -4,
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.apps_rounded, color: AppColors.accentRose, size: 22),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text('全部功能', style: AppTextStyles.titleXs),
+            ),
+            Text('更多双人小工具',
+                style: AppTextStyles.label),
+            const SizedBox(width: 4),
+            const Icon(Icons.chevron_right_rounded,
+                size: 20, color: AppColors.textTertiary),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _FuncCard extends StatelessWidget {
   final IconData icon;
   final String title;
@@ -342,7 +386,7 @@ class _FuncCard extends StatelessWidget {
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: AppColors.bgCard,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(AppColors.radiusSheet),
           boxShadow: const [
             BoxShadow(
               color: AppColors.shadowCard,
@@ -360,7 +404,7 @@ class _FuncCard extends StatelessWidget {
               height: 36,
               decoration: BoxDecoration(
                 color: bg,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(AppColors.radiusSm),
               ),
               child: Icon(icon, color: iconColor, size: 20),
             ),

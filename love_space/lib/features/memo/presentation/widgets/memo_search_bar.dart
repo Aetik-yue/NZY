@@ -25,6 +25,12 @@ class _MemoSearchBarState extends ConsumerState<MemoSearchBar> {
 
   @override
   Widget build(BuildContext context) {
+    // watch 搜索词以驱动清除按钮的显隐（文本变化时 provider 会通知重建）
+    final query = ref.watch(memoSearchProvider);
+    // 输入框内容与 provider 状态同步（如通过 provider 清除时）
+    if (query != _controller.text) {
+      _controller.text = query;
+    }
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
@@ -54,7 +60,7 @@ class _MemoSearchBarState extends ConsumerState<MemoSearchBar> {
                   ref.read(memoSearchProvider.notifier).state = v,
             ),
           ),
-          if (_controller.text.isNotEmpty)
+          if (query.isNotEmpty)
             IconButton(
               icon: const Icon(Icons.close_rounded,
                   size: 18, color: AppColors.textTertiary),

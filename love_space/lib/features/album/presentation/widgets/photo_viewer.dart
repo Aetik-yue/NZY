@@ -60,6 +60,17 @@ class _PhotoViewerState extends ConsumerState<PhotoViewer> {
   late List<AlbumPhoto> _photos;
   bool _showAppBar = true;
 
+  // 黑底沉浸场景专用样式（设计系统样式为浅色背景，此处不适用）
+  static const _indexStyle = TextStyle(
+    color: Colors.white,
+    fontSize: 16,
+    fontWeight: FontWeight.w600,
+  );
+  static const _dateStyle = TextStyle(
+    color: Colors.white70,
+    fontSize: 14,
+  );
+
   @override
   void initState() {
     super.initState();
@@ -99,7 +110,7 @@ class _PhotoViewerState extends ConsumerState<PhotoViewer> {
     final confirmed = await showConfirmDeleteDialog(
       context,
       title: '删除照片',
-      content: '确定要删除这张照片吗？此操作无法撤销。',
+      content: '确定要删除这张照片吗？删除后可在提示中撤销。',
     );
     if (!confirmed) return;
     if (!mounted) return;
@@ -214,11 +225,7 @@ class _PhotoViewerState extends ConsumerState<PhotoViewer> {
                     Expanded(
                       child: Text(
                         '${_currentIndex + 1} / ${_photos.length}',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
+                        style: _indexStyle,
                         textAlign: TextAlign.center,
                       ),
                     ),
@@ -260,10 +267,7 @@ class _PhotoViewerState extends ConsumerState<PhotoViewer> {
                   ),
                   child: Text(
                     _formatPhotoDate(_photos[_currentIndex].date),
-                    style: const TextStyle(
-                      color: Colors.white70,
-                      fontSize: 14,
-                    ),
+                    style: _dateStyle,
                     textAlign: TextAlign.center,
                   ),
                 ),

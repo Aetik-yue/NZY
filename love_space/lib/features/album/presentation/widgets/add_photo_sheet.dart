@@ -49,15 +49,6 @@ class _AddPhotoSheetState extends ConsumerState<AddPhotoSheet> {
   DateTime _selectedDate = DateTime.now();
   int _gradientIndex = 0;
 
-  static const _gradients = [
-    [Color(0xFFFFBFD0), Color(0xFFFF8FB1)],
-    [Color(0xFFFFD1BF), Color(0xFFFFB5A1)],
-    [Color(0xFFFFB5CC), Color(0xFFFFD4E0)],
-    [Color(0xFFFFBFCC), Color(0xFFFFA1B5)],
-    [Color(0xFFFFE0D4), Color(0xFFFFB5CC)],
-    [Color(0xFFFF8FB1), Color(0xFFFF6B9D)],
-  ];
-
   bool get _isEditing => widget.initial != null;
 
   @override
@@ -72,7 +63,8 @@ class _AddPhotoSheetState extends ConsumerState<AddPhotoSheet> {
       _gradientIndex = initial.gradientIndex;
     } else {
       // 随机渐变色，让每张照片视觉有区别
-      _gradientIndex = DateTime.now().millisecondsSinceEpoch % _gradients.length;
+      _gradientIndex =
+          DateTime.now().millisecondsSinceEpoch % AppColors.coverGradients.length;
     }
   }
 
@@ -111,6 +103,7 @@ class _AddPhotoSheetState extends ConsumerState<AddPhotoSheet> {
         final photo = widget.initial!
           ..date = _selectedDate
           ..category = _selectedCategory
+          ..filePath = _imagePath
           ..gradientIndex = _gradientIndex;
         await repo.update(photo);
         if (mounted) {
@@ -131,7 +124,8 @@ class _AddPhotoSheetState extends ConsumerState<AddPhotoSheet> {
           AppSnackbar.show(context, '照片已添加 📷');
         }
       }
-    } catch (_) {
+    } catch (e) {
+      debugPrint('[AddPhotoSheet] 保存失败: $e');
       if (mounted) {
         AppSnackbar.show(context, '保存失败，请重试');
       }
@@ -175,12 +169,12 @@ class _AddPhotoSheetState extends ConsumerState<AddPhotoSheet> {
                   height: 180,
                   decoration: BoxDecoration(
                     color: AppColors.accentPinkSoft.withValues(alpha: 0.3),
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(AppColors.radiusMd),
                     border: Border.all(color: AppColors.borderSoft, style: BorderStyle.solid),
                   ),
                   child: _imagePath != null
                       ? ClipRRect(
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius: BorderRadius.circular(AppColors.radiusMd),
                           child: Image.file(
                             File(_imagePath!),
                             fit: BoxFit.cover,
@@ -248,22 +242,21 @@ class _AddPhotoSheetState extends ConsumerState<AddPhotoSheet> {
                           color: isSelected
                               ? AppColors.accentRose
                               : AppColors.bgCard,
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(AppColors.radiusSm),
                           border: Border.all(
                             color: isSelected ? AppColors.accentRose : AppColors.borderSoft,
                           ),
                         ),
                         child: Column(
                           children: [
-                            Icon(cat.$2 == '旅行' ? Icons.flight_rounded :
-                                 cat.$2 == '美食' ? Icons.restaurant_rounded :
-                                 Icons.wb_sunny_rounded,
+                            Icon(cat.$3,
                                 color: isSelected ? Colors.white : AppColors.accentRose),
                             const SizedBox(height: 4),
                             Text(cat.$2,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: isSelected ? Colors.white : AppColors.textSecondary,
+                                style: AppTextStyles.caption.copyWith(
+                                  color: isSelected
+                                      ? Colors.white
+                                      : AppColors.textSecondary,
                                 )),
                           ],
                         ),
@@ -283,7 +276,7 @@ class _AddPhotoSheetState extends ConsumerState<AddPhotoSheet> {
                   style: FilledButton.styleFrom(
                     backgroundColor: AppColors.accentRose,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(AppColors.radiusSm),
                     ),
                   ),
                   child: _isSubmitting
@@ -295,7 +288,8 @@ class _AddPhotoSheetState extends ConsumerState<AddPhotoSheet> {
                             color: Colors.white,
                           ),
                         )
-                      : const Text('保存', style: TextStyle(fontSize: 16)),
+                      : Text('保存',
+                          style: AppTextStyles.onPink.copyWith(fontSize: 16)),
                 ),
               ),
             ],

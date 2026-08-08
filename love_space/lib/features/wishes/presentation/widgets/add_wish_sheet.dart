@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_text_styles.dart';
@@ -35,7 +35,7 @@ class AddWishSheet extends ConsumerStatefulWidget {
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppColors.radiusCard)),
       ),
       builder: (_) => AddWishSheet(initial: initial),
     );
@@ -106,7 +106,8 @@ class _AddWishSheetState extends ConsumerState<AddWishSheet> {
         Navigator.of(context).pop();
         AppSnackbar.show(context, _isEditing ? '愿望已更新 ✨' : '愿望已添加 ✨');
       }
-    } catch (_) {
+    } catch (e) {
+      debugPrint('[AddWishSheet] 保存失败: $e');
       if (mounted) {
         AppSnackbar.show(context, '保存失败，请重试');
       }
@@ -149,10 +150,10 @@ class _AddWishSheetState extends ConsumerState<AddWishSheet> {
                   labelText: '愿望标题',
                   hintText: '例如：一起去北海道看雪',
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(AppColors.radiusSm),
                   ),
                   focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(AppColors.radiusSm),
                     borderSide: const BorderSide(color: AppColors.accentRose),
                   ),
                 ),
@@ -167,10 +168,10 @@ class _AddWishSheetState extends ConsumerState<AddWishSheet> {
                   labelText: '描述（可选）',
                   hintText: '添加一些细节...',
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(AppColors.radiusSm),
                   ),
                   focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(AppColors.radiusSm),
                     borderSide: const BorderSide(color: AppColors.accentRose),
                   ),
                 ),
@@ -194,7 +195,7 @@ class _AddWishSheetState extends ConsumerState<AddWishSheet> {
                         color: isSelected
                             ? AppColors.accentRose
                             : AppColors.accentPinkSoft,
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(AppColors.radiusSm),
                       ),
                       child: Icon(
                         _presetIcons[i],
@@ -216,7 +217,7 @@ class _AddWishSheetState extends ConsumerState<AddWishSheet> {
                   style: FilledButton.styleFrom(
                     backgroundColor: AppColors.accentRose,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(AppColors.radiusSm),
                     ),
                   ),
                   child: _isSubmitting
@@ -228,7 +229,8 @@ class _AddWishSheetState extends ConsumerState<AddWishSheet> {
                             color: Colors.white,
                           ),
                         )
-                      : const Text('保存', style: TextStyle(fontSize: 16)),
+                      : Text('保存',
+                          style: AppTextStyles.onPink.copyWith(fontSize: 16)),
                 ),
               ),
             ],

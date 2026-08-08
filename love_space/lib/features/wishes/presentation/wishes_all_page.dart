@@ -6,6 +6,7 @@ import '../../../data/models/wish.dart';
 import '../../../data/providers/data_providers.dart';
 import '../../../shared/widgets/app_snackbar.dart';
 import '../../../shared/widgets/confirm_dialog.dart';
+import 'widgets/add_wish_sheet.dart';
 
 /// 全部愿望页（二级页）
 ///
@@ -20,6 +21,9 @@ class WishesAllPage extends ConsumerStatefulWidget {
 
 class _WishesAllPageState extends ConsumerState<WishesAllPage> {
   int _tab = 0; // 0=全部 1=进行中 2=已完成
+
+  /// 防连点：正在切换状态的愿望 id
+  int? _busyWishId;
 
   @override
   Widget build(BuildContext context) {
@@ -93,7 +97,7 @@ class _WishesAllPageState extends ConsumerState<WishesAllPage> {
                     return _WishRow(
                       wish: wish,
                       onToggle: () => _toggle(context, wish),
-                      onDelete: () => _delete(context, wish),
+                      onLongPress: () => _showActions(context, wish),
                     );
                   },
                 );
@@ -135,11 +139,54 @@ class _WishesAllPageState extends ConsumerState<WishesAllPage> {
 
   /// 勾选/取消勾选（已完成也可取消，误触可逆）
   Future<void> _toggle(BuildContext context, Wish wish) async {
+    // 防连点：切换进行中时忽略重复点击
+    if (_busyWishId == wish.id) return;
+    setState(() => _busyWishId = wish.id);
     try {
       await ref.read(wishRepositoryProvider).toggleDone(wish.id);
     } catch (e) {
       debugPrint('[WishesAllPage] 切换失败: $e');
       if (context.mounted) AppSnackbar.show(context, '操作失败，请重试');
+    } finally {
+      if (mounted) setState(() => _busyWishId = null);
+    }
+  }
+
+  /// 长按操作单：编辑 / 删除
+  Future<void> _showActions(BuildContext context, Wish wish) async {
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 8),
+            ListTile(
+              leading: const Icon(Icons.edit_outlined,
+                  color: AppColors.accentRose),
+              title: const Text('编辑愿望'),
+              onTap: () => Navigator.of(ctx).pop('edit'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete_outline,
+                  color: AppColors.accentRose),
+              title: const Text('删除愿望'),
+              onTap: () => Navigator.of(ctx).pop('delete'),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (!context.mounted) return;
+    switch (action) {
+      case 'edit':
+        await AddWishSheet.show(context, initial: wish);
+      case 'delete':
+        await _delete(context, wish);
     }
   }
 
@@ -149,11 +196,20 @@ class _WishesAllPageState extends ConsumerState<WishesAllPage> {
       content: '确定要删除这个愿望吗？',
     );
     if (!confirmed || !context.mounted) return;
-    await ref.read(wishRepositoryProvider).delete(wish.id);
-    if (!context.mounted) return;
-    AppSnackbar.showUndo(context, '愿望已删除', () async {
-      await ref.read(wishRepositoryProvider).add(wish);
-    });
+    try {
+      await ref.read(wishRepositoryProvider).delete(wish.id);
+      if (!context.mounted) return;
+      AppSnackbar.showUndo(context, '愿望已删除', () async {
+        try {
+          await ref.read(wishRepositoryProvider).add(wish);
+        } catch (e) {
+          debugPrint('[WishesAllPage] 撤销删除失败: $e');
+        }
+      });
+    } catch (e) {
+      debugPrint('[WishesAllPage] 删除失败: $e');
+      if (context.mounted) AppSnackbar.show(context, '删除失败，请重试');
+    }
   }
 }
 
@@ -161,19 +217,19 @@ class _WishesAllPageState extends ConsumerState<WishesAllPage> {
 class _WishRow extends StatelessWidget {
   final Wish wish;
   final VoidCallback onToggle;
-  final VoidCallback onDelete;
+  final VoidCallback onLongPress;
 
   const _WishRow({
     required this.wish,
     required this.onToggle,
-    required this.onDelete,
+    required this.onLongPress,
   });
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onToggle,
-      onLongPress: onDelete,
+      onLongPress: onLongPress,
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(

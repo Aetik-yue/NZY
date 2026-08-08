@@ -11,77 +11,84 @@ import 'package:love_space/core/utils/date_utils.dart';
 import 'package:love_space/features/music/providers/audio_backend.dart';
 import 'package:love_space/features/music/providers/music_player_provider.dart';
 import 'package:love_space/features/music/providers/music_library_provider.dart';
+import 'package:love_space/shared/layouts/main_shell.dart';
 import 'package:love_space/shared/widgets/pill_nav_bar.dart';
+
+/// 公共 overrides：所有被页面 watch 的 provider 在此统一覆盖，
+/// 避免依赖链走到真实 isarProvider / 原生插件
+List<Override> _buildOverrides() => [
+      // 问候语
+      greetingProvider.overrideWithValue('早上好，亲爱的'),
+      // 在一起天数
+      daysTogetherProvider.overrideWithValue(365),
+      // 连续打卡天数
+      checkinStreakProvider.overrideWithValue(128),
+      // 时间轴事件
+      timelineEventsProvider.overrideWith(
+        (ref) => Stream.value([
+          TimelineEvent()
+            ..date = DateTime(2024, 5, 20)
+            ..title = '表白纪念日'
+            ..description = '那天下着小雨'
+            ..dotColorValue = 0xFFFF6B9D,
+        ]),
+      ),
+      // 相册照片数量
+      photoCountProvider.overrideWithValue(128),
+      // 相册照片
+      allPhotosTypedProvider.overrideWith((ref) => Stream.value([])),
+      // 相册筛选后的照片（相册页 build 时 watch，必须 override，
+      // 否则依赖链会走到真实 isarProvider 抛 UnimplementedError）
+      filteredAlbumPhotosProvider.overrideWith((ref) => Stream.value([])),
+      // 愿望列表
+      wishesProvider.overrideWith((ref) => Stream.value([])),
+      // 愿望统计
+      wishStatsProvider.overrideWithValue(
+        const WishStats(done: 8, total: 32),
+      ),
+      // 打卡记录
+      checkinsProvider.overrideWith((ref) => Stream.value([])),
+      // 应用设置
+      appSettingsProvider.overrideWith(
+        (ref) => Stream.value(AppSettings()
+          ..partner1Name = '小桃'
+          ..partner2Name = '阿树'
+          ..togetherSince = DateUtilsX.today().subtract(
+            const Duration(days: 365),
+          )),
+      ),
+      // 书架小说
+      novelsProvider.overrideWith((ref) => Stream.value([])),
+      // 小说章节（family）
+      chaptersProvider.overrideWith(
+        (ref, novelId) => Stream.value([]),
+      ),
+      // 阅读设置
+      readerSettingsProvider.overrideWith(
+        (ref) => Stream.value(ReaderSettings()
+          ..fontSize = 18
+          ..lineHeight = 1.6
+          ..pageMode = 0
+          ..bgTheme = 0
+          ..keepScreenOn = true),
+      ),
+      // 纪念日（首页倒数卡 + 纪念日页 watch，必须 override）
+      anniversariesProvider.overrideWith((ref) => Stream.value([])),
+      // 备忘录
+      memosProvider.overrideWith((ref) => Stream.value([])),
+      // 备忘录总数
+      memoCountProvider.overrideWithValue(0),
+      // 音乐：Fake 后端 + 空歌单，避免 audioBackendProvider 抛
+      // UnimplementedError 与 musicLibraryProvider 触发原生库
+      audioBackendProvider.overrideWithValue(FakeAudioBackend()),
+      musicLibraryProvider.overrideWith((ref) async => []),
+    ];
 
 void main() {
   testWidgets('App renders home page smoke test', (WidgetTester tester) async {
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [
-          // 问候语
-          greetingProvider.overrideWithValue('早上好，亲爱的'),
-          // 在一起天数
-          daysTogetherProvider.overrideWithValue(365),
-          // 连续打卡天数
-          checkinStreakProvider.overrideWithValue(128),
-          // 时间轴事件
-          timelineEventsProvider.overrideWith(
-            (ref) => Stream.value([
-              TimelineEvent()
-                ..date = DateTime(2024, 5, 20)
-                ..title = '表白纪念日'
-                ..description = '那天下着小雨'
-                ..dotColorValue = 0xFFFF6B9D,
-            ]),
-          ),
-          // 相册照片数量
-          photoCountProvider.overrideWithValue(128),
-          // 相册照片
-          allPhotosTypedProvider.overrideWith((ref) => Stream.value([])),
-          // 相册筛选后的照片（相册页 build 时 watch，必须 override，
-          // 否则依赖链会走到真实 isarProvider 抛 UnimplementedError）
-          filteredAlbumPhotosProvider.overrideWith((ref) => Stream.value([])),
-          // 愿望列表
-          wishesProvider.overrideWith((ref) => Stream.value([])),
-          // 愿望统计
-          wishStatsProvider.overrideWithValue(
-            const WishStats(done: 8, total: 32),
-          ),
-          // 打卡记录
-          checkinsProvider.overrideWith((ref) => Stream.value([])),
-          // 应用设置
-          appSettingsProvider.overrideWith(
-            (ref) => Stream.value(AppSettings()
-              ..partner1Name = '小桃'
-              ..partner2Name = '阿树'
-              ..togetherSince = DateUtilsX.today().subtract(
-                const Duration(days: 365),
-              )),
-          ),
-          // 书架小说
-          novelsProvider.overrideWith((ref) => Stream.value([])),
-          // 小说章节（family）
-          chaptersProvider.overrideWith(
-            (ref, novelId) => Stream.value([]),
-          ),
-          // 阅读设置
-          readerSettingsProvider.overrideWith(
-            (ref) => Stream.value(ReaderSettings()
-              ..fontSize = 18
-              ..lineHeight = 1.6
-              ..pageMode = 0
-              ..bgTheme = 0
-              ..keepScreenOn = true),
-          ),
-          // 备忘录
-          memosProvider.overrideWith((ref) => Stream.value([])),
-          // 备忘录总数
-          memoCountProvider.overrideWithValue(0),
-          // 音乐：Fake 后端 + 空歌单，避免 audioBackendProvider 抛
-          // UnimplementedError 与 musicLibraryProvider 触发原生库
-          audioBackendProvider.overrideWithValue(FakeAudioBackend()),
-          musicLibraryProvider.overrideWith((ref) async => []),
-        ],
+        overrides: _buildOverrides(),
         child: const LoveSpaceApp(),
       ),
     );
@@ -106,5 +113,36 @@ void main() {
     // 空列表应渲染空状态引导，而非「加载失败」
     expect(find.text('还没有照片，快去添加第一张吧'), findsOneWidget);
     expect(find.text('加载失败'), findsNothing);
+  });
+
+  testWidgets('我的页点击小说卡应切换到小说 Tab', (WidgetTester tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: _buildOverrides(),
+        child: const LoveSpaceApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // 切换到「我的」Tab
+    await tester.tap(
+      find.descendant(
+        of: find.byType(PillNavBar),
+        matching: find.text('我的'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // 小说功能卡的副文案（书架为空时的引导文案），点击应触发切 Tab
+    await tester.tap(find.text('一起读书吧'));
+    await tester.pumpAndSettle();
+
+    // 验证 currentTabProvider 已切到小说 Tab
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(MainShell)),
+    );
+    expect(container.read(currentTabProvider), NavTab.novel);
+    // 小说页已可见（书架空态）
+    expect(find.text('书架还空空的'), findsOneWidget);
   });
 }

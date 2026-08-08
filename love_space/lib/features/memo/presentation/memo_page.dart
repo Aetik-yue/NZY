@@ -82,12 +82,12 @@ class MemoPage extends ConsumerWidget {
 }
 
 /// 备忘录列表（按日期分组，置顶在前）
-class _MemoList extends StatelessWidget {
+class _MemoList extends ConsumerWidget {
   final List<Memo> memos;
   const _MemoList({required this.memos});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     // 分离置顶和非置顶
     final pinned = memos.where((m) => m.isPinned).toList();
     final unpinned = memos.where((m) => !m.isPinned).toList();
@@ -106,8 +106,8 @@ class _MemoList extends StatelessWidget {
             MemoCard(
               memo: m,
               onTap: () => _openEdit(context, m.id),
-              onTogglePin: () => _togglePin(context, m.id),
-              onDelete: () => _delete(context, m),
+              onTogglePin: () => _togglePin(context, ref, m.id),
+              onDelete: () => _delete(context, ref, m),
             ),
           const SizedBox(height: 16),
         ],
@@ -119,8 +119,8 @@ class _MemoList extends StatelessWidget {
             MemoCard(
               memo: m,
               onTap: () => _openEdit(context, m.id),
-              onTogglePin: () => _togglePin(context, m.id),
-              onDelete: () => _delete(context, m),
+              onTogglePin: () => _togglePin(context, ref, m.id),
+              onDelete: () => _delete(context, ref, m),
             ),
           const SizedBox(height: 16),
         ],
@@ -164,28 +164,33 @@ class _MemoList extends StatelessWidget {
     );
   }
 
-  void _togglePin(BuildContext context, int memoId) {
-    _container(context).read(memoRepositoryProvider).togglePin(memoId);
+  Future<void> _togglePin(
+      BuildContext context, WidgetRef ref, int memoId) async {
+    try {
+      await ref.read(memoRepositoryProvider).togglePin(memoId);
+    } catch (e) {
+      debugPrint('[MemoList] 置顶失败: $e');
+      if (context.mounted) AppSnackbar.show(context, '操作失败，请重试');
+    }
   }
 
-  Future<void> _delete(BuildContext context, Memo memo) async {
+  Future<void> _delete(BuildContext context, WidgetRef ref, Memo memo) async {
     // 删除前确认（与其他模块保持一致）
     final confirmed = await showConfirmDeleteDialog(
       context,
       content: '确定要删除这条备忘录吗？',
     );
     if (!confirmed || !context.mounted) return;
-    final container = _container(context);
-    await container.read(memoRepositoryProvider).delete(memo.id);
-    if (context.mounted) {
-      AppSnackbar.showUndo(context, '已删除', () {
-        container.read(memoRepositoryProvider).add(memo);
+    try {
+      await ref.read(memoRepositoryProvider).delete(memo.id);
+      if (!context.mounted) return;
+      AppSnackbar.showUndo(context, '已删除', () async {
+        await ref.read(memoRepositoryProvider).add(memo);
       });
+    } catch (e) {
+      debugPrint('[MemoList] 删除失败: $e');
+      if (context.mounted) AppSnackbar.show(context, '删除失败，请重试');
     }
-  }
-
-  ProviderContainer _container(BuildContext context) {
-    return ProviderScope.containerOf(context);
   }
 }
 
