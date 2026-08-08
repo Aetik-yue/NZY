@@ -126,6 +126,57 @@ class SeedService {
       });
     }
 
+    // 扩展源：bqge.cc（明文，章节路径 /read/{id}/{chid}.html）
+    final bqgeccSource = await _isar.novelSources
+        .where()
+        .keyEqualTo('bqgecc')
+        .findFirst();
+    if (bqgeccSource == null) {
+      await _isar.writeTxn(() async {
+        await _isar.novelSources.put(NovelSource()
+          ..key = 'bqgecc'
+          ..name = '笔趣阁（bqge.cc）'
+          ..baseUrl = 'https://www.bqge.cc'
+          ..enabled = true
+          ..createdAt = DateTime.now()
+          ..selectors = _bqgeccSelectors);
+      });
+    }
+
+    // 扩展源：biqumo.com（base64 加密正文，xacywc.omvymw() 同型加密）
+    final biqumoSource = await _isar.novelSources
+        .where()
+        .keyEqualTo('biqumo')
+        .findFirst();
+    if (biqumoSource == null) {
+      await _isar.writeTxn(() async {
+        await _isar.novelSources.put(NovelSource()
+          ..key = 'biqumo'
+          ..name = '笔趣阁（biqumo）'
+          ..baseUrl = 'https://www.biqumo.com'
+          ..enabled = true
+          ..createdAt = DateTime.now()
+          ..selectors = _biqumoSelectors);
+      });
+    }
+
+    // 扩展源：bxwxorg.com（明文，正文 .word_read、标题 .info-main h1）
+    final bxwxorgSource = await _isar.novelSources
+        .where()
+        .keyEqualTo('bxwxorg')
+        .findFirst();
+    if (bxwxorgSource == null) {
+      await _isar.writeTxn(() async {
+        await _isar.novelSources.put(NovelSource()
+          ..key = 'bxwxorg'
+          ..name = '笔下文学（bxwxorg）'
+          ..baseUrl = 'https://www.bxwxorg.com'
+          ..enabled = true
+          ..createdAt = DateTime.now()
+          ..selectors = _bxwxorgSelectors);
+      });
+    }
+
     // 默认爬取配置
     final configRepo = CrawlConfigRepository(_isar);
     await configRepo.getOrCreate();
@@ -160,6 +211,54 @@ class SeedService {
   "chapterListSelector": ".yanqing_list li a",
   "chapterTitleSelector": ".chapter-title",
   "chapterContentSelector": "#chaptercontent"
+}
+''';
+
+  /// bqge.cc 选择器配置（明文源，章节路径 /read/{id}/{chid}.html）
+  ///
+  /// 选择器仅作元数据记录；实际抓取由 BiqugeCrawler 的硬编码兜底选择器处理。
+  static const String _bqgeccSelectors = '''
+{
+  "searchUrl": "/search.html?searchkey={keyword}",
+  "bookLinkSelector": ".result-list a, #info h1 a",
+  "titleSelector": "#info h1",
+  "authorSelector": "#info p a",
+  "introSelector": "#intro",
+  "chapterListSelector": "#list dd a",
+  "chapterTitleSelector": ".bookname h1",
+  "chapterContentSelector": "#content"
+}
+''';
+
+  /// biqumo.com 选择器配置（base64 加密源，正文 xacywc.omvymw() 同型加密）
+  ///
+  /// 选择器仅作元数据记录；base64 解密由 BiqugeCrawler._decodeBase64Content 处理。
+  static const String _biqumoSelectors = '''
+{
+  "searchUrl": "/modules/article/search.php?searchkey={keyword}",
+  "bookLinkSelector": "#info h1 a",
+  "titleSelector": "#info h1",
+  "authorSelector": "#info p a",
+  "introSelector": "#intro",
+  "chapterListSelector": "#list dd a",
+  "chapterTitleSelector": ".bookname h1",
+  "chapterContentSelector": "#content"
+}
+''';
+
+  /// bxwxorg.com 选择器配置（明文源，正文 .word_read、标题 .info-main h1）
+  ///
+  /// 选择器仅作元数据记录；实际抓取由 BiqugeCrawler 的硬编码兜底选择器处理。
+  static const String _bxwxorgSelectors = '''
+{
+  "searchUrl": "/modules/article/search.php?searchkey={keyword}",
+  "bookLinkSelector": ".info-main h1 a",
+  "titleSelector": ".info-main h1",
+  "authorSelector": ".info-main p a",
+  "introSelector": "#intro",
+  "chapterListSelector": "#list dd a, .chapter-list a",
+  "chapterTitleSelector": "h1",
+  "chapterContentSelector": ".word_read"
 }
 ''';
 }

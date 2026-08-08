@@ -566,8 +566,21 @@ class CrawlRepository {
   }
 
   /// 从书籍 URL 提取书籍 ID
+  ///
+  /// 兼容多站点书籍详情页路径：
+  /// - /book/{id}/ /read/{id}/ /chapter/{id}/   (biquge2 / bqgbb / bqge.cc / bxwxorg)
+  /// - /{d}_{d}/                                (biqumo)
+  /// - /{id}/                                   (纯数字末段)
+  /// - /{d}/{d}/{d}.html                        (经典笔趣阁)
   String _extractBookId(String url) {
-    final match = RegExp(r'/(\d+)/?$').firstMatch(url);
+    // /book/{id}/ /read/{id}/ /chapter/{id}/
+    var match = RegExp(r'/(?:book|read|chapter)/(\d+)/?$').firstMatch(url);
+    if (match != null) return match.group(1)!;
+    // biqumo: /{d}_{d}/
+    match = RegExp(r'/(\d+_\d+)/?$').firstMatch(url);
+    if (match != null) return match.group(1)!;
+    // 末段纯数字 /{id}/
+    match = RegExp(r'/(\d+)/?$').firstMatch(url);
     if (match != null) return match.group(1)!;
 
     final segments = url.split('/').where((s) => s.isNotEmpty).toList();
