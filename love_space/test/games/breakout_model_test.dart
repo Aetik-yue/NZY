@@ -39,6 +39,28 @@ void main() {
       final ball = Ball(x: 0.06, y: top + brickH + 0.005, vx: 0, vy: -0.02, r: 0.015);
       expect(collideBrick(ball, bricks, brickW, brickH, top), isNull);
     });
+
+    test('高屏 aspectRatio 下 y 方向碰撞按比例缩放（与视觉正圆一致）', () {
+      // 球画成半径 r*w 像素的正圆；高屏（h>w）下逻辑 y 半径 r 对应 r*h 像素 > r*w，
+      // 原碰撞在 y 方向“提前命中”。修复后 dy 乘 aspectRatio(h/w) 缩放，使碰撞圆
+      // 等效于半径 r*w 像素。此处验证：同一 y 距离，aspectRatio=1 命中、=2 不命中。
+      // 坐标：ball 在砖块正下方，dy=0.012，r=0.015（r²=2.25e-4）
+      //   aspectRatio=1: 0 + 0.012² = 1.44e-4 ≤ 2.25e-4 -> 命中
+      //   aspectRatio=2: 0 + (0.012*2)² = 5.76e-4 > 2.25e-4 -> 不命中
+      final bricks = [Brick(row: 0, col: 0, kind: BrickKind.rose)];
+      final ball = Ball(
+        x: 0.06,
+        y: top + brickH + 0.012,
+        vx: 0,
+        vy: -0.02,
+        r: 0.015,
+      );
+      expect(collideBrick(ball, bricks, brickW, brickH, top), isNotNull);
+      expect(
+        collideBrick(ball, bricks, brickW, brickH, top, aspectRatio: 2),
+        isNull,
+      );
+    });
   });
 
   group('levelCleared', () {

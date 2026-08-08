@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
+import 'package:flutter/services.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_text_styles.dart';
 import 'breakout_model.dart';
@@ -15,7 +17,14 @@ class BreakoutPage extends StatefulWidget {
 
 class _BreakoutPageState extends State<BreakoutPage>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _ctrl;
+  // 用 Ticker 而非 AnimationController.repeat()：基于真实时间 dt 位移，
+  // 高刷屏（120Hz）下球速不会翻倍。createTicker 由 mixin 绑定 vsync 与 TickerMode。
+  late final Ticker _ticker;
+  // 上一次回调的 elapsed，用于计算帧间 dt；start() 时归零
+  Duration _lastTick = Duration.zero;
+  // 场地高宽比（h/w），由 LayoutBuilder 写入，供 collideBrick 缩放 y 距离
+  double _aspectRatio = 1.0;
+
   final int _cols = 8;
 
   List<Brick> _bricks = [];
@@ -29,16 +38,17 @@ class _BreakoutPageState extends State<BreakoutPage>
   @override
   void initState() {
     super.initState();
-    _ctrl = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 1),
-    )..addListener(_tick);
+    _ticker = createTicker(_onTick);
     _loadLevel(0);
+    // 锁竖屏：打砖块布局按竖屏设计
+    SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   }
 
   @override
   void dispose() {
-    _ctrl.dispose();
+    _ticker.dispose();
+    // 恢复所有朝向
+    SystemChrome.setPreferredOrientations(DeviceOrientation.values);
     super.dispose();
   }
 
@@ -61,20 +71,29 @@ class _BreakoutPageState extends State<BreakoutPage>
     if (_status == BreakoutStatus.ready ||
         _status == BreakoutStatus.paused) {
       setState(() => _status = BreakoutStatus.playing);
-      _ctrl.repeat();
+      // 归零 dt 基准，避免暂停期间累积的时间在恢复瞬间造成大跳
+      _lastTick = Duration.zero;
+      _ticker.start();
     }
   }
 
   void _pause() {
     if (_status == BreakoutStatus.playing) {
-      _ctrl.stop();
+      _ticker.stop();
       setState(() => _status = BreakoutStatus.paused);
     }
   }
 
-  void _tick() {
-    // 系统返回键退出时控制器可能在 dispose 前再触发一帧，避免对已卸载 State 调 setState
+  void _onTick(Duration elapsed) {
+    // 系统返回键退出时 Ticker 可能在 dispose 前再触发一帧，避免对已卸载 State 调 setState
     if (!mounted) return;
+    // 帧率无关：dt 归一化到 60fps（1.0 = 一帧@60Hz）。
+    // 120Hz 屏 dt≈0.5，位移减半，球速与 60Hz 一致；30Hz 卡顿 dt≈2.0。
+    final dt = (elapsed - _lastTick).inMicroseconds / 16666.0;
+    _lastTick = elapsed;
+    // dt<=0：首帧（elapsed=0）或时间未前进，跳过；
+    // dt>4：单帧跨度过大（>~66ms，如后台恢复/GC），丢弃防穿透
+    if (dt <= 0 || dt > 4) return;
 
     final level = kBreakoutLevels[_levelIndex];
     final ball = _ball;
@@ -82,8 +101,9 @@ class _BreakoutPageState extends State<BreakoutPage>
     final brickW = 1.0 / _cols;
     const brickH = kBrickHeight;
 
-    ball.x += ball.vx;
-    ball.y += ball.vy;
+    // 位移乘 dt：vx/vy 是“逻辑/帧@60fps”的速度定义，仅位移需按真实时间缩放
+    ball.x += ball.vx * dt;
+    ball.y += ball.vy * dt;
 
     // 左右墙
     if (ball.x - ball.r < 0) {
@@ -114,19 +134,27 @@ class _BreakoutPageState extends State<BreakoutPage>
       ball.y = paddleTop - ball.r;
       final hitPos = (ball.x - _paddle.x) / _paddle.width - 0.5;
       final speed = level.ballSpeed;
+      // 速度定义不变（不乘 dt），仅作为方向/大小基准
       ball.vx = hitPos * speed * 1.6;
       ball.vy = -speed;
     }
 
-    // 砖块碰撞
-    final hit = collideBrick(ball, _bricks, brickW, brickH, kBrickTop);
+    // 砖块碰撞：传 aspectRatio 使碰撞圆与视觉正圆（半径 r*w 像素）一致
+    final hit = collideBrick(
+      ball,
+      _bricks,
+      brickW,
+      brickH,
+      kBrickTop,
+      aspectRatio: _aspectRatio,
+    );
     if (hit != null) {
       hit.brick.alive = false;
       _score += hit.brick.kind.score;
       if (hit.bounceY) ball.vy = -ball.vy;
       if (hit.bounceX) ball.vx = -ball.vx;
       if (levelCleared(_bricks)) {
-        _ctrl.stop();
+        _ticker.stop();
         if (_levelIndex + 1 >= kBreakoutLevels.length) {
           setState(() => _status = BreakoutStatus.gameWin);
         } else {
@@ -140,7 +168,7 @@ class _BreakoutPageState extends State<BreakoutPage>
   }
 
   void _loseLife() {
-    _ctrl.stop();
+    _ticker.stop();
     _lives--;
     if (_lives <= 0) {
       setState(() => _status = BreakoutStatus.gameOver);
@@ -183,7 +211,7 @@ class _BreakoutPageState extends State<BreakoutPage>
       canPop: true,
       // 退出转场期间停动画循环（系统返回键与 AppBar 返回键均经此回调）
       onPopInvokedWithResult: (didPop, _) {
-        if (didPop) _ctrl.stop();
+        if (didPop) _ticker.stop();
       },
       child: Scaffold(
         backgroundColor: AppColors.bgPrimary,
@@ -218,6 +246,10 @@ class _BreakoutPageState extends State<BreakoutPage>
               Expanded(
                 child: LayoutBuilder(
                   builder: (context, constraints) {
+                    // 场地高宽比（h/w），供 collideBrick 缩放 y 距离，使碰撞圆与
+                    // 视觉正圆一致。在 build 中写入字段供 _onTick 读取
+                    // （constraints 在此闭包内有效，_onTick 在帧回调时读最新值）。
+                    _aspectRatio = constraints.maxHeight / constraints.maxWidth;
                     return GestureDetector(
                       behavior: HitTestBehavior.opaque,
                       onPanUpdate: (d) =>

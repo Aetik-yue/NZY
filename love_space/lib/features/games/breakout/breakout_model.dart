@@ -113,7 +113,21 @@ class BrickHit {
 ///
 /// 返回命中的砖块（alive=true 且矩形与球圆相交）+ 反弹方向。
 /// 反弹方向：用球中心相对砖块中心的方向（|relX|>|relY| -> bounceX，否则 bounceY）。
-BrickHit? collideBrick(Ball ball, List<Brick> bricks, double brickW, double brickH, double top) {
+///
+/// [aspectRatio] = 场高/场宽（h/w）。球在 Painter 中画成半径 `r*w` 的正圆，
+/// 但逻辑 y 半径 `r` 对应 `r*h` 像素；高屏（h>w）下碰撞圆 y 方向比视觉圆大，
+/// 导致 y 方向提前命中。此处将 y 距离按 aspectRatio 缩放，使碰撞圆与视觉圆
+/// （x、y 半径均为 `r*w` 像素）一致：碰撞条件等价于像素空间
+/// `(dx*w)² + (dy*h)² ≤ (r*w)²`，即 `dx² + (dy*aspectRatio)² ≤ r²`。
+/// 默认 1.0（正方形场地），保持既有行为。
+BrickHit? collideBrick(
+  Ball ball,
+  List<Brick> bricks,
+  double brickW,
+  double brickH,
+  double top, {
+  double aspectRatio = 1.0,
+}) {
   for (final b in bricks) {
     if (!b.alive) continue;
     final bx = b.col * brickW;
@@ -121,12 +135,14 @@ BrickHit? collideBrick(Ball ball, List<Brick> bricks, double brickW, double bric
     final nearestX = ball.x.clamp(bx, bx + brickW);
     final nearestY = ball.y.clamp(by, by + brickH);
     final dx = ball.x - nearestX;
-    final dy = ball.y - nearestY;
+    // y 距离按高宽比缩放，使碰撞圆与视觉正圆（半径 r*w 像素）一致
+    final dy = (ball.y - nearestY) * aspectRatio;
     if (dx * dx + dy * dy <= ball.r * ball.r) {
       final cx = bx + brickW / 2;
       final cy = by + brickH / 2;
       final relX = (ball.x - cx) / (brickW / 2);
-      final relY = (ball.y - cy) / (brickH / 2);
+      // 反弹方向判断同样按像素空间缩放 y，保持与碰撞一致
+      final relY = (ball.y - cy) / (brickH / 2) * aspectRatio;
       if (relX.abs() > relY.abs()) {
         return BrickHit(brick: b, bounceX: true);
       } else {
