@@ -15,6 +15,8 @@ import '../repositories/crawl_config_repository.dart';
 import '../repositories/crawl_log_repository.dart';
 import '../repositories/crawl_repository.dart';
 import '../repositories/memo_repository.dart';
+import '../repositories/pomodoro_settings_repository.dart';
+import '../repositories/focus_session_repository.dart';
 import '../../core/utils/greeting.dart';
 import '../../core/utils/date_utils.dart';
 import '../../core/utils/streak.dart';
@@ -34,6 +36,8 @@ import '../models/novel_source.dart';
 import '../models/crawl_config.dart';
 import '../models/crawl_log.dart';
 import '../models/memo.dart';
+import '../models/pomodoro_settings.dart';
+import '../models/focus_session.dart';
 
 // ═══════════════════════════════════════════════════════════════
 // Repository providers（依赖 isarProvider）
@@ -395,5 +399,51 @@ final allTagsProvider = Provider<List<String>>((ref) {
     tags.addAll(extractMemoTags(m.content));
   }
   return tags.toList()..sort();
+});
+
+// ═══════════════════════════════════════════════════════════════
+// 番茄钟模块 providers（设置 / 记录 / 今日统计 / 连续天数）
+// ═══════════════════════════════════════════════════════════════
+
+/// 番茄钟设置数据仓库（单例，id 固定 0）
+final pomodoroSettingsRepositoryProvider = Provider((ref) =>
+    PomodoroSettingsRepository(ref.watch(isarProvider)));
+
+/// 番茄钟设置（实时流，行不存在时仓库以默认值兜底）
+final pomodoroSettingsProvider = StreamProvider<PomodoroSettings>((ref) =>
+    ref.watch(pomodoroSettingsRepositoryProvider).watch());
+
+/// 专注记录数据仓库
+final focusSessionRepositoryProvider = Provider((ref) =>
+    FocusSessionRepository(ref.watch(isarProvider)));
+
+/// 所有专注记录（实时流，按开始时间降序）
+final focusSessionsProvider = StreamProvider<List<FocusSession>>((ref) =>
+    ref.watch(focusSessionRepositoryProvider).watchAll());
+
+/// 今日专注统计（时长分钟 + 次数）
+///
+/// 从 focusSessionsProvider 内存过滤今日 completed 的 focus 记录，
+/// 避免单独的 watchToday 查询依赖；每次记录变化自动重算。
+final todayFocusProvider = Provider<({int minutes, int count})>((ref) {
+  final sessions = ref.watch(focusSessionsProvider).valueOrNull ?? [];
+  final now = DateTime.now();
+  final startOfDay = DateTime(now.year, now.month, now.day);
+  final today = sessions.where((s) =>
+      s.type == FocusType.focus &&
+      !s.startTime.isBefore(startOfDay) &&
+      s.completed);
+  final minutes = today.fold<int>(0, (sum, s) => sum + s.actualMin);
+  return (minutes: minutes, count: today.length);
+});
+
+/// 连续专注天数（复用 computeStreak，按 completed focus 记录的日期回溯）
+final focusStreakProvider = Provider<int>((ref) {
+  final sessions = ref.watch(focusSessionsProvider).valueOrNull ?? [];
+  final dates = sessions
+      .where((s) => s.type == FocusType.focus && s.completed)
+      .map((s) => s.startTime)
+      .toList();
+  return computeStreak(dates);
 });
 
