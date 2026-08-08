@@ -9,10 +9,10 @@ import '../../../../shared/widgets/confirm_dialog.dart';
 import 'widgets/todo_fields.dart';
 import 'widgets/memo_edit_fields.dart';
 
-/// 备忘录编辑/新建页
+/// 待办编辑/新建页
 ///
 /// - 新建：memoId = null
-/// - 编辑：memoId 传入现有备忘录 id
+/// - 编辑：memoId 传入现有待办 id
 class MemoEditPage extends ConsumerStatefulWidget {
   final int? memoId;
   const MemoEditPage({super.key, this.memoId});
@@ -139,7 +139,7 @@ class _MemoEditPageState extends ConsumerState<MemoEditPage> {
 
       if (!mounted) return;
       Navigator.of(context).pop();
-      AppSnackbar.show(context, _isEditing ? '已保存' : '备忘录已添加 ✨');
+      AppSnackbar.show(context, _isEditing ? '已保存' : '待办已添加 ✨');
     } catch (e) {
       debugPrint('[MemoEditPage] 保存失败: $e');
       if (mounted) AppSnackbar.show(context, '保存失败，请重试');
@@ -148,11 +148,11 @@ class _MemoEditPageState extends ConsumerState<MemoEditPage> {
     }
   }
 
-  /// 删除当前备忘录（确认 + 撤销）
+  /// 删除当前待办（确认 + 撤销）
   Future<void> _deleteMemo() async {
     final confirmed = await showConfirmDeleteDialog(
       context,
-      content: '确定要删除这条备忘录吗？',
+      content: '确定要删除这条待办吗？',
     );
     if (!confirmed || !mounted) return;
     final repo = ref.read(memoRepositoryProvider);
@@ -205,7 +205,7 @@ class _MemoEditPageState extends ConsumerState<MemoEditPage> {
           // 必须用 maybePop：强制 pop 会绕过 PopScope 的未保存拦截
           onPressed: () => Navigator.of(context).maybePop(),
         ),
-        title: Text(_isEditing ? '编辑备忘录' : '新建备忘录',
+        title: Text(_isEditing ? '编辑待办' : '新建待办',
             style: AppTextStyles.titleMedium),
         centerTitle: true,
         actions: [

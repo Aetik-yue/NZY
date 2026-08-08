@@ -6,7 +6,7 @@ import '../../../../data/providers/data_providers.dart';
 
 /// 搜索栏
 ///
-/// 实时过滤备忘录（按 content 模糊匹配）。
+/// 实时过滤待办（按 content 模糊匹配）。
 class MemoSearchBar extends ConsumerStatefulWidget {
   const MemoSearchBar({super.key});
 
@@ -47,7 +47,7 @@ class _MemoSearchBarState extends ConsumerState<MemoSearchBar> {
             child: TextField(
               controller: _controller,
               decoration: InputDecoration(
-                hintText: '搜索备忘录...',
+                hintText: '搜索待办...',
                 hintStyle: AppTextStyles.body.copyWith(
                   color: AppColors.textTertiary,
                 ),

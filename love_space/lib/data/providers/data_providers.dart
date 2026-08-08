@@ -347,14 +347,14 @@ class CrawlStatus {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// 备忘录模块 providers（数据仓库 / 流 / 筛选 / 衍生）
+// 待办模块 providers（数据仓库 / 流 / 筛选 / 衍生）
 // ═══════════════════════════════════════════════════════════════
 
-/// 备忘录数据仓库
+/// 待办数据仓库
 final memoRepositoryProvider = Provider((ref) =>
     MemoRepository(ref.watch(isarProvider)));
 
-/// 所有备忘录（实时流，按创建时间降序）
+/// 所有待办（实时流，按创建时间降序）
 final memosProvider = StreamProvider<List<Memo>>((ref) =>
     ref.watch(memoRepositoryProvider).watchAll());
 
@@ -374,7 +374,7 @@ enum TodoFilter { all, active, done }
 final memoDoneFilterProvider =
     StateProvider<TodoFilter>((ref) => TodoFilter.all);
 
-/// 过滤后的备忘录（搜索 + 标签 + 作者 + 完成状态 + 排序）
+/// 过滤后的待办（搜索 + 标签 + 作者 + 完成状态 + 排序）
 ///
 /// 搜索词先 trim（避免尾随空格搜不到）；标签按独立标签精确匹配
 /// （选「旅行」不会误命中「#旅行计划」）。
@@ -432,7 +432,7 @@ int _priorityWeight(TodoPriority p) => switch (p) {
       TodoPriority.none => 0,
     };
 
-/// 备忘录统计（完成数 / 总数 / 百分比）
+/// 待办统计（完成数 / 总数 / 百分比）
 class MemoStats {
   final int done;
   final int total;
@@ -443,7 +443,7 @@ class MemoStats {
   int get percentInt => (percent * 100).round();
 }
 
-/// 待办统计（基于全部备忘录，不受筛选影响）
+/// 待办统计（基于全部待办，不受筛选影响）
 final memoStatsProvider = Provider<MemoStats>((ref) {
   final memos = ref.watch(memosProvider).valueOrNull ?? [];
   return MemoStats(
@@ -452,7 +452,7 @@ final memoStatsProvider = Provider<MemoStats>((ref) {
   );
 });
 
-/// 备忘录总数
+/// 待办总数
 final memoCountProvider = Provider<int>((ref) =>
     ref.watch(memosProvider).valueOrNull?.length ?? 0);
 

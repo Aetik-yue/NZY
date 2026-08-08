@@ -15,9 +15,9 @@ import 'widgets/date_group_header.dart';
 import 'widgets/memo_card.dart';
 import 'memo_edit_page.dart';
 
-/// 备忘录主页面（二级页）
+/// 待办主页面（二级页）
 ///
-/// 从「我的」页功能卡点击进入，展示按时间分组的备忘录列表，
+/// 从「我的」页功能卡点击进入，展示按时间分组的待办列表，
 /// 支持快速输入、搜索、标签筛选、置顶、编辑、删除。
 class MemoPage extends ConsumerWidget {
   const MemoPage({super.key});
@@ -43,7 +43,7 @@ class MemoPage extends ConsumerWidget {
               size: 20, color: AppColors.textPrimary),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: Text('备忘录', style: AppTextStyles.titleMedium),
+        title: Text('待办', style: AppTextStyles.titleMedium),
         centerTitle: true,
       ),
       body: SafeArea(
@@ -88,7 +88,7 @@ class MemoPage extends ConsumerWidget {
   }
 }
 
-/// 备忘录列表（按日期分组，置顶在前）
+/// 待办列表（按日期分组，置顶在前）
 class _MemoList extends ConsumerWidget {
   final List<Memo> memos;
   const _MemoList({required this.memos});
@@ -197,7 +197,7 @@ class _MemoList extends ConsumerWidget {
     // 删除前确认（与其他模块保持一致）
     final confirmed = await showConfirmDeleteDialog(
       context,
-      content: '确定要删除这条备忘录吗？',
+      content: '确定要删除这条待办吗？',
     );
     if (!confirmed || !context.mounted) return;
     try {
@@ -220,7 +220,7 @@ class _DateGroup {
   const _DateGroup({required this.label, required this.memos});
 }
 
-/// 空状态（区分：无备忘录 / 搜索无结果 / 标签无结果）
+/// 空状态（区分：无待办 / 搜索无结果 / 标签无结果）
 class _EmptyState extends StatelessWidget {
   final bool isSearchResult;
   const _EmptyState({this.isSearchResult = false});
@@ -238,7 +238,7 @@ class _EmptyState extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           Text(
-            isSearchResult ? '没有找到相关备忘录' : '还没有备忘录',
+            isSearchResult ? '没有找到相关待办' : '还没有待办',
             style: AppTextStyles.titleSmall,
           ),
           const SizedBox(height: 6),

@@ -78,9 +78,9 @@ List<Override> _buildOverrides() => [
       ),
       // 纪念日（首页倒数卡 + 纪念日页 watch，必须 override）
       anniversariesProvider.overrideWith((ref) => Stream.value([])),
-      // 备忘录
+      // 待办
       memosProvider.overrideWith((ref) => Stream.value([])),
-      // 备忘录总数
+      // 待办总数
       memoCountProvider.overrideWithValue(0),
       // 音乐：Fake 后端 + 空歌单，避免 audioBackendProvider 抛
       // UnimplementedError 与 musicLibraryProvider 触发原生库

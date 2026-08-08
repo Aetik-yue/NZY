@@ -85,9 +85,9 @@ List<Override> _appOverrides(void Function() onLibraryScan) => [
           ..bgTheme = 0
           ..keepScreenOn = true),
       ),
-      // 备忘录
+      // 待办
       memosProvider.overrideWith((ref) => Stream.value([])),
-      // 备忘录总数
+      // 待办总数
       memoCountProvider.overrideWithValue(0),
       // 音乐：Fake 后端 + 扫描计数 spy
       audioBackendProvider.overrideWithValue(FakeAudioBackend()),

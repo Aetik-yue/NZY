@@ -5,7 +5,7 @@ part 'memo.g.dart';
 /// 待办优先级
 enum TodoPriority { none, high, medium, low }
 
-/// 备忘录条目
+/// 待办条目
 ///
 /// 承载情侣双方的日常记录：情话、计划、回忆、待办等。
 /// 标签以内嵌 `#标签名` 语法存储在 content 中，UI 层解析展示。

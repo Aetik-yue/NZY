@@ -5,9 +5,9 @@ import '../../../../core/utils/tag_utils.dart';
 import '../../../../data/models/memo.dart';
 import 'todo_fields.dart';
 
-/// 备忘录卡片
+/// 待办卡片
 ///
-/// 展示单条备忘录：勾选框（完成态切换）+ 优先级色点 + 作者标识 + 时间 +
+/// 展示单条待办：勾选框（完成态切换）+ 优先级色点 + 作者标识 + 时间 +
 /// 正文（标签高亮，完成时置灰加删除线）+ 截止日期标签（逾期高亮）。
 /// 单击编辑，长按弹出菜单（置顶/编辑/删除）。
 class MemoCard extends StatelessWidget {

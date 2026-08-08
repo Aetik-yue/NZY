@@ -43,7 +43,7 @@ class SeedService {
         ..remindDays = 3
         ..createdAt = DateTime.now());
 
-      // 备忘录种子数据
+      // 待办种子数据
       await _isar.memos.putAll([
         Memo()
           ..content = '第一次牵手的那天，心跳得好快 💕'
