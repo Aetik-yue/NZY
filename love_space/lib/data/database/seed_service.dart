@@ -50,19 +50,25 @@ class SeedService {
           ..author = 1
           ..isPinned = true
           ..colorValue = 0xFFFF8FB1
-          ..createdAt = DateTime.now().subtract(const Duration(days: 30)),
+          ..createdAt = DateTime.now().subtract(const Duration(days: 30))
+          ..done = false
+          ..priority = TodoPriority.none,
         Memo()
           ..content = '一起去北海道看雪！#旅行计划'
           ..author = 2
           ..isPinned = false
           ..colorValue = 0xFFFFD1BF
-          ..createdAt = DateTime.now().subtract(const Duration(days: 15)),
+          ..createdAt = DateTime.now().subtract(const Duration(days: 15))
+          ..done = false
+          ..priority = TodoPriority.none,
         Memo()
           ..content = '记得买牛奶和面包 #购物'
           ..author = 1
           ..isPinned = false
           ..colorValue = 0xFFFF8FB1
-          ..createdAt = DateTime.now().subtract(const Duration(hours: 3)),
+          ..createdAt = DateTime.now().subtract(const Duration(hours: 3))
+          ..done = false
+          ..priority = TodoPriority.none,
       ]);
     });
 

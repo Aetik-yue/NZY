@@ -37,13 +37,29 @@ const MemoSchema = CollectionSchema(
       name: r'createdAt',
       type: IsarType.dateTime,
     ),
-    r'isPinned': PropertySchema(
+    r'done': PropertySchema(
       id: 4,
+      name: r'done',
+      type: IsarType.bool,
+    ),
+    r'dueDate': PropertySchema(
+      id: 5,
+      name: r'dueDate',
+      type: IsarType.dateTime,
+    ),
+    r'isPinned': PropertySchema(
+      id: 6,
       name: r'isPinned',
       type: IsarType.bool,
     ),
+    r'priority': PropertySchema(
+      id: 7,
+      name: r'priority',
+      type: IsarType.string,
+      enumMap: _MemopriorityEnumValueMap,
+    ),
     r'updatedAt': PropertySchema(
-      id: 5,
+      id: 8,
       name: r'updatedAt',
       type: IsarType.dateTime,
     )
@@ -69,6 +85,7 @@ int _memoEstimateSize(
 ) {
   var bytesCount = offsets.last;
   bytesCount += 3 + object.content.length * 3;
+  bytesCount += 3 + object.priority.name.length * 3;
   return bytesCount;
 }
 
@@ -82,8 +99,11 @@ void _memoSerialize(
   writer.writeLong(offsets[1], object.colorValue);
   writer.writeString(offsets[2], object.content);
   writer.writeDateTime(offsets[3], object.createdAt);
-  writer.writeBool(offsets[4], object.isPinned);
-  writer.writeDateTime(offsets[5], object.updatedAt);
+  writer.writeBool(offsets[4], object.done);
+  writer.writeDateTime(offsets[5], object.dueDate);
+  writer.writeBool(offsets[6], object.isPinned);
+  writer.writeString(offsets[7], object.priority.name);
+  writer.writeDateTime(offsets[8], object.updatedAt);
 }
 
 Memo _memoDeserialize(
@@ -97,9 +117,14 @@ Memo _memoDeserialize(
   object.colorValue = reader.readLong(offsets[1]);
   object.content = reader.readString(offsets[2]);
   object.createdAt = reader.readDateTime(offsets[3]);
+  object.done = reader.readBool(offsets[4]);
+  object.dueDate = reader.readDateTimeOrNull(offsets[5]);
   object.id = id;
-  object.isPinned = reader.readBool(offsets[4]);
-  object.updatedAt = reader.readDateTimeOrNull(offsets[5]);
+  object.isPinned = reader.readBool(offsets[6]);
+  object.priority =
+      _MemopriorityValueEnumMap[reader.readStringOrNull(offsets[7])] ??
+          TodoPriority.none;
+  object.updatedAt = reader.readDateTimeOrNull(offsets[8]);
   return object;
 }
 
@@ -122,10 +147,30 @@ P _memoDeserializeProp<P>(
       return (reader.readBool(offset)) as P;
     case 5:
       return (reader.readDateTimeOrNull(offset)) as P;
+    case 6:
+      return (reader.readBool(offset)) as P;
+    case 7:
+      return (_MemopriorityValueEnumMap[reader.readStringOrNull(offset)] ??
+          TodoPriority.none) as P;
+    case 8:
+      return (reader.readDateTimeOrNull(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
   }
 }
+
+const _MemopriorityEnumValueMap = {
+  r'none': r'none',
+  r'high': r'high',
+  r'medium': r'medium',
+  r'low': r'low',
+};
+const _MemopriorityValueEnumMap = {
+  r'none': TodoPriority.none,
+  r'high': TodoPriority.high,
+  r'medium': TodoPriority.medium,
+  r'low': TodoPriority.low,
+};
 
 Id _memoGetId(Memo object) {
   return object.id;
@@ -500,6 +545,84 @@ extension MemoQueryFilter on QueryBuilder<Memo, Memo, QFilterCondition> {
     });
   }
 
+  QueryBuilder<Memo, Memo, QAfterFilterCondition> doneEqualTo(bool value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'done',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Memo, Memo, QAfterFilterCondition> dueDateIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'dueDate',
+      ));
+    });
+  }
+
+  QueryBuilder<Memo, Memo, QAfterFilterCondition> dueDateIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'dueDate',
+      ));
+    });
+  }
+
+  QueryBuilder<Memo, Memo, QAfterFilterCondition> dueDateEqualTo(
+      DateTime? value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'dueDate',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Memo, Memo, QAfterFilterCondition> dueDateGreaterThan(
+    DateTime? value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'dueDate',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Memo, Memo, QAfterFilterCondition> dueDateLessThan(
+    DateTime? value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'dueDate',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Memo, Memo, QAfterFilterCondition> dueDateBetween(
+    DateTime? lower,
+    DateTime? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'dueDate',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
   QueryBuilder<Memo, Memo, QAfterFilterCondition> idEqualTo(Id value) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.equalTo(
@@ -557,6 +680,135 @@ extension MemoQueryFilter on QueryBuilder<Memo, Memo, QFilterCondition> {
       return query.addFilterCondition(FilterCondition.equalTo(
         property: r'isPinned',
         value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Memo, Memo, QAfterFilterCondition> priorityEqualTo(
+    TodoPriority value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'priority',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Memo, Memo, QAfterFilterCondition> priorityGreaterThan(
+    TodoPriority value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'priority',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Memo, Memo, QAfterFilterCondition> priorityLessThan(
+    TodoPriority value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'priority',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Memo, Memo, QAfterFilterCondition> priorityBetween(
+    TodoPriority lower,
+    TodoPriority upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'priority',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Memo, Memo, QAfterFilterCondition> priorityStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'priority',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Memo, Memo, QAfterFilterCondition> priorityEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'priority',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Memo, Memo, QAfterFilterCondition> priorityContains(String value,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'priority',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Memo, Memo, QAfterFilterCondition> priorityMatches(
+      String pattern,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'priority',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Memo, Memo, QAfterFilterCondition> priorityIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'priority',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<Memo, Memo, QAfterFilterCondition> priorityIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'priority',
+        value: '',
       ));
     });
   }
@@ -684,6 +936,30 @@ extension MemoQuerySortBy on QueryBuilder<Memo, Memo, QSortBy> {
     });
   }
 
+  QueryBuilder<Memo, Memo, QAfterSortBy> sortByDone() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'done', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Memo, Memo, QAfterSortBy> sortByDoneDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'done', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Memo, Memo, QAfterSortBy> sortByDueDate() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'dueDate', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Memo, Memo, QAfterSortBy> sortByDueDateDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'dueDate', Sort.desc);
+    });
+  }
+
   QueryBuilder<Memo, Memo, QAfterSortBy> sortByIsPinned() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'isPinned', Sort.asc);
@@ -693,6 +969,18 @@ extension MemoQuerySortBy on QueryBuilder<Memo, Memo, QSortBy> {
   QueryBuilder<Memo, Memo, QAfterSortBy> sortByIsPinnedDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'isPinned', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Memo, Memo, QAfterSortBy> sortByPriority() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'priority', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Memo, Memo, QAfterSortBy> sortByPriorityDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'priority', Sort.desc);
     });
   }
 
@@ -758,6 +1046,30 @@ extension MemoQuerySortThenBy on QueryBuilder<Memo, Memo, QSortThenBy> {
     });
   }
 
+  QueryBuilder<Memo, Memo, QAfterSortBy> thenByDone() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'done', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Memo, Memo, QAfterSortBy> thenByDoneDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'done', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Memo, Memo, QAfterSortBy> thenByDueDate() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'dueDate', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Memo, Memo, QAfterSortBy> thenByDueDateDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'dueDate', Sort.desc);
+    });
+  }
+
   QueryBuilder<Memo, Memo, QAfterSortBy> thenById() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'id', Sort.asc);
@@ -779,6 +1091,18 @@ extension MemoQuerySortThenBy on QueryBuilder<Memo, Memo, QSortThenBy> {
   QueryBuilder<Memo, Memo, QAfterSortBy> thenByIsPinnedDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'isPinned', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Memo, Memo, QAfterSortBy> thenByPriority() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'priority', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Memo, Memo, QAfterSortBy> thenByPriorityDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'priority', Sort.desc);
     });
   }
 
@@ -821,9 +1145,28 @@ extension MemoQueryWhereDistinct on QueryBuilder<Memo, Memo, QDistinct> {
     });
   }
 
+  QueryBuilder<Memo, Memo, QDistinct> distinctByDone() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'done');
+    });
+  }
+
+  QueryBuilder<Memo, Memo, QDistinct> distinctByDueDate() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'dueDate');
+    });
+  }
+
   QueryBuilder<Memo, Memo, QDistinct> distinctByIsPinned() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'isPinned');
+    });
+  }
+
+  QueryBuilder<Memo, Memo, QDistinct> distinctByPriority(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'priority', caseSensitive: caseSensitive);
     });
   }
 
@@ -865,9 +1208,27 @@ extension MemoQueryProperty on QueryBuilder<Memo, Memo, QQueryProperty> {
     });
   }
 
+  QueryBuilder<Memo, bool, QQueryOperations> doneProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'done');
+    });
+  }
+
+  QueryBuilder<Memo, DateTime?, QQueryOperations> dueDateProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'dueDate');
+    });
+  }
+
   QueryBuilder<Memo, bool, QQueryOperations> isPinnedProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'isPinned');
+    });
+  }
+
+  QueryBuilder<Memo, TodoPriority, QQueryOperations> priorityProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'priority');
     });
   }
 

@@ -2,6 +2,9 @@ import 'package:isar/isar.dart';
 
 part 'memo.g.dart';
 
+/// 待办优先级
+enum TodoPriority { none, high, medium, low }
+
 /// 备忘录条目
 ///
 /// 承载情侣双方的日常记录：情话、计划、回忆、待办等。
@@ -27,4 +30,14 @@ class Memo {
 
   /// 最后修改时间（null = 未修改过）
   DateTime? updatedAt;
+
+  /// 完成状态（待办场景使用，默认 false）
+  late bool done;
+
+  /// 截止日期（可选，待办场景使用；null = 无截止）
+  DateTime? dueDate;
+
+  /// 优先级（待办场景使用，默认 none）
+  @Enumerated(EnumType.name)
+  late TodoPriority priority;
 }
