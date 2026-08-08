@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../app/theme/app_colors.dart';
+import '../../data/providers/data_providers.dart';
 import '../../features/home/presentation/home_page.dart';
 import '../../features/album/presentation/album_page.dart';
 import '../../features/wishes/presentation/wishes_page.dart';

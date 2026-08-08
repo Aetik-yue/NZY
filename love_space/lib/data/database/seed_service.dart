@@ -3,6 +3,7 @@ import '../../core/constants/seed_data.dart';
 import '../../data/models/timeline_event.dart';
 import '../../data/models/check_in.dart';
 import '../../data/models/app_settings.dart';
+import '../../data/models/anniversary.dart';
 import '../../data/models/novel_source.dart';
 import '../../data/models/memo.dart';
 import '../repositories/crawl_config_repository.dart';
@@ -31,6 +32,16 @@ class SeedService {
 
       // 打卡
       await _isar.checkIns.putAll(Seed.checkIns());
+
+      // 纪念日：在一起（与设置里的起始日一致，保证首页倒数卡开箱即有内容）
+      await _isar.anniversarys.put(Anniversary()
+        ..title = '我们在一起'
+        ..date = Seed.togetherSince
+        ..note = '故事的开始'
+        ..colorValue = 0xFFFF6B9D
+        ..remindEnabled = true
+        ..remindDays = 3
+        ..createdAt = DateTime.now());
 
       // 备忘录种子数据
       await _isar.memos.putAll([

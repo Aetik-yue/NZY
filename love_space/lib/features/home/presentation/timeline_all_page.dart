@@ -6,10 +6,12 @@ import '../../../data/models/timeline_event.dart';
 import '../../../data/providers/data_providers.dart';
 import '../../../shared/widgets/app_snackbar.dart';
 import '../../../shared/widgets/confirm_dialog.dart';
+import 'widgets/add_timeline_sheet.dart';
+import 'widgets/timeline_detail_sheet.dart';
 
 /// 时光线全量页（二级页）
 ///
-/// 按年月分组展示全部时光事件，长按可删除（确认 + 撤销）。
+/// 按年月分组展示全部时光事件，长按可编辑/删除（确认 + 撤销）。
 class TimelineAllPage extends ConsumerWidget {
   const TimelineAllPage({super.key});
 
@@ -43,7 +45,12 @@ class TimelineAllPage extends ConsumerWidget {
                 Text(group.label, style: AppTextStyles.titleSmall),
                 const SizedBox(height: 12),
                 for (final event in group.events) ...[
-                  _TimelineRow(event: event, onDelete: () => _delete(context, ref, event)),
+                  _TimelineRow(
+                    event: event,
+                    onTap: () =>
+                        TimelineDetailSheet.show(context, event: event),
+                    onLongPress: () => _showActions(context, ref, event),
+                  ),
                   const SizedBox(height: 16),
                 ],
               ],
@@ -70,6 +77,48 @@ class TimelineAllPage extends ConsumerWidget {
         .toList();
   }
 
+  /// 长按操作单：编辑 / 删除（与首页时光线交互一致）
+  Future<void> _showActions(
+    BuildContext context,
+    WidgetRef ref,
+    TimelineEvent event,
+  ) async {
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 8),
+            ListTile(
+              leading: const Icon(Icons.edit_outlined,
+                  color: AppColors.textSecondary),
+              title: const Text('编辑'),
+              onTap: () => Navigator.of(ctx).pop('edit'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete_outline,
+                  color: AppColors.accentRose),
+              title: const Text('删除'),
+              onTap: () => Navigator.of(ctx).pop('delete'),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (!context.mounted) return;
+    switch (action) {
+      case 'edit':
+        await AddTimelineSheet.show(context, initial: event);
+      case 'delete':
+        await _delete(context, ref, event);
+    }
+  }
+
   Future<void> _delete(
     BuildContext context,
     WidgetRef ref,
@@ -80,11 +129,20 @@ class TimelineAllPage extends ConsumerWidget {
       content: '确定要删除这条时光记录吗？',
     );
     if (!confirmed || !context.mounted) return;
-    await ref.read(timelineRepositoryProvider).delete(event.id);
-    if (!context.mounted) return;
-    AppSnackbar.showUndo(context, '时光已删除', () async {
-      await ref.read(timelineRepositoryProvider).add(event);
-    });
+    try {
+      await ref.read(timelineRepositoryProvider).delete(event.id);
+      if (!context.mounted) return;
+      AppSnackbar.showUndo(context, '时光已删除', () async {
+        try {
+          await ref.read(timelineRepositoryProvider).add(event);
+        } catch (e) {
+          debugPrint('[TimelineAllPage] 撤销删除失败: $e');
+        }
+      });
+    } catch (e) {
+      debugPrint('[TimelineAllPage] 删除失败: $e');
+      if (context.mounted) AppSnackbar.show(context, '删除失败，请重试');
+    }
   }
 }
 
@@ -98,14 +156,20 @@ class _MonthGroup {
 /// 单条时光行
 class _TimelineRow extends StatelessWidget {
   final TimelineEvent event;
-  final VoidCallback onDelete;
+  final VoidCallback onTap;
+  final VoidCallback onLongPress;
 
-  const _TimelineRow({required this.event, required this.onDelete});
+  const _TimelineRow({
+    required this.event,
+    required this.onTap,
+    required this.onLongPress,
+  });
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onLongPress: onDelete,
+      onTap: onTap,
+      onLongPress: onLongPress,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../app/theme/app_colors.dart';
 import '../../app/theme/app_text_styles.dart';
+import '../../data/providers/data_providers.dart';
 
 /// 底部导航 Tab 定义
 enum NavTab { home, album, wishes, novel, profile }
@@ -28,8 +29,7 @@ extension NavTabX on NavTab {
   }
 }
 
-/// 当前激活 Tab 状态
-final currentTabProvider = StateProvider<NavTab>((ref) => NavTab.home);
+/// 当前激活 Tab 状态（定义在 data_providers.dart，遵循 Provider 集中规范）
 
 /// 胶囊式底部导航栏
 /// 还原设计稿：悬浮胶囊，36px 圆角，激活态粉色渐变

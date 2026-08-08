@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_text_styles.dart';
@@ -6,12 +6,12 @@ import '../../../../data/models/timeline_event.dart';
 import '../../../../data/providers/data_providers.dart';
 import '../../../../shared/widgets/app_snackbar.dart';
 
-/// 预设颜色
+/// 预设颜色（与设计令牌保持一致）
 const _presetColors = [
-  Color(0xFFFF6B9D),
-  Color(0xFFFF8FB1),
-  Color(0xFFFFB5A1),
-  Color(0xFFB57DBA),
+  AppColors.accentRose,
+  AppColors.accentPink,
+  AppColors.accentCoral,
+  AppColors.accentMauve,
 ];
 
 /// 添加/编辑时间轴事件的底部弹出表单
@@ -27,7 +27,7 @@ class AddTimelineSheet extends ConsumerStatefulWidget {
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppColors.radiusCard)),
       ),
       builder: (_) => AddTimelineSheet(initial: initial),
     );
@@ -118,7 +118,8 @@ class _AddTimelineSheetState extends ConsumerState<AddTimelineSheet> {
         Navigator.of(context).pop();
         AppSnackbar.show(context, _isEditing ? '时光已更新 💕' : '时光已记录 💕');
       }
-    } catch (_) {
+    } catch (e) {
+      debugPrint('[AddTimelineSheet] 保存失败: $e');
       if (mounted) {
         AppSnackbar.show(context, '保存失败，请重试');
       }
@@ -161,7 +162,7 @@ class _AddTimelineSheetState extends ConsumerState<AddTimelineSheet> {
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                   decoration: BoxDecoration(
                     border: Border.all(color: AppColors.borderSoft),
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(AppColors.radiusSm),
                   ),
                   child: Row(
                     children: [
@@ -185,10 +186,10 @@ class _AddTimelineSheetState extends ConsumerState<AddTimelineSheet> {
                   labelText: '标题',
                   hintText: '例如：第一次旅行',
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(AppColors.radiusSm),
                   ),
                   focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(AppColors.radiusSm),
                     borderSide: const BorderSide(color: AppColors.accentRose),
                   ),
                 ),
@@ -203,10 +204,10 @@ class _AddTimelineSheetState extends ConsumerState<AddTimelineSheet> {
                   labelText: '描述（可选）',
                   hintText: '记录这个美好的时刻...',
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(AppColors.radiusSm),
                   ),
                   focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(AppColors.radiusSm),
                     borderSide: const BorderSide(color: AppColors.accentRose),
                   ),
                 ),
@@ -253,7 +254,7 @@ class _AddTimelineSheetState extends ConsumerState<AddTimelineSheet> {
                   style: FilledButton.styleFrom(
                     backgroundColor: AppColors.accentRose,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(AppColors.radiusSm),
                     ),
                   ),
                   child: _isSubmitting
@@ -265,7 +266,8 @@ class _AddTimelineSheetState extends ConsumerState<AddTimelineSheet> {
                             color: Colors.white,
                           ),
                         )
-                      : const Text('保存', style: TextStyle(fontSize: 16)),
+                      : Text('保存',
+                          style: AppTextStyles.onPink.copyWith(fontSize: 16)),
                 ),
               ),
             ],

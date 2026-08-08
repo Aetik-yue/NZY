@@ -5,6 +5,7 @@ import '../models/timeline_event.dart';
 import '../models/album_photo.dart';
 import '../models/check_in.dart';
 import '../models/app_settings.dart';
+import '../models/anniversary.dart';
 import '../models/novel.dart';
 import '../models/novel_chapter.dart';
 import '../models/reader_settings.dart';
@@ -28,6 +29,7 @@ const isarSchemas = [
   AlbumPhotoSchema,
   CheckInSchema,
   AppSettingsSchema,
+  AnniversarySchema,
   NovelSchema,
   NovelChapterSchema,
   ReaderSettingsSchema,

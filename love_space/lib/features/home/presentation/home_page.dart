@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_text_styles.dart';
+import '../../../core/utils/anniversary_utils.dart';
 import '../../../core/utils/date_utils.dart';
 import '../../../data/models/check_in.dart';
 import '../../../shared/widgets/section_header.dart';
@@ -9,8 +10,11 @@ import '../../../shared/widgets/app_snackbar.dart';
 import '../../../shared/widgets/confirm_dialog.dart';
 import '../../../data/providers/data_providers.dart';
 import '../../../shared/widgets/pill_nav_bar.dart';
+import '../../anniversary/presentation/anniversary_page.dart';
 import '../../music/presentation/music_player_page.dart';
+import '../../profile/presentation/all_features_page.dart';
 import 'widgets/add_timeline_sheet.dart';
+import 'widgets/timeline_detail_sheet.dart';
 import 'checkin_history_page.dart';
 import 'timeline_all_page.dart';
 
@@ -29,6 +33,8 @@ class HomePage extends ConsumerWidget {
           _GreetingHeader(),
           SizedBox(height: 20),
           _AnniversaryHeroCard(),
+          SizedBox(height: 14),
+          _NextAnniversaryCard(),
           SizedBox(height: 20),
           _CheckinCard(),
           SizedBox(height: 20),
@@ -76,7 +82,7 @@ class _CoupleAvatars extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const SizedBox(
+    return SizedBox(
       width: 68,
       height: 48,
       child: Stack(
@@ -84,18 +90,10 @@ class _CoupleAvatars extends StatelessWidget {
           // 女友头像（右）
           Positioned(
             left: 24,
-            child: _Avatar(
-              gradient: LinearGradient(
-                colors: [Color(0xFFFFB5CC), Color(0xFFFF8FB1)],
-              ),
-            ),
+            child: _Avatar(gradient: AppColors.avatarGradients[0]),
           ),
           // 我的头像（左）
-          _Avatar(
-            gradient: LinearGradient(
-              colors: [Color(0xFFFFD1BF), Color(0xFFFFA1A1)],
-            ),
-          ),
+          _Avatar(gradient: AppColors.avatarGradients[1]),
         ],
       ),
     );
@@ -130,66 +128,200 @@ String _heroSubtitle(int days) {
   return '超越一年的爱，历久弥新';
 }
 
-/// 纪念日主卡片（渐变粉 + 装饰爱心）
+/// 纪念日主卡片（渐变粉 + 装饰爱心），点击进入纪念日管理
 class _AnniversaryHeroCard extends ConsumerWidget {
   const _AnniversaryHeroCard();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final days = ref.watch(daysTogetherProvider);
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        gradient: AppColors.heroGradient,
-        borderRadius: BorderRadius.circular(28),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x40FF6B8F),
-            blurRadius: 32,
-            offset: Offset(0, 12),
-            spreadRadius: -8,
-          ),
-        ],
+    return GestureDetector(
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const AnniversaryPage()),
       ),
-      child: Stack(
-        children: [
-          // 装饰爱心（右上角）
-          const Positioned(
-            right: 0,
-            top: 0,
-            child: Opacity(
-              opacity: 0.25,
-              child: Icon(Icons.favorite, size: 110, color: Colors.white),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          gradient: AppColors.heroGradient,
+          borderRadius: BorderRadius.circular(AppColors.radiusCard),
+          boxShadow: const [
+            BoxShadow(
+              color: AppColors.shadowPinkHero,
+              blurRadius: 32,
+              offset: Offset(0, 12),
+              spreadRadius: -8,
             ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text('我们在一起', style: AppTextStyles.onPink.copyWith(fontSize: 15)),
-              const SizedBox(height: 6),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.baseline,
-                textBaseline: TextBaseline.alphabetic,
+          ],
+        ),
+        child: Stack(
+          children: [
+            // 装饰爱心（右上角）
+            const Positioned(
+              right: 0,
+              top: 0,
+              child: Opacity(
+                opacity: 0.25,
+                child: Icon(Icons.favorite, size: 110, color: Colors.white),
+              ),
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('我们在一起', style: AppTextStyles.onPink.copyWith(fontSize: 15)),
+                const SizedBox(height: 6),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                  textBaseline: TextBaseline.alphabetic,
+                  children: [
+                    Text('$days', style: AppTextStyles.heroNumber),
+                    const SizedBox(width: 4),
+                    Text('天',
+                        style: AppTextStyles.onPink.copyWith(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w700,
+                        )),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(_heroSubtitle(days),
+                    style: AppTextStyles.onPink.copyWith(fontSize: 13).copyWith(
+                          color: Colors.white.withValues(alpha: 0.85),
+                        )),
+              ],
+            ),
+            // 管理入口提示
+            Positioned(
+              right: 14,
+              bottom: 0,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text('$days', style: AppTextStyles.heroNumber),
-                  const SizedBox(width: 4),
-                  Text('天',
+                  Text('纪念日',
                       style: AppTextStyles.onPink.copyWith(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
                       )),
+                  const Icon(Icons.chevron_right_rounded,
+                      size: 16, color: Colors.white),
                 ],
               ),
-              const SizedBox(height: 6),
-              Text(_heroSubtitle(days),
-                  style: AppTextStyles.onPink.copyWith(fontSize: 13).copyWith(
-                        color: Colors.white.withValues(alpha: 0.85),
-                      )),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 下一个纪念日倒数卡（点击进入纪念日管理）
+class _NextAnniversaryCard extends ConsumerWidget {
+  const _NextAnniversaryCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final next = ref.watch(nextAnniversaryProvider);
+    final upcoming = ref.watch(upcomingAnniversaryProvider);
+
+    // 无纪念日：引导添加
+    if (next == null) {
+      return GestureDetector(
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const AnniversaryPage()),
+        ),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: AppColors.bgCard,
+            borderRadius: BorderRadius.circular(AppColors.radiusSm),
+            border: Border.all(color: AppColors.borderSoft),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.favorite_border_rounded,
+                  size: 18, color: AppColors.accentRose),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text('添加纪念日，不错过每个特别的日子',
+                    style: AppTextStyles.bodySmall),
+              ),
+              const Icon(Icons.chevron_right_rounded,
+                  size: 18, color: AppColors.textTertiary),
             ],
           ),
-        ],
+        ),
+      );
+    }
+
+    // 即将到来（7 天内）用强调样式
+    final days = AnniversaryUtils.daysUntil(next.date, DateUtilsX.today());
+    final isUpcoming = upcoming != null && upcoming.id == next.id;
+    final countdown = AnniversaryUtils.countdownText(days);
+    final years = AnniversaryUtils.anniversaryYearsOf(next.date, DateUtilsX.today());
+
+    return GestureDetector(
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const AnniversaryPage()),
+      ),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          gradient: isUpcoming ? AppColors.pinkButtonGradient : null,
+          color: isUpcoming ? null : AppColors.bgCard,
+          borderRadius: BorderRadius.circular(AppColors.radiusSm),
+          border: isUpcoming
+              ? null
+              : Border.all(color: AppColors.borderSoft),
+          boxShadow: isUpcoming
+              ? const [
+                  BoxShadow(
+                    color: AppColors.shadowPinkStrong,
+                    blurRadius: 16,
+                    offset: Offset(0, 6),
+                    spreadRadius: -4,
+                  ),
+                ]
+              : null,
+        ),
+        child: Row(
+          children: [
+            Icon(
+              days == 0 ? Icons.celebration_rounded : Icons.favorite_rounded,
+              size: 20,
+              color: isUpcoming ? Colors.white : AppColors.accentRose,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    isUpcoming ? '即将到来：${next.title}' : '下一个纪念日：${next.title}',
+                    style: (isUpcoming
+                            ? AppTextStyles.onPink
+                            : AppTextStyles.body)
+                        .copyWith(fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    years != null && years > 0 && days != 0
+                        ? '$countdown · ${years + 1} 周年'
+                        : countdown,
+                    style: isUpcoming
+                        ? AppTextStyles.onPink.copyWith(fontSize: 12)
+                        : AppTextStyles.label,
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right_rounded,
+                size: 18,
+                color: isUpcoming ? Colors.white : AppColors.textTertiary),
+          ],
+        ),
       ),
     );
   }
@@ -309,7 +441,7 @@ class _CheckinCardState extends ConsumerState<_CheckinCard> {
                     : null,
                 boxShadow: const [
                   BoxShadow(
-                    color: Color(0x66FF6B9D),
+                    color: AppColors.shadowPinkDeep,
                     blurRadius: 16,
                     offset: Offset(0, 6),
                     spreadRadius: -2,
@@ -340,7 +472,10 @@ class _CheckinCardState extends ConsumerState<_CheckinCard> {
   }
 }
 
-/// 快捷功能入口（相册/愿望/音乐/小说）
+/// 快捷功能入口（相册/愿望/音乐/小说/更多）
+///
+/// 横向可滚动宫格：新功能只需在 [_QuickActions.build] 的列表里加一项，
+/// 无需改动 Tab 结构。
 class _QuickActions extends ConsumerWidget {
   const _QuickActions();
 
@@ -372,34 +507,61 @@ class _QuickActions extends ConsumerWidget {
         bg: AppColors.accentPinkSoft,
         onTap: () => ref.read(currentTabProvider.notifier).state = NavTab.novel,
       ),
+      _QuickAction(
+        icon: Icons.favorite_rounded,
+        label: '纪念日',
+        bg: AppColors.accentPinkSoft,
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const AnniversaryPage()),
+        ),
+      ),
+      // 「更多」固定收尾：跳转全部功能页，承载后续新增的低频功能
+      _QuickAction(
+        icon: Icons.apps_rounded,
+        label: '全部功能',
+        bg: AppColors.bgBlush,
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const AllFeaturesPage()),
+        ),
+      ),
     ];
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: actions
-          .map((a) => SizedBox(
-                width: 76,
-                child: GestureDetector(
-                  onTap: a.onTap,
-                  behavior: HitTestBehavior.opaque,
-                  child: Column(
-                    children: [
-                      Container(
-                        width: 56,
-                        height: 56,
-                        decoration: BoxDecoration(
-                          color: a.bg,
-                          borderRadius: BorderRadius.circular(18),
-                        ),
-                        child:
-                            Icon(a.icon, color: AppColors.accentRose, size: 26),
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      physics: const BouncingScrollPhysics(),
+      child: Row(
+        children: actions
+            .map((a) => Padding(
+                  padding: const EdgeInsets.only(right: 18),
+                  child: SizedBox(
+                    width: 64,
+                    child: GestureDetector(
+                      onTap: a.onTap,
+                      behavior: HitTestBehavior.opaque,
+                      child: Column(
+                        children: [
+                          Container(
+                            width: 56,
+                            height: 56,
+                            decoration: BoxDecoration(
+                              color: a.bg,
+                              borderRadius:
+                                  BorderRadius.circular(AppColors.radiusMd),
+                            ),
+                            child: Icon(a.icon,
+                                color: AppColors.accentRose, size: 26),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(a.label,
+                              style: AppTextStyles.caption,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis),
+                        ],
                       ),
-                      const SizedBox(height: 8),
-                      Text(a.label, style: AppTextStyles.caption),
-                    ],
+                    ),
                   ),
-                ),
-              ))
-          .toList(),
+                ))
+            .toList(),
+      ),
     );
   }
 }
@@ -483,9 +645,9 @@ class _TimelineSection extends ConsumerWidget {
                   ),
                 );
               }
-              // 首页只展示最新 5 条，其余进全量页
+              // 首页只展示最新 3 条，其余进全量页
               final visible =
-                  events.length > 5 ? events.sublist(0, 5) : events;
+                  events.length > 3 ? events.sublist(0, 3) : events;
               return Column(
                 children: [
                   for (var i = 0; i < visible.length; i++) ...[
@@ -496,6 +658,10 @@ class _TimelineSection extends ConsumerWidget {
                       desc: visible[i].description,
                       dotColor: Color(visible[i].dotColorValue),
                       showLine: i < visible.length - 1,
+                      onTap: () => TimelineDetailSheet.show(
+                        context,
+                        event: visible[i],
+                      ),
                       onEdit: () =>
                           AddTimelineSheet.show(context, initial: visible[i]),
                       onDelete: () async {
@@ -503,17 +669,26 @@ class _TimelineSection extends ConsumerWidget {
                           context,
                           content: '确定要删除这条时光记录吗？',
                         );
-                        if (confirmed && context.mounted) {
+                        if (!confirmed || !context.mounted) return;
+                        try {
                           final eventToDelete = visible[i];
                           await ref
                               .read(timelineRepositoryProvider)
-                              .delete(visible[i].id);
-                          if (context.mounted) {
-                            AppSnackbar.showUndo(context, '时光已删除', () async {
+                              .delete(eventToDelete.id);
+                          if (!context.mounted) return;
+                          AppSnackbar.showUndo(context, '时光已删除', () async {
+                            try {
                               await ref
                                   .read(timelineRepositoryProvider)
                                   .add(eventToDelete);
-                            });
+                            } catch (e) {
+                              debugPrint('[HomePage] 撤销删除失败: $e');
+                            }
+                          });
+                        } catch (e) {
+                          debugPrint('[HomePage] 删除失败: $e');
+                          if (context.mounted) {
+                            AppSnackbar.show(context, '删除失败，请重试');
                           }
                         }
                       },
@@ -565,6 +740,7 @@ class _TimelineItem extends StatelessWidget {
   final String desc;
   final Color dotColor;
   final bool showLine;
+  final VoidCallback? onTap;
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
 
@@ -574,6 +750,7 @@ class _TimelineItem extends StatelessWidget {
     required this.desc,
     required this.dotColor,
     required this.showLine,
+    this.onTap,
     this.onEdit,
     this.onDelete,
   });
@@ -617,6 +794,7 @@ class _TimelineItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
+      onTap: onTap,
       onLongPress: onDelete == null && onEdit == null
           ? null
           : () => _showActions(context),

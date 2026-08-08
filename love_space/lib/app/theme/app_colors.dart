@@ -46,6 +46,14 @@ class AppColors {
   // ──────── 阴影 ────────
   /// 粉色阴影 rgba(255,107,143,0.12)
   static const shadowPink = Color(0x1FFF6B8F);
+  /// 中粉色阴影 rgba(255,107,143,0.20)（渐变卡片）
+  static const shadowPinkMedium = Color(0x33FF6B8F);
+  /// 纪念日主卡阴影 rgba(255,107,143,0.25)
+  static const shadowPinkHero = Color(0x40FF6B8F);
+  /// 强粉色阴影 rgba(255,107,157,0.35)（圆形悬浮按钮）
+  static const shadowPinkStrong = Color(0x59FF6B9D);
+  /// 打卡按钮阴影 rgba(255,107,157,0.40)
+  static const shadowPinkDeep = Color(0x66FF6B9D);
   /// 卡片阴影 rgba(80,43,57,0.06)
   static const shadowCard = Color(0x0F502B39);
 
@@ -56,6 +64,12 @@ class AppColors {
     end: Alignment.bottomRight,
     colors: [Color(0xFFFF8FB1), Color(0xFFFFB5CC), Color(0xFFFFD1BF)],
   );
+
+  /// 情侣头像渐变组（首页顶部重叠头像）
+  static const avatarGradients = <LinearGradient>[
+    LinearGradient(colors: [Color(0xFFFFB5CC), Color(0xFFFF8FB1)]), // 女友头像
+    LinearGradient(colors: [Color(0xFFFFD1BF), Color(0xFFFFA1A1)]), // 我的头像
+  ];
 
   /// 粉色按钮渐变（柔粉 → 玫瑰粉）
   static const pinkButtonGradient = LinearGradient(
@@ -86,6 +100,15 @@ class AppColors {
     LinearGradient(colors: [Color(0xFFFF8FB1), Color(0xFFFF6B9D)]),
   ];
 
+  /// 小说封面色板（按书名哈希取色占位，见 CrawlRepository）
+  static const coverPalette = <Color>[
+    accentRose,
+    accentPink,
+    accentCoral,
+    accentPeach,
+    accentMauve,
+  ];
+
   // ──────── 圆角（Primitives）────────
   static const radiusCard = 24.0;
   static const radiusButton = 50.0;
@@ -94,6 +117,8 @@ class AppColors {
   static const radiusXs = 8.0;
   static const radiusPill = 26.0;
   static const radiusTab = 36.0;
+  /// 底部弹窗/操作单圆角 20
+  static const radiusSheet = 20.0;
 
   // ──────── 阅读器背景主题 ────────
   /// 阅读器背景·白 #FFFFFF

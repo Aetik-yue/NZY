@@ -1,10 +1,12 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../shared/widgets/pill_nav_bar.dart';
 import '../database/isar_provider.dart';
 import '../repositories/wish_repository.dart';
 import '../repositories/timeline_repository.dart';
 import '../repositories/album_repository.dart';
 import '../repositories/checkin_repository.dart';
 import '../repositories/settings_repository.dart';
+import '../repositories/anniversary_repository.dart';
 import '../repositories/novel_repository.dart';
 import '../repositories/novel_chapter_repository.dart';
 import '../repositories/reader_settings_repository.dart';
@@ -17,10 +19,12 @@ import '../../core/utils/greeting.dart';
 import '../../core/utils/date_utils.dart';
 import '../../core/utils/streak.dart';
 import '../../core/utils/tag_utils.dart';
+import '../../core/utils/anniversary_utils.dart';
 import '../../core/constants/seed_data.dart';
 import '../models/wish.dart';
 import '../models/timeline_event.dart';
 import '../models/app_settings.dart';
+import '../models/anniversary.dart';
 import '../models/check_in.dart';
 import '../models/album_photo.dart';
 import '../models/novel.dart';
@@ -34,6 +38,9 @@ import '../models/memo.dart';
 // ═══════════════════════════════════════════════════════════════
 // Repository providers（依赖 isarProvider）
 // ═══════════════════════════════════════════════════════════════
+
+/// 当前激活的底部 Tab（驱动 MainShell 的 IndexedStack 切换）
+final currentTabProvider = StateProvider<NavTab>((ref) => NavTab.home);
 
 final wishRepositoryProvider = Provider((ref) =>
     WishRepository(ref.watch(isarProvider)));
@@ -49,6 +56,9 @@ final checkinRepositoryProvider = Provider((ref) =>
 
 final settingsRepositoryProvider = Provider((ref) =>
     SettingsRepository(ref.watch(isarProvider)));
+
+final anniversaryRepositoryProvider = Provider((ref) =>
+    AnniversaryRepository(ref.watch(isarProvider)));
 
 // ═══════════════════════════════════════════════════════════════
 // Data stream providers（监听数据库变化）
@@ -72,6 +82,28 @@ final checkinsProvider = StreamProvider<List<CheckIn>>((ref) =>
     ref.watch(checkinRepositoryProvider).watchAll());
 
 // ═══════════════════════════════════════════════════════════════
+// 纪念日模块 providers（多节点管理 + 首页倒数）
+// ═══════════════════════════════════════════════════════════════
+
+/// 所有纪念日（实时流，按日期升序）
+final anniversariesProvider = StreamProvider<List<Anniversary>>((ref) =>
+    ref.watch(anniversaryRepositoryProvider).watchAll());
+
+/// 距今天最近的下一个纪念日（含今天当天），无数据返回 null
+final nextAnniversaryProvider = Provider<Anniversary?>((ref) {
+  final items = ref.watch(anniversariesProvider).valueOrNull;
+  if (items == null || items.isEmpty) return null;
+  return AnniversaryUtils.nextFrom(items, DateUtilsX.today());
+});
+
+/// 即将到来的纪念日（今天起 7 天内，用于首页提前提醒提示）
+final upcomingAnniversaryProvider = Provider<Anniversary?>((ref) {
+  final items = ref.watch(anniversariesProvider).valueOrNull;
+  if (items == null || items.isEmpty) return null;
+  return AnniversaryUtils.upcomingWithin(items, DateUtilsX.today());
+});
+
+// ═══════════════════════════════════════════════════════════════
 // Derived / computed providers（跨页一致性的单一数据源）
 // ═══════════════════════════════════════════════════════════════
 
@@ -79,10 +111,12 @@ final checkinsProvider = StreamProvider<List<CheckIn>>((ref) =>
 final clockProvider = StreamProvider<DateTime>((ref) =>
     Stream.periodic(const Duration(minutes: 1), (_) => DateTime.now()));
 
-/// 问候语
+/// 问候语（特殊节点优先：在一起周年 / 阳历节日，否则按时段）
 final greetingProvider = Provider<String>((ref) {
   ref.watch(clockProvider);
-  return Greeting.now();
+  final settings = ref.watch(appSettingsProvider).valueOrNull;
+  return Greeting.special(DateTime.now(), settings?.togetherSince) ??
+      Greeting.now();
 });
 
 /// 在一起天数（第 1 天起，边界归一化）
@@ -245,14 +279,18 @@ final crawlLogRepositoryProvider = Provider((ref) =>
     CrawlLogRepository(ref.watch(isarProvider)));
 
 /// 爬取协调器（依赖其他 4 个 repository）
-final crawlRepositoryProvider = Provider((ref) =>
-    CrawlRepository(
-      novelRepository: ref.watch(novelRepositoryProvider),
-      novelChapterRepository: ref.watch(novelChapterRepositoryProvider),
-      sourceRepository: ref.watch(novelSourceRepositoryProvider),
-      configRepository: ref.watch(crawlConfigRepositoryProvider),
-      logRepository: ref.watch(crawlLogRepositoryProvider),
-    ));
+final crawlRepositoryProvider = Provider<CrawlRepository>((ref) {
+  final repo = CrawlRepository(
+    novelRepository: ref.watch(novelRepositoryProvider),
+    novelChapterRepository: ref.watch(novelChapterRepositoryProvider),
+    sourceRepository: ref.watch(novelSourceRepositoryProvider),
+    configRepository: ref.watch(crawlConfigRepositoryProvider),
+    logRepository: ref.watch(crawlLogRepositoryProvider),
+  );
+  // 应用退出时释放底层 HTTP 连接
+  ref.onDispose(repo.dispose);
+  return repo;
+});
 
 /// 所有爬取源
 final novelSourcesProvider = StreamProvider<List<NovelSource>>((ref) =>

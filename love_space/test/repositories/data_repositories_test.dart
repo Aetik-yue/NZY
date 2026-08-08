@@ -13,6 +13,7 @@ import 'package:love_space/data/models/timeline_event.dart';
 import 'package:love_space/data/models/album_photo.dart';
 import 'package:love_space/data/models/check_in.dart';
 import 'package:love_space/data/models/app_settings.dart';
+import 'package:love_space/data/models/anniversary.dart';
 import 'package:love_space/data/models/novel.dart';
 import 'package:love_space/data/models/novel_chapter.dart';
 import 'package:love_space/data/models/reader_settings.dart';
@@ -26,6 +27,7 @@ import 'package:love_space/data/repositories/memo_repository.dart';
 import 'package:love_space/data/repositories/album_repository.dart';
 import 'package:love_space/data/repositories/crawl_config_repository.dart';
 import 'package:love_space/data/repositories/reader_settings_repository.dart';
+import 'package:love_space/data/repositories/anniversary_repository.dart';
 import 'package:love_space/data/repositories/novel_repository.dart';
 import 'package:love_space/data/repositories/novel_chapter_repository.dart';
 
@@ -38,6 +40,7 @@ Future<Isar> _openTestIsar() {
       AlbumPhotoSchema,
       CheckInSchema,
       AppSettingsSchema,
+      AnniversarySchema,
       NovelSchema,
       NovelChapterSchema,
       ReaderSettingsSchema,
@@ -335,6 +338,42 @@ void main() {
 
       expect(await repo.getById(partial.id), isNull);
       expect(await repo.getById(builtin.id), isNotNull);
+    });
+  });
+
+  group('AnniversaryRepository', () {
+    test('add/update/delete 与日期排序', () async {
+      if (!isarOpened) {
+        markTestSkipped('Isar 原生库不可用，跳过数据层测试');
+        return;
+      }
+      final repo = AnniversaryRepository(isar);
+
+      final late = Anniversary()
+        ..title = '圣诞节'
+        ..date = DateTime(2024, 12, 25)
+        ..createdAt = DateTime.now();
+      final early = Anniversary()
+        ..title = '生日'
+        ..date = DateTime(2024, 3, 1)
+        ..createdAt = DateTime.now();
+      await repo.add(late);
+      await repo.add(early);
+
+      // 按日期升序
+      final all = await repo.getAll();
+      expect(all.length, 2);
+      expect(all.first.title, '生日');
+
+      // 编辑
+      early.title = '你的生日';
+      await repo.update(early);
+      final updated = await repo.getById(early.id);
+      expect(updated!.title, '你的生日');
+
+      // 删除
+      await repo.delete(early.id);
+      expect(await repo.getAll(), hasLength(1));
     });
   });
 }
