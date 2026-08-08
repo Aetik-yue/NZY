@@ -143,6 +143,10 @@ class _EqualizerBarsState extends State<_EqualizerBars>
     );
     if (widget.playing) {
       _ctrl.repeat(reverse: true);
+    } else {
+      // 首屏暂停态静止在中间高度，与 didUpdateWidget 暂停分支对称，
+      // 避免默认 value=0 时中间条满高（14px 灰色）形似"仍在播放"
+      _ctrl.value = 0.5;
     }
     _a = Tween(begin: 0.3, end: 1.0)
         .animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));

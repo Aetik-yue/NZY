@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -65,6 +66,25 @@ ProviderContainer _containerWith(ControllableBackend backend) {
   return ProviderContainer(overrides: [
     audioBackendProvider.overrideWithValue(backend),
   ]);
+}
+
+/// 脚本化 Random：按预设序列循环返回 nextInt，用于确定性验证 shuffle 真实按
+/// randomProvider 分派（可检出 shuffle 被误实现为顺序 (idx+1)%len 的回归）。
+/// 不引入 mockito 依赖，手写最小 Random 实现。
+class _ScriptedRandom implements Random {
+  _ScriptedRandom(this.sequence);
+  final List<int> sequence;
+  int _i = 0;
+  @override
+  int nextInt(int max) {
+    final v = sequence[_i % sequence.length];
+    _i++;
+    return v % max;
+  }
+  @override
+  bool nextBool() => false;
+  @override
+  double nextDouble() => 0;
 }
 
 void main() {
@@ -425,5 +445,97 @@ void main() {
     expect(state.isLoading, false);
     expect(state.isPlaying, true); // 已继续播放
     expect(backend.playedUrls, isNot(contains('file:///song2.mp3')));
+  });
+
+  test('shuffle 的 next 按 musicRandomProvider 序列分派（确定性验证，可检测顺序回归）', () async {
+    // override musicRandomProvider 用脚本序列：若 shuffle 被误实现为顺序 (idx+1)%len，
+    // 断言（期望 2/0/3）会失败（顺序实现会给 1/2/3），从而检出回归
+    final backend = ControllableBackend();
+    final container = ProviderContainer(overrides: [
+      audioBackendProvider.overrideWithValue(backend),
+      musicRandomProvider.overrideWithValue(_ScriptedRandom([2, 0, 3])),
+    ]);
+    addTearDown(container.dispose);
+    addTearDown(backend.dispose);
+
+    final ctrl = container.read(musicPlayerProvider.notifier);
+    ctrl.setPlaylist([_song(1), _song(2), _song(3), _song(4)]);
+    await ctrl.selectSong(0);
+    ctrl.togglePlayMode(); // sequence -> shuffle
+    await ctrl.next();
+    expect(container.read(musicPlayerProvider).currentIndex, 2); // 第一个随机值 2
+    await ctrl.next();
+    expect(container.read(musicPlayerProvider).currentIndex, 0); // 第二个随机值 0（!= 当前 2）
+    await ctrl.next();
+    expect(container.read(musicPlayerProvider).currentIndex, 3); // 第三个随机值 3（!= 当前 0）
+  });
+
+  test('歌单缩短致 currentIndex 越界：夹紧到末位，currentSong 非 null', () async {
+    final ctrl = container.read(musicPlayerProvider.notifier);
+    ctrl.setPlaylist([_song(1), _song(2), _song(3)]);
+    await ctrl.selectSong(2); // 末首 song3
+    expect(container.read(musicPlayerProvider).currentIndex, 2);
+    // 歌单缩短：移除末首，currentIndex(2) 越界（旧实现会保留越界值致 currentSong=null）
+    ctrl.setPlaylist([_song(1), _song(2)]);
+    final state = container.read(musicPlayerProvider);
+    expect(state.currentIndex, 1); // 夹紧到末位
+    expect(state.currentSong, isNotNull);
+    expect(state.currentSong!.id, 2);
+  });
+
+  test('歌单重排：按已加载身份重定位 currentIndex，续播不重载、进度保留', () async {
+    final backend = ControllableBackend();
+    final container = _containerWith(backend);
+    addTearDown(container.dispose);
+    addTearDown(backend.dispose);
+
+    final ctrl = container.read(musicPlayerProvider.notifier);
+    ctrl.setPlaylist([_song(1), _song(2)]);
+    await ctrl.selectSong(0); // song1，index 0
+    await ctrl.seekTo(const Duration(seconds: 5));
+    await ctrl.togglePlay(); // 暂停
+    expect(container.read(musicPlayerProvider).isPlaying, false);
+
+    // 重排：song1 从 index 0 漂移到 index 1（旧实现会保留 currentIndex=0 指向 song2）
+    ctrl.setPlaylist([_song(2), _song(1)]);
+    final state = container.read(musicPlayerProvider);
+    expect(state.currentIndex, 1); // 跟随 song1 重定位
+    expect(state.currentSong!.id, 1);
+
+    // 续播：_loadedSongId 保留，togglePlay 不重载、进度保留
+    await ctrl.togglePlay();
+    final state2 = container.read(musicPlayerProvider);
+    expect(state2.isPlaying, true);
+    expect(state2.position, const Duration(seconds: 5));
+    expect(backend.setUrlCalls, ['file:///song1.mp3']); // 恢复未重复 setUrl
+  });
+
+  test('auto-advance 不重载已加载当前曲：其它候选全失败时保留当前曲不二次 setUrl', () async {
+    final backend = ControllableBackend();
+    backend.breakUrl('file:///song2.mp3');
+    backend.breakUrl('file:///song3.mp3');
+    final container = _containerWith(backend);
+    addTearDown(container.dispose);
+    addTearDown(backend.dispose);
+
+    final ctrl = container.read(musicPlayerProvider.notifier);
+    // song1(0) 已加载播放，song2(1)/song3(2) 均坏
+    ctrl.setPlaylist([_song(1), _song(2), _song(3)]);
+    await ctrl.selectSong(0); // 正常播 song1
+    expect(backend.setUrlCalls, ['file:///song1.mp3']);
+
+    // 点坏曲 song2：auto-advance 候选排除已加载当前曲 song1(0) 后仅剩 song3(2)，
+    // song3 也坏 -> 全部候选失败，不重载 song1（保留播放、不二次 setUrl）
+    await expectLater(
+      ctrl.selectSong(1),
+      throwsA(isA<MusicPlaybackException>()),
+    );
+    final state = container.read(musicPlayerProvider);
+    expect(state.currentIndex, 0); // 回到正在播放的 song1
+    expect(state.isPlaying, true); // 仍在播放（未被重载打断）
+    // song1 只 setUrl 过一次（首次加载），auto-advance 未重载当前曲
+    expect(backend.setUrlCalls.where((u) => u == 'file:///song1.mp3').length, 1);
+    expect(backend.setUrlCalls,
+        ['file:///song1.mp3', 'file:///song2.mp3', 'file:///song3.mp3']);
   });
 }

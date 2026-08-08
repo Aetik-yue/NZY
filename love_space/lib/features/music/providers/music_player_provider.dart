@@ -79,6 +79,10 @@ final audioBackendProvider = Provider<AudioBackend>((ref) {
   throw UnimplementedError('audioBackendProvider 必须被 override');
 });
 
+/// 随机源 provider（测试可 override 用脚本化序列验证 shuffle 真实按随机源分派，
+/// 而非被误实现为顺序 (idx+1)%len——后者在仅断言 isNot(prev) 时会漏检）
+final musicRandomProvider = Provider<Random>((ref) => Random());
+
 /// 音乐播放控制器
 class MusicPlayerController extends Notifier<MusicPlayerState> {
   AudioBackend get _backend => ref.read(audioBackendProvider);
@@ -102,7 +106,8 @@ class MusicPlayerController extends Notifier<MusicPlayerState> {
   // just_audio 无源时 play() 仅置 playing 标志不发声，直接 play 会「假播放」。
   int? _loadedSongId;
 
-  final _random = Random();
+  // 随机源：通过 provider 注入，测试可 override 用脚本化序列确定性验证 shuffle
+  Random get _random => ref.read(musicRandomProvider);
 
   @override
   MusicPlayerState build() {
@@ -122,29 +127,44 @@ class MusicPlayerController extends Notifier<MusicPlayerState> {
 
   /// 注入扫描到的歌单
   ///
-  /// 未选过歌（currentIndex == -1）且歌单非空时自动选中首个可播曲目（只选中不播放），
-  /// 避免播放页打开后标题/封面空白占位或指向无 URI 的不可播曲目；
-  /// 已选过歌则保持当前曲不变。
+  /// - 未选过歌（currentIndex == -1）且歌单非空时自动选中首个可播曲目（只选中不播放），
+  ///   避免播放页打开后标题/封面空白占位或指向无 URI 的不可播曲目。
+  /// - 已选过歌则按已加载身份 [_loadedSongId] 在新歌单重定位（应对重排/漂移），
+  ///   使「暂停 -> 重排 -> 恢复」能续播同一首而不重置进度。
+  /// - 歌单缩短致 currentIndex 越界时夹紧到末位，避免 currentSong 返回 null、
+  ///   播放键失效（加刷新入口即会暴露）。
   void setPlaylist(List<MusicSong> songs) {
     // 重注入使在途加载的请求作废：递增请求序号，防止旧请求完成时用新歌单盖章旧结果
     _requestSeq++;
-    // 仅当 currentIndex 不再指向已加载的同一首曲目时才失去加载记忆：
-    // 「暂停 → 歌单重注入（同曲原位）→ 恢复」应直接续播，不重复 setUrl、不重置进度
-    if (state.currentIndex < 0 ||
-        state.currentIndex >= songs.length ||
-        songs[state.currentIndex].id != _loadedSongId) {
-      _loadedSongId = null;
-    }
-    if (state.currentIndex < 0 && songs.isNotEmpty) {
+    if (state.currentIndex < 0) {
+      // 未选过歌：自动选中首个可播曲目（全不可播回退 0，UI 有展示）
       final firstPlayable = songs.indexWhere((s) => s.isPlayable);
       state = state.copyWith(
         playlist: songs,
-        // 全部不可播时仍回退第一首（UI 有展示），播放由 selectSong 的 isPlayable 守卫兜底
-        currentIndex: firstPlayable < 0 ? 0 : firstPlayable,
+        currentIndex:
+            songs.isEmpty ? -1 : (firstPlayable < 0 ? 0 : firstPlayable),
       );
-    } else {
-      state = state.copyWith(playlist: songs);
+      return;
     }
+    // 已选过歌：尽量保持当前曲
+    if (songs.isEmpty) {
+      _loadedSongId = null;
+      state = state.copyWith(playlist: const [], currentIndex: -1);
+      return;
+    }
+    // 按已加载身份重定位（应对重排/漂移）：找到则跟随，保持加载记忆与进度
+    if (_loadedSongId != null) {
+      final newIdx = songs.indexWhere((s) => s.id == _loadedSongId);
+      if (newIdx >= 0) {
+        state = state.copyWith(playlist: songs, currentIndex: newIdx);
+        return;
+      }
+      // 已加载曲不在新歌单：清加载记忆
+      _loadedSongId = null;
+    }
+    // currentIndex 越界（歌单缩短）或无加载记忆：夹紧到末位
+    final clamped = state.currentIndex.clamp(0, songs.length - 1);
+    state = state.copyWith(playlist: songs, currentIndex: clamped);
   }
 
   /// 选择并播放指定曲目
@@ -212,13 +232,25 @@ class MusicPlayerController extends Notifier<MusicPlayerState> {
   }
 
   /// 播放失败后自动跳下一首（跳过坏 URI，最多尝试一圈，避免死循环）
+  ///
+  /// 候选排除失败曲 [fromIndex]；并排除「已加载的当前曲」--若当前曲源已 setUrl
+  /// 在播放/暂停中，重载会 setUrl 清零进度，故跳过。但若当前曲仅被 setPlaylist
+  /// 自动选中、从未加载（无源、无进度），则仍可作为候选加载播放（避免回退后无声音）。
+  /// 若排除后候选全部失败，则不操作--已加载当前曲源仍在播放，坏曲静默失败有声音延续。
   Future<void> _autoAdvance(int fromIndex) async {
     final len = state.playlist.length;
     if (len <= 1) return; // 没有可跳的下一首
-    // 候选：从 fromIndex 起的一圈顺序索引（不含自身）
+    final currentIdx = state.currentIndex;
+    // 当前曲是否已实际加载（源在播放/暂停中，重载会清零进度）
+    final currentLoaded = _loadedSongId != null &&
+        state.currentSong != null &&
+        state.currentSong!.id == _loadedSongId;
+    // 候选：从 fromIndex 起的一圈顺序索引，排除失败曲与已加载的当前曲
     final candidates = <int>[];
     for (var i = 1; i < len; i++) {
-      candidates.add((fromIndex + i) % len);
+      final idx = (fromIndex + i) % len;
+      if (currentLoaded && idx == currentIdx) continue; // 不重载已加载当前曲（保留进度）
+      candidates.add(idx);
     }
     if (state.playMode == PlayMode.shuffle) {
       candidates.shuffle(_random); // 随机模式下失败跳歌也随机
@@ -234,6 +266,7 @@ class MusicPlayerController extends Notifier<MusicPlayerState> {
         }
       }
     }
+    // 所有候选都失败：已加载当前曲源仍在播放，不重载以保留进度
   }
 
   Future<void> togglePlay() async {
