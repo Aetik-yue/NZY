@@ -260,7 +260,7 @@ class NovelDetailPage extends ConsumerWidget {
               ),
               child: Text(
                 novel.lastChapterIndex < 0 ? '开始阅读' : '继续阅读',
-                style: const TextStyle(fontSize: 16),
+                style: AppTextStyles.onPink.copyWith(fontSize: 16),
               ),
             ),
           ),
@@ -341,15 +341,21 @@ class NovelDetailPage extends ConsumerWidget {
                   title: '删除小说',
                   content: '确定要删除《${novel.title}》吗？所有章节也会被一并删除，此操作无法撤销。',
                 );
-                if (!confirmed) return;
-                if (!context.mounted) return;
-                await ref
-                    .read(novelChapterRepositoryProvider)
-                    .deleteByNovel(novel.id);
-                await ref.read(novelRepositoryProvider).delete(novel.id);
-                if (!context.mounted) return;
-                AppSnackbar.show(context, '已删除《${novel.title}》');
-                Navigator.of(context).pop();
+                if (!confirmed || !context.mounted) return;
+                try {
+                  await ref
+                      .read(novelChapterRepositoryProvider)
+                      .deleteByNovel(novel.id);
+                  await ref.read(novelRepositoryProvider).delete(novel.id);
+                  if (!context.mounted) return;
+                  AppSnackbar.show(context, '已删除《${novel.title}》');
+                  Navigator.of(context).pop();
+                } catch (e) {
+                  debugPrint('[NovelDetailPage] 删除失败: $e');
+                  if (context.mounted) {
+                    AppSnackbar.show(context, '删除失败，请重试');
+                  }
+                }
               },
               style: OutlinedButton.styleFrom(
                 side: const BorderSide(color: AppColors.accentRose),

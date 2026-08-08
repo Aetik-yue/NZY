@@ -226,11 +226,11 @@ class ContentCleaner {
     return false;
   }
 
-  /// 判断是否为乱码行（非中文比例 > 60%）
   /// 判断是否为孤立的导航词行（章节页翻页控件残留）
   static const _navigationWords = {"目录", "书页", "首页", "返回顶部", "上页", "下页"};
   bool _isNavigationWord(String line) => _navigationWords.contains(line);
 
+  /// 判断是否为乱码行（中文比例 < 40%）
   bool _isGarbled(String line) {
     if (line.isEmpty) return false;
     final chineseCount = RegExp(r'[一-龥]').allMatches(line).length;

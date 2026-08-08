@@ -8,7 +8,9 @@ import '../../../../data/providers/data_providers.dart';
 import '../../../../data/repositories/crawl_repository.dart';
 import '../../../../shared/widgets/app_snackbar.dart';
 import '../novel_detail_page.dart';
+import 'category_book_card.dart';
 import 'crawl_progress_sheet.dart';
+import 'novel_search_result_card.dart';
 
 /// 添加小说底部面板
 ///
@@ -22,7 +24,8 @@ class AddNovelSheet extends ConsumerStatefulWidget {
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius:
+            BorderRadius.vertical(top: Radius.circular(AppColors.radiusCard)),
       ),
       builder: (_) => const AddNovelSheet(),
     );
@@ -100,6 +103,7 @@ class _AddNovelSheetState extends ConsumerState<AddNovelSheet> {
       debugPrint('[AddNovelSheet] 分类浏览失败: $e');
       if (!mounted) return;
       setState(() => _isBrowsing = false);
+      AppSnackbar.show(context, '分类加载失败，请重试');
     }
   }
 
@@ -134,8 +138,12 @@ class _AddNovelSheetState extends ConsumerState<AddNovelSheet> {
     }
   }
 
-  /// 添加分类浏览到的书到书架
-  Future<void> _addCategoryBook(CategoryBook book) async {
+  /// 统一的添加流程（搜索 / 分类浏览 / 粘贴链接共用）：
+  /// 弹进度面板 → 爬取 → 成功关闭面板 / 重复跳详情 / 失败/取消静默返回。
+  Future<void> _startAdd({
+    required String url,
+    required String title,
+  }) async {
     if (_isAdding) return;
 
     setState(() => _isAdding = true);
@@ -152,12 +160,12 @@ class _AddNovelSheetState extends ConsumerState<AddNovelSheet> {
     // 其返回值 true=成功、false=失败/取消，据此再关闭添加面板（只 pop 一次）。
     final sheetFuture = CrawlProgressSheet.show(
       context,
-      title: '正在添加《${book.title}》',
+      title: '正在添加《$title》',
     );
 
     try {
       await ref.read(crawlRepositoryProvider).addNovel(
-            book.url,
+            url,
             onProgress: (message, current, total) {
               if (!mounted) return;
               ref.read(crawlStatusProvider.notifier).state = CrawlStatus(
@@ -182,9 +190,9 @@ class _AddNovelSheetState extends ConsumerState<AddNovelSheet> {
     } catch (e) {
       debugPrint('[AddNovelSheet] 添加失败: $e');
       if (!mounted) return;
-      ref.read(crawlStatusProvider.notifier).state = CrawlStatus(
+      ref.read(crawlStatusProvider.notifier).state = const CrawlStatus(
         state: 'failed',
-        message: '添加失败：$e',
+        message: '添加失败',
       );
     }
 
@@ -196,10 +204,14 @@ class _AddNovelSheetState extends ConsumerState<AddNovelSheet> {
       _handleDuplicate(_duplicateNovel!, navigator);
     } else if (ok == true) {
       navigator.pop(); // 关闭添加面板（进度面板已自动关闭）
-      AppSnackbar.show(navigator.context, '已添加《${book.title}》');
+      AppSnackbar.show(navigator.context, '已添加《$title》');
     }
     if (mounted) setState(() => _isAdding = false);
   }
+
+  /// 添加分类浏览到的书到书架
+  Future<void> _addCategoryBook(CategoryBook book) =>
+      _startAdd(url: book.url, title: book.title);
 
   /// 去重命中：记录命中的书，并让进度面板以「已在书架中」状态关闭
   void _onDuplicate(NovelAlreadyExistsException e) {
@@ -221,81 +233,12 @@ class _AddNovelSheetState extends ConsumerState<AddNovelSheet> {
     );
   }
 
-  /// 添加小说到书架
-  Future<void> _addNovel(SearchResult result) async {
-    if (_isAdding) return;
-
-    setState(() => _isAdding = true);
-
-    // 捕获根导航器（用于后续关闭添加面板 + 显示提示）
-    final navigator = Navigator.of(context);
-
-    // 重置爬取状态
-    ref.read(crawlStatusProvider.notifier).state = const CrawlStatus(
-      state: 'fetching',
-      message: '准备获取...',
-    );
-
-    // 弹出进度面板：成功/失败/取消时面板会自动关闭，
-    // 其返回值 true=成功、false=失败/取消，据此再关闭添加面板（只 pop 一次）。
-    final sheetFuture = CrawlProgressSheet.show(
-      context,
-      title: '正在添加《${result.title}》',
-    );
-
-    try {
-      await ref.read(crawlRepositoryProvider).addNovel(
-            result.url,
-            onProgress: (message, current, total) {
-              if (!mounted) return;
-              ref.read(crawlStatusProvider.notifier).state = CrawlStatus(
-                state: 'fetching',
-                message: message,
-                current: current,
-                total: total,
-              );
-            },
-          );
-
-      if (!mounted) return;
-
-      // 标记成功
-      ref.read(crawlStatusProvider.notifier).state = const CrawlStatus(
-        state: 'success',
-        message: '完成',
-      );
-    } on NovelAlreadyExistsException catch (e) {
-      // 已在书架：记录命中，关闭面板后提示并跳转详情
-      _onDuplicate(e);
-    } on CancelledException {
-      // 用户主动取消，不显示错误
-    } catch (e) {
-      debugPrint('[AddNovelSheet] 添加失败: $e');
-      if (!mounted) return;
-      ref.read(crawlStatusProvider.notifier).state = CrawlStatus(
-        state: 'failed',
-        message: '添加失败：$e',
-      );
-    }
-
-    // 等待进度面板自动关闭
-    final ok = await sheetFuture;
-    if (!mounted) return;
-
-    if (_duplicateNovel != null) {
-      _handleDuplicate(_duplicateNovel!, navigator);
-    } else if (ok == true) {
-      // 关闭添加面板（进度面板已自动关闭）
-      navigator.pop();
-      AppSnackbar.show(navigator.context, '已添加《${result.title}》');
-    }
-    if (mounted) setState(() => _isAdding = false);
-  }
+  /// 添加搜索到的小说到书架
+  Future<void> _addNovel(SearchResult result) =>
+      _startAdd(url: result.url, title: result.title);
 
   /// 从粘贴的 URL 直接添加小说
   Future<void> _addFromUrl() async {
-    if (_isAdding) return;
-
     // 显示输入链接的对话框
     final urlController = TextEditingController();
     final url = await showDialog<String>(
@@ -316,7 +259,7 @@ class _AddNovelSheetState extends ConsumerState<AddNovelSheet> {
           ),
         ),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(AppColors.radiusSheet),
         ),
         actions: [
           TextButton(
@@ -336,67 +279,7 @@ class _AddNovelSheetState extends ConsumerState<AddNovelSheet> {
 
     if (url == null || url.isEmpty) return;
     if (!mounted) return;
-
-    setState(() => _isAdding = true);
-
-    // 捕获根导航器（用于后续关闭添加面板 + 显示提示）
-    final navigator = Navigator.of(context);
-
-    ref.read(crawlStatusProvider.notifier).state = const CrawlStatus(
-      state: 'fetching',
-      message: '准备获取...',
-    );
-
-    // 弹出进度面板：成功/失败/取消时面板会自动关闭，
-    // 其返回值 true=成功、false=失败/取消，据此再关闭添加面板（只 pop 一次）。
-    final sheetFuture = CrawlProgressSheet.show(context, title: '正在添加小说');
-
-    try {
-      await ref.read(crawlRepositoryProvider).addNovel(
-            url,
-            onProgress: (message, current, total) {
-              if (!mounted) return;
-              ref.read(crawlStatusProvider.notifier).state = CrawlStatus(
-                state: 'fetching',
-                message: message,
-                current: current,
-                total: total,
-              );
-            },
-          );
-
-      if (!mounted) return;
-
-      ref.read(crawlStatusProvider.notifier).state = const CrawlStatus(
-        state: 'success',
-        message: '完成',
-      );
-    } on NovelAlreadyExistsException catch (e) {
-      // 已在书架：记录命中，关闭面板后提示并跳转详情
-      _onDuplicate(e);
-    } on CancelledException {
-      // 用户主动取消
-    } catch (e) {
-      debugPrint('[AddNovelSheet] 添加失败: $e');
-      if (!mounted) return;
-      ref.read(crawlStatusProvider.notifier).state = CrawlStatus(
-        state: 'failed',
-        message: '添加失败：$e',
-      );
-    }
-
-    // 等待进度面板自动关闭
-    final ok = await sheetFuture;
-    if (!mounted) return;
-
-    if (_duplicateNovel != null) {
-      _handleDuplicate(_duplicateNovel!, navigator);
-    } else if (ok == true) {
-      // 关闭添加面板（进度面板已自动关闭）
-      navigator.pop();
-      AppSnackbar.show(navigator.context, '已添加小说');
-    }
-    if (mounted) setState(() => _isAdding = false);
+    await _startAdd(url: url, title: '小说');
   }
 
   @override
@@ -693,7 +576,7 @@ class _AddNovelSheetState extends ConsumerState<AddNovelSheet> {
         }
 
         final book = _categoryBooks[i];
-        return _CategoryBookCard(
+        return CategoryBookCard(
           book: book,
           onTap: () => _addCategoryBook(book),
         );
@@ -757,227 +640,11 @@ class _AddNovelSheetState extends ConsumerState<AddNovelSheet> {
       separatorBuilder: (_, __) => const SizedBox(height: 8),
       itemBuilder: (_, i) {
         final result = _results[i];
-        return _NovelSearchResultCard(
+        return NovelSearchResultCard(
           result: result,
           onTap: () => _addNovel(result),
         );
       },
-    );
-  }
-}
-
-/// 搜索结果卡片
-class _NovelSearchResultCard extends StatelessWidget {
-  final SearchResult result;
-  final VoidCallback onTap;
-
-  const _NovelSearchResultCard({
-    required this.result,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: AppColors.bgCard,
-          borderRadius: BorderRadius.circular(AppColors.radiusMd),
-          border: Border.all(color: AppColors.borderSoft),
-        ),
-        child: Row(
-          children: [
-            // 封面占位
-            Container(
-              width: 56,
-              height: 76,
-              decoration: BoxDecoration(
-                color: AppColors.accentPinkSoft,
-                borderRadius: BorderRadius.circular(AppColors.radiusSm),
-              ),
-              child: const Center(
-                child: Icon(
-                  Icons.menu_book_rounded,
-                  color: AppColors.accentRose,
-                  size: 28,
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-
-            // 信息
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    result.title,
-                    style: AppTextStyles.titleSmall,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    result.author.isNotEmpty ? '作者：${result.author}' : '作者未知',
-                    style: AppTextStyles.caption,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  if (result.intro.isNotEmpty) ...[
-                    const SizedBox(height: 6),
-                    Text(
-                      result.intro,
-                      style: AppTextStyles.label,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                  if (result.latestChapter.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      '最新：${result.latestChapter}',
-                      style: AppTextStyles.label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ],
-              ),
-            ),
-
-            const SizedBox(width: 8),
-
-            // 添加按钮
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: AppColors.accentPinkSoft,
-                borderRadius: BorderRadius.circular(AppColors.radiusPill),
-              ),
-              child: Text(
-                '加入书架',
-                style: AppTextStyles.label.copyWith(
-                  color: AppColors.accentRose,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// 分类浏览书籍卡片
-class _CategoryBookCard extends StatelessWidget {
-  final CategoryBook book;
-  final VoidCallback onTap;
-
-  const _CategoryBookCard({
-    required this.book,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: AppColors.bgCard,
-          borderRadius: BorderRadius.circular(AppColors.radiusMd),
-          border: Border.all(color: AppColors.borderSoft),
-        ),
-        child: Row(
-          children: [
-            // 封面占位
-            Container(
-              width: 56,
-              height: 76,
-              decoration: BoxDecoration(
-                color: AppColors.accentPeach.withValues(alpha: 0.6),
-                borderRadius: BorderRadius.circular(AppColors.radiusSm),
-              ),
-              child: const Center(
-                child: Icon(
-                  Icons.menu_book_rounded,
-                  color: AppColors.accentCoral,
-                  size: 28,
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-
-            // 信息
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    book.title,
-                    style: AppTextStyles.titleSmall,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    book.author.isNotEmpty ? '作者：${book.author}' : '作者未知',
-                    style: AppTextStyles.caption,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  if (book.intro.isNotEmpty) ...[
-                    const SizedBox(height: 6),
-                    Text(
-                      book.intro,
-                      style: AppTextStyles.label,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                  if (book.wordCount.isNotEmpty ||
-                      book.updateTime.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      [
-                        if (book.wordCount.isNotEmpty) book.wordCount,
-                        if (book.updateTime.isNotEmpty) book.updateTime,
-                      ].join(' · '),
-                      style: AppTextStyles.label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ],
-              ),
-            ),
-
-            const SizedBox(width: 8),
-
-            // 添加按钮
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: AppColors.accentPinkSoft,
-                borderRadius: BorderRadius.circular(AppColors.radiusPill),
-              ),
-              child: Text(
-                '加入书架',
-                style: AppTextStyles.label.copyWith(
-                  color: AppColors.accentRose,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

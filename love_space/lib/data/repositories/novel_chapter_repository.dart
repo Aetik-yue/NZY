@@ -14,6 +14,14 @@ class NovelChapterRepository {
           .sortByChapterIndex()
           .watch(fireImmediately: true);
 
+  /// 查询某本小说的全部章节（一次性，按章序号升序）
+  Future<List<NovelChapter>> getByNovel(int novelId) =>
+      _isar.novelChapters
+          .where()
+          .novelIdEqualTo(novelId)
+          .sortByChapterIndex()
+          .findAll();
+
   /// 按小说 id + 章序号查询单章
   Future<NovelChapter?> getByNovelAndIndex(
     int novelId,

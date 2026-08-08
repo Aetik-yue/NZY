@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../../app/theme/app_colors.dart';
 import '../../core/network/app_http_client.dart';
 import '../crawler/base_crawler.dart';
 import '../crawler/biquge_crawler.dart';
@@ -33,6 +34,39 @@ class CrawlRepository {
   final NovelSourceRepository sourceRepository;
   final CrawlConfigRepository configRepository;
   final CrawlLogRepository logRepository;
+
+  /// 复用的 HTTP 客户端（避免每次操作新建连接后不释放）
+  ///
+  /// 配置未变化时复用同一实例；配置变化时关闭旧实例并重建。
+  AppHttpClient? _httpClient;
+
+  /// 获取（或复用）与配置匹配的 HTTP 客户端
+  AppHttpClient _getHttpClient(CrawlConfig config) {
+    final current = _httpClient;
+    if (current != null &&
+        current.timeout.inMilliseconds == config.timeoutMs &&
+        current.maxRetries == config.maxRetries &&
+        current.minInterval.inMilliseconds == config.requestIntervalMs &&
+        current.rotateUserAgent == config.rotateUserAgent) {
+      return current;
+    }
+    // 配置变化或首次创建：关闭旧实例避免连接泄漏
+    current?.close();
+    final client = AppHttpClient(
+      timeout: Duration(milliseconds: config.timeoutMs),
+      maxRetries: config.maxRetries,
+      minInterval: Duration(milliseconds: config.requestIntervalMs),
+      rotateUserAgent: config.rotateUserAgent,
+    );
+    _httpClient = client;
+    return client;
+  }
+
+  /// 释放底层 HTTP 连接（应用退出时由 Provider 生命周期调用）
+  void dispose() {
+    _httpClient?.close();
+    _httpClient = null;
+  }
 
   /// 取消令牌（UI 取消时设为 true）
   bool _cancelled = false;
@@ -179,7 +213,8 @@ class CrawlRepository {
             rethrow;
           } catch (e) {
             debugPrint('[CrawlRepository] 章节抓取失败 (${ref.title}): $e');
-            content = '（本章内容抓取失败，请稍后重试）';
+            // 留空正文：阅读器会对空章节自动按需重抓并提供重试入口
+            content = '';
           }
         }
 
@@ -255,7 +290,8 @@ class CrawlRepository {
       final detail = await crawler.fetchBookDetail(novel.sourceUrl!);
 
       // 获取已有章节的 sourceChapterId 集合（用于去重）
-      final existingChapters = await novelChapterRepository.watchByNovel(novelId).first;
+      final existingChapters =
+          await novelChapterRepository.getByNovel(novelId);
       final existingIds = existingChapters
           .map((c) => c.sourceChapterId)
           .whereType<String>()
@@ -313,7 +349,8 @@ class CrawlRepository {
           rethrow;
         } catch (e) {
           debugPrint('[CrawlRepository] 新章节抓取失败 (${ref.title}): $e');
-          content = '（本章内容抓取失败，请稍后重试）';
+          // 留空正文：阅读器会对空章节自动按需重抓并提供重试入口
+          content = '';
         }
 
         newChapters.add(NovelChapter()
@@ -433,12 +470,7 @@ class CrawlRepository {
 
   /// 创建爬虫实例
   BaseCrawler _createCrawler(NovelSource source, CrawlConfig config) {
-    final httpClient = AppHttpClient(
-      timeout: Duration(milliseconds: config.timeoutMs),
-      maxRetries: config.maxRetries,
-      minInterval: Duration(milliseconds: config.requestIntervalMs),
-      rotateUserAgent: config.rotateUserAgent,
-    );
+    final httpClient = _getHttpClient(config);
     final contentCleaner = ContentCleaner(adPhrases: config.adKeywords);
 
     // 目前仅支持笔趣阁系列
@@ -479,20 +511,12 @@ class CrawlRepository {
     return url;
   }
 
-  /// 根据书名生成稳定的封面色（取自 AppColors 调色板）
-  static const List<int> _coverPalette = [
-    0xFFFF6B9D, // accentRose
-    0xFFFF8FB1, // accentPink
-    0xFFFFB5A1, // accentCoral
-    0xFFFFD1BF, // accentPeach
-    0xFFB57DBA, // accentMauve
-  ];
-
+  /// 根据书名生成稳定的封面色（取自 AppColors.coverPalette 设计令牌）
   int _coverColorFor(String title) {
     // 基于书名哈希选择颜色，同一本书每次结果一致
     final hash = title.hashCode;
-    final index = hash.abs() % _coverPalette.length;
-    return _coverPalette[index];
+    final index = hash.abs() % AppColors.coverPalette.length;
+    return AppColors.coverPalette[index].toARGB32();
   }
 }
 
