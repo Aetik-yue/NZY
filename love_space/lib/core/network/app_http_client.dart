@@ -21,7 +21,7 @@ class AppHttpClient {
   AppHttpClient({
     this.timeout = const Duration(seconds: 15),
     this.maxRetries = 3,
-    this.minInterval = const Duration(milliseconds: 1000),
+    this.minInterval = const Duration(milliseconds: 500),
     this.rotateUserAgent = true,
   });
 

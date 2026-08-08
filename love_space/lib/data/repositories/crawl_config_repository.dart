@@ -7,7 +7,10 @@ class CrawlConfigRepository {
   final Isar _isar;
 
   /// 默认配置
-  static const int defaultIntervalMs = 1000;
+  ///
+  /// 请求间隔从 1000ms 降至 500ms：章节预取改为有界并发（每批 5 章并行），
+  /// 整体吞吐提升；minInterval 仍提供整站礼貌限速（批与批之间保持间隔）。
+  static const int defaultIntervalMs = 500;
   static const int defaultMaxRetries = 3;
   static const int defaultTimeoutMs = 15000;
   static const bool defaultRotateUserAgent = true;

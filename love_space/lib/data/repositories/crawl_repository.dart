@@ -35,6 +35,12 @@ class CrawlRepository {
   final CrawlConfigRepository configRepository;
   final CrawlLogRepository logRepository;
 
+  /// 章节预取/更新并发数（小窗口并行）。
+  ///
+  /// 配合 [AppHttpClient.minInterval] 做整站礼貌限速：同一批内 N 章并发，
+  /// 批与批之间由 minInterval 保持间隔，兼顾速度与防封。
+  static const int _chapterFetchConcurrency = 5;
+
   /// 复用的 HTTP 客户端（避免每次操作新建连接后不释放）
   ///
   /// 配置未变化时复用同一实例；配置变化时关闭旧实例并重建。
@@ -88,24 +94,57 @@ class CrawlRepository {
     }
   }
 
+  /// 有界并发映射
+  ///
+  /// 将 [items] 按 [concurrency] 分批，每批内并发执行 [fn]，批与批之间串行。
+  /// 结果顺序与 [items] 一致。每批开始前检查取消；[fn] 抛出 [CancelledException]
+  /// 时立即向上传播（取消整批），其他异常需由 [fn] 自行捕获并返回兜底值，
+  /// 不中断批次。
+  Future<List<R>> _mapWithConcurrency<T, R>(
+    List<T> items,
+    int concurrency,
+    Future<R> Function(T item, int index) fn,
+  ) async {
+    final results = List<R?>.filled(items.length, null);
+    for (var start = 0; start < items.length; start += concurrency) {
+      _checkCancelled();
+      final end =
+          start + concurrency > items.length ? items.length : start + concurrency;
+      final batch = <Future<void>>[];
+      for (var i = start; i < end; i++) {
+        final index = i;
+        batch.add(fn(items[index], index).then((r) => results[index] = r));
+      }
+      await Future.wait(batch);
+    }
+    return results.cast<R>();
+  }
+
   /// 搜索小说（跨所有启用的源）
+  ///
+  /// 各源搜索并发执行：任一源失败/空结果不影响其他源，慢源（如引擎兜底）
+  /// 不阻塞快源返回。各源共享同一 [AppHttpClient]，minInterval 仍提供
+  /// 整站礼貌限速（并发请求以小窗口并行，批与批之间保持间隔）。
   Future<List<SearchResult>> search(String keyword) async {
     final sources = await sourceRepository.getEnabled();
     if (sources.isEmpty) return [];
 
     final config = await configRepository.getOrCreate();
-    final results = <SearchResult>[];
 
-    for (final source in sources) {
+    final futures = sources.map((source) async {
       try {
         final crawler = _createCrawler(source, config);
-        final searchResults = await crawler.search(keyword);
-        results.addAll(searchResults);
+        return await crawler.search(keyword);
       } catch (e) {
         debugPrint('[CrawlRepository] 搜索失败 (${source.name}): $e');
+        return <SearchResult>[];
       }
-    }
+    }).toList();
 
+    final results = <SearchResult>[];
+    for (final batch in await Future.wait(futures)) {
+      results.addAll(batch);
+    }
     return results;
   }
 
@@ -191,38 +230,52 @@ class CrawlRepository {
       created = novel;
       await novelRepository.add(novel);
 
-      // 4. 写入章节列表 + 预取正文
+      // 4. 写入章节列表 + 预取正文（前 N 章有界并发抓取）
       final prefetch =
           prefetchChapters ?? config.prefetchChapters;
       final chaptersToFetch =
           detail.chapters.length < prefetch ? detail.chapters.length : prefetch;
 
+      // 并发预取前 N 章正文：每批 _chapterFetchConcurrency 章并行，结果保持顺序。
+      final prefetchRefs = detail.chapters.take(chaptersToFetch).toList();
+      var prefetchedContents = <String>[];
+      if (prefetchRefs.isNotEmpty) {
+        var doneCount = 0;
+        onProgress?.call('正在抓取章节 0/$chaptersToFetch', 0, chaptersToFetch);
+        prefetchedContents = await _mapWithConcurrency<ChapterRef, String>(
+          prefetchRefs,
+          _chapterFetchConcurrency,
+          (ref, _) async {
+            try {
+              final chapterContent = await crawler.fetchChapterContent(ref.url);
+              return chapterContent.content;
+            } on CancelledException {
+              rethrow;
+            } catch (e) {
+              debugPrint('[CrawlRepository] 章节抓取失败 (${ref.title}): $e');
+              // 留空正文：阅读器会对空章节自动按需重抓并提供重试入口
+              return '';
+            } finally {
+              doneCount++;
+              onProgress?.call(
+                '正在抓取章节 $doneCount/$chaptersToFetch',
+                doneCount,
+                chaptersToFetch,
+              );
+            }
+          },
+        );
+      }
+
+      // 组装全部章节：预取的带正文，其余留空待阅读器按需重抓
       final chapters = <NovelChapter>[];
       for (var i = 0; i < detail.chapters.length; i++) {
-        _checkCancelled();
         final ref = detail.chapters[i];
-        String content = '';
-
-        // 仅预取前 N 章正文
-        if (i < chaptersToFetch) {
-          onProgress?.call('正在抓取章节 ${i + 1}/$chaptersToFetch', i + 1, chaptersToFetch);
-          try {
-            final chapterContent = await crawler.fetchChapterContent(ref.url);
-            content = chapterContent.content;
-          } on CancelledException {
-            rethrow;
-          } catch (e) {
-            debugPrint('[CrawlRepository] 章节抓取失败 (${ref.title}): $e');
-            // 留空正文：阅读器会对空章节自动按需重抓并提供重试入口
-            content = '';
-          }
-        }
-
         chapters.add(NovelChapter()
           ..novelId = novel.id
           ..chapterIndex = i
           ..title = ref.title
-          ..content = content
+          ..content = i < chaptersToFetch ? prefetchedContents[i] : ''
           ..sourceChapterId = ref.sourceId
           ..sourceUrl = ref.url);
       }
@@ -325,41 +378,55 @@ class CrawlRepository {
         existingChapters,
       );
 
-      // 抓取新章节正文（chapterIndex = 源站规范序列中的真实位置）
-      final newChapters = <NovelChapter>[];
-      var fetchedCount = 0;
+      // 抓取新章节正文（chapterIndex = 源站规范序列中的真实位置；有界并发）
+      // newChapterIndices 与 newRefs 一一对应，均按源站规范顺序排列，
+      // 故 newChapterIndices[j] 即 newRefs[j] 在 detail.chapters 中的位置。
+      final newChapterIndices = <int>[];
       for (var i = 0; i < detail.chapters.length; i++) {
         final ref = detail.chapters[i];
-        if (ref.sourceId.isEmpty || existingIds.contains(ref.sourceId)) {
-          continue;
+        if (ref.sourceId.isNotEmpty && !existingIds.contains(ref.sourceId)) {
+          newChapterIndices.add(i);
         }
-        _checkCancelled();
-        fetchedCount++;
-        onProgress?.call(
-          '正在抓取新章节 $fetchedCount/${newRefs.length}',
-          fetchedCount,
-          newRefs.length,
+      }
+
+      final newChapters = <NovelChapter>[];
+      if (newRefs.isNotEmpty) {
+        var fetchedCount = 0;
+        onProgress?.call('正在抓取新章节 0/${newRefs.length}', 0, newRefs.length);
+        final contents = await _mapWithConcurrency<ChapterRef, String>(
+          newRefs,
+          _chapterFetchConcurrency,
+          (ref, _) async {
+            try {
+              final chapterContent = await crawler.fetchChapterContent(ref.url);
+              return chapterContent.content;
+            } on CancelledException {
+              rethrow;
+            } catch (e) {
+              debugPrint('[CrawlRepository] 新章节抓取失败 (${ref.title}): $e');
+              // 留空正文：阅读器会对空章节自动按需重抓并提供重试入口
+              return '';
+            } finally {
+              fetchedCount++;
+              onProgress?.call(
+                '正在抓取新章节 $fetchedCount/${newRefs.length}',
+                fetchedCount,
+                newRefs.length,
+              );
+            }
+          },
         );
 
-        String content;
-        try {
-          final chapterContent = await crawler.fetchChapterContent(ref.url);
-          content = chapterContent.content;
-        } on CancelledException {
-          rethrow;
-        } catch (e) {
-          debugPrint('[CrawlRepository] 新章节抓取失败 (${ref.title}): $e');
-          // 留空正文：阅读器会对空章节自动按需重抓并提供重试入口
-          content = '';
+        for (var j = 0; j < newRefs.length; j++) {
+          final ref = newRefs[j];
+          newChapters.add(NovelChapter()
+            ..novelId = novelId
+            ..chapterIndex = newChapterIndices[j]
+            ..title = ref.title
+            ..content = contents[j]
+            ..sourceChapterId = ref.sourceId
+            ..sourceUrl = ref.url);
         }
-
-        newChapters.add(NovelChapter()
-          ..novelId = novelId
-          ..chapterIndex = i
-          ..title = ref.title
-          ..content = content
-          ..sourceChapterId = ref.sourceId
-          ..sourceUrl = ref.url);
       }
 
       await novelChapterRepository.addAll(newChapters);
