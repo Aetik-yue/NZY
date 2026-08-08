@@ -7,12 +7,14 @@ import 'package:love_space/app/app.dart';
 import 'package:love_space/data/providers/data_providers.dart';
 import 'package:love_space/data/models/timeline_event.dart';
 import 'package:love_space/data/models/app_settings.dart';
+import 'package:love_space/data/models/pomodoro_settings.dart';
 import 'package:love_space/data/models/reader_settings.dart';
 import 'package:love_space/core/utils/date_utils.dart';
 import 'package:love_space/features/games/breakout/breakout_page.dart';
 import 'package:love_space/features/music/providers/audio_backend.dart';
 import 'package:love_space/features/music/providers/music_player_provider.dart';
 import 'package:love_space/features/music/providers/music_library_provider.dart';
+import 'package:love_space/features/pomodoro/presentation/pomodoro_page.dart';
 import 'package:love_space/shared/layouts/main_shell.dart';
 import 'package:love_space/shared/widgets/pill_nav_bar.dart';
 
@@ -155,5 +157,33 @@ void main() {
     await tester.pump();
     expect(find.text('打砖块'), findsOneWidget);
     expect(find.text('准备好了吗'), findsOneWidget); // ready 遮罩
+  });
+
+  testWidgets('PomodoroPage renders smoke', (tester) async {
+    // 番茄钟页 watch pomodoroSettingsProvider / pomodoroTimerProvider /
+    // todayFocusProvider（间接 watch focusSessionsProvider）。
+    // 计时器 build() 为纯初值（idle），onAppResumed 在 idle 时早退，
+    // 故只需 override 两个会触达 isarProvider 的 StreamProvider。
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          pomodoroSettingsProvider.overrideWith(
+            (ref) => Stream.value(PomodoroSettings()
+              ..focusMin = 25
+              ..shortBreakMin = 5
+              ..longBreakMin = 15
+              ..longBreakInterval = 4
+              ..autoStartBreak = true
+              ..autoStartFocus = false),
+          ),
+          focusSessionsProvider.overrideWith((ref) => Stream.value([])),
+        ],
+        child: const MaterialApp(home: PomodoroPage()),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('番茄钟'), findsOneWidget);
+    expect(find.text('加载失败'), findsNothing);
   });
 }

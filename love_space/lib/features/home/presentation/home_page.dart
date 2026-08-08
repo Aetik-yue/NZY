@@ -12,6 +12,7 @@ import '../../../data/providers/data_providers.dart';
 import '../../../shared/widgets/pill_nav_bar.dart';
 import '../../anniversary/presentation/anniversary_page.dart';
 import '../../music/presentation/music_player_page.dart';
+import '../../pomodoro/presentation/pomodoro_page.dart';
 import '../../profile/presentation/all_features_page.dart';
 import 'widgets/add_timeline_sheet.dart';
 import 'widgets/timeline_detail_sheet.dart';
@@ -472,7 +473,7 @@ class _CheckinCardState extends ConsumerState<_CheckinCard> {
   }
 }
 
-/// 快捷功能入口（相册/愿望/音乐/小说/更多）
+/// 快捷功能入口（番茄钟/愿望/音乐/小说/纪念日/更多）
 ///
 /// 横向可滚动宫格：新功能只需在 [_QuickActions.build] 的列表里加一项，
 /// 无需改动 Tab 结构。
@@ -483,10 +484,12 @@ class _QuickActions extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final actions = [
       _QuickAction(
-        icon: Icons.photo_library_rounded,
-        label: '相册',
+        icon: Icons.timer_rounded,
+        label: '番茄钟',
         bg: AppColors.accentPinkSoft,
-        onTap: () => ref.read(currentTabProvider.notifier).state = NavTab.album,
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const PomodoroPage()),
+        ),
       ),
       _QuickAction(
         icon: Icons.star_rounded,
