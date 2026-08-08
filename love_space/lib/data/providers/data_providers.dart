@@ -367,24 +367,89 @@ final memoTagFilterProvider = StateProvider<String?>((ref) => null);
 /// 当前作者筛选（null = 全部, 1 或 2）
 final memoAuthorFilterProvider = StateProvider<int?>((ref) => null);
 
-/// 过滤后的备忘录（搜索 + 标签 + 作者）
+/// 待办筛选（全部/待办/已完成）
+enum TodoFilter { all, active, done }
+
+/// 当前待办筛选状态（默认全部）
+final memoDoneFilterProvider =
+    StateProvider<TodoFilter>((ref) => TodoFilter.all);
+
+/// 过滤后的备忘录（搜索 + 标签 + 作者 + 完成状态 + 排序）
 ///
 /// 搜索词先 trim（避免尾随空格搜不到）；标签按独立标签精确匹配
 /// （选「旅行」不会误命中「#旅行计划」）。
+/// 排序规则：未完成在前、已完成沉底；同状态内按优先级
+/// （high>medium>low>none）+ 截止日期（近在前，无截止在后）；
+/// 最后按创建时间降序兜底。
 final filteredMemosProvider = Provider<List<Memo>>((ref) {
   final memos = ref.watch(memosProvider).valueOrNull ?? [];
   final query = ref.watch(memoSearchProvider).trim().toLowerCase();
   final tag = ref.watch(memoTagFilterProvider);
   final author = ref.watch(memoAuthorFilterProvider);
+  final doneFilter = ref.watch(memoDoneFilterProvider);
 
-  return memos.where((m) {
+  var result = memos.where((m) {
     if (author != null && m.author != author) return false;
     if (tag != null && !contentHasTag(m.content, tag)) return false;
     if (query.isNotEmpty && !m.content.toLowerCase().contains(query)) {
       return false;
     }
+    // done 筛选
+    if (doneFilter == TodoFilter.active && m.done) return false;
+    if (doneFilter == TodoFilter.done && !m.done) return false;
     return true;
   }).toList();
+
+  // 排序：未完成在前、已完成沉底；同状态内按优先级 + 截止日期 + 创建时间
+  result.sort((a, b) {
+    // 1. 未完成在前
+    if (a.done != b.done) return a.done ? 1 : -1;
+    // 2. 优先级（high>medium>low>none）
+    final aPri = _priorityWeight(a.priority);
+    final bPri = _priorityWeight(b.priority);
+    if (aPri != bPri) return bPri - aPri;
+    // 3. 截止日期（近在前，无截止在后）
+    final aDue = a.dueDate;
+    final bDue = b.dueDate;
+    if (aDue != null && bDue != null) return aDue.compareTo(bDue);
+    if (aDue != null && bDue == null) return -1;
+    if (aDue == null && bDue != null) return 1;
+    // 4. 创建时间降序（保留原序兜底）
+    return b.createdAt.compareTo(a.createdAt);
+  });
+
+  return result;
+});
+
+/// 优先级权重（high>medium>low>none，数值越大越靠前）
+///
+/// 注意 TodoPriority 枚举声明顺序为 none/high/medium/low，
+/// 其 index 与优先级高低不一致，故显式映射。
+int _priorityWeight(TodoPriority p) => switch (p) {
+      TodoPriority.high => 3,
+      TodoPriority.medium => 2,
+      TodoPriority.low => 1,
+      TodoPriority.none => 0,
+    };
+
+/// 备忘录统计（完成数 / 总数 / 百分比）
+class MemoStats {
+  final int done;
+  final int total;
+  const MemoStats({required this.done, required this.total});
+
+  double get percent => total == 0 ? 0 : done / total;
+
+  int get percentInt => (percent * 100).round();
+}
+
+/// 待办统计（基于全部备忘录，不受筛选影响）
+final memoStatsProvider = Provider<MemoStats>((ref) {
+  final memos = ref.watch(memosProvider).valueOrNull ?? [];
+  return MemoStats(
+    done: memos.where((m) => m.done).length,
+    total: memos.length,
+  );
 });
 
 /// 备忘录总数

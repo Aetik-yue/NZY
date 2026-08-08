@@ -36,4 +36,12 @@ class MemoRepository {
         m.isPinned = !m.isPinned;
         await _isar.memos.put(m);
       });
+
+  /// 切换完成状态（读出取反写回）
+  Future<void> toggleDone(Id id) => _isar.writeTxn(() async {
+        final m = await _isar.memos.get(id);
+        if (m == null) return;
+        m.done = !m.done;
+        await _isar.memos.put(m);
+      });
 }
