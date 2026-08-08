@@ -34,8 +34,8 @@ class AllFeaturesPage extends ConsumerWidget {
           ),
           _FeatureEntry(
             icon: Icons.sticky_note_2_rounded,
-            title: '备忘录',
-            subtitle: '记录想说的话与计划',
+            title: '待办',
+            subtitle: '记录要一起完成的事',
             color: AppColors.accentCoral,
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const MemoPage()),

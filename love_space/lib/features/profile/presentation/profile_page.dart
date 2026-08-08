@@ -11,7 +11,7 @@ import 'all_features_page.dart';
 import 'settings_page.dart';
 
 /// 我的页
-/// 还原设计稿：渐变头部 → 统计行 → 音乐卡 → 功能卡（小说/备忘录/设置）
+/// 还原设计稿：渐变头部 → 统计行 → 音乐卡 → 功能卡（小说/待办/设置）
 class ProfilePage extends ConsumerWidget {
   const ProfilePage({super.key});
 
@@ -142,7 +142,7 @@ class _Avatar extends StatelessWidget {
   }
 }
 
-/// 统计行（相伴天数 / 相册 / 愿望 / 备忘录）
+/// 统计行（相伴天数 / 相册 / 愿望 / 待办）
 class _StatsRow extends ConsumerWidget {
   const _StatsRow();
 
@@ -157,7 +157,7 @@ class _StatsRow extends ConsumerWidget {
       ('$days', '相伴天数', AppColors.textPrimary),
       ('$photoCount', '相册照片', AppColors.accentRose),
       ('${wishStats.total}', '愿望', AppColors.accentRose),
-      ('$memoCount', '备忘录', AppColors.accentRose),
+      ('$memoCount', '待办', AppColors.accentRose),
     ];
     return Container(
       padding: const EdgeInsets.all(16),
@@ -265,7 +265,7 @@ class _MusicCard extends ConsumerWidget {
   }
 }
 
-/// 功能卡行（小说 / 备忘录 / 设置）
+/// 功能卡行（小说 / 待办 / 设置）
 class _FunctionCards extends ConsumerWidget {
   const _FunctionCards();
 
@@ -285,8 +285,8 @@ class _FunctionCards extends ConsumerWidget {
       ),
       _FuncCard(
         icon: Icons.sticky_note_2_rounded,
-        title: '备忘录',
-        sub: '$memoCount 条记录',
+        title: '待办',
+        sub: '$memoCount 项待办',
         bg: AppColors.accentPeach,
         iconColor: AppColors.accentCoral,
         onTap: () => Navigator.of(context).push(
