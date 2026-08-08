@@ -177,7 +177,7 @@
     时间轴 `_currentIndex` 在分组减少时未校正可能越界；isHighlight 只比月份不比年份会跨年误标纪念日；日期选择 firstDate 硬编码 2010。应 clamp 校正、按 togetherSince 具体年月日判定纪念日、firstDate 取 togetherSince 与 2010 较早者并允许未来 0-7 天容错。
     `lib/features/album/presentation/photo_timeline_page.dart`、`lib/features/album/presentation/widgets/add_photo_sheet.dart`、`lib/data/providers/data_providers.dart`
 
-35. **✅ 启用 flutter_localizations + 清理未使用依赖**
+35. **✅ 启用 flutter_localizations + 清理未使用依赖**（2026-08-04 完成）
     pubspec 声明 flutter_localizations 但 MaterialApp 未配置 localizationsDelegates/supportedLocales，中文日期选择器等本地化未生效；go_router/shared_preferences/cached_network_image/uuid/intl 全 lib/ 无 import。应配置本地化（或将其中确实需要的能力落地后保留，其余移除）。
     `lib/app/app.dart`、`pubspec.yaml`
 
@@ -185,7 +185,7 @@
     小说卡「共读 12 本」为硬编码假数据且不跳转 NovelPage；音乐卡「32 首·正在播放小幸运」假数据；统计行纯展示不可点；头部昵称无 maxLines/ellipsis 会溢出。应接入真实数据、统计行 onTap 跳转（复用 currentTabProvider）、音乐卡隐藏假数据或做真实歌单、昵称加 ellipsis。
     `lib/features/profile/presentation/profile_page.dart`
 
-37. **✅ 阅读器 keepScreenOn 常亮生效**
+37. **✅ 阅读器 keepScreenOn 常亮生效**（2026-08-04 完成）
     keepScreenOn 仅持久化与设置面板切换，阅读器从不读取（无 Wakelock/SystemChrome）。应在阅读器 initState/dispose 按 readerSettings.keepScreenOn 保持/释放唤醒锁。
     `lib/data/models/reader_settings.dart`、`lib/features/novel/presentation/novel_reader_page.dart`
 
@@ -193,7 +193,7 @@
     novelSourcesProvider/crawlConfigProvider/crawlLogsProvider 定义后无任何页面消费。应新增管理页展示/编辑爬取源与配置（含 prefetchChapters/请求间隔/超时/重试），并展示爬取日志供排查。
     `lib/data/providers/data_providers.dart`
 
-39. **✅ AppHttpClient 生命周期治理**
+39. **✅ AppHttpClient 生命周期治理**（2026-08-04 完成）
     每次爬取新建 AppHttpClient 且 close() 从不被调用（`_createCrawler` 每次 new），长期使用句柄/连接累积。应改为 provider 单例复用并在退出时 close，或爬取完成后显式 close。
     `lib/data/repositories/crawl_repository.dart`、`lib/core/network/app_http_client.dart`
 

@@ -14,7 +14,9 @@
 | 框架 | Flutter 3.x / Dart 3.5+ |
 | 状态管理 | Riverpod (`flutter_riverpod`) |
 | 本地数据库 | Isar (`isar` + `isar_flutter_libs`) |
-| 路由 | 底部导航（IndexedStack，4 个 Tab） |
+| 路由 | 底部导航（IndexedStack，5 个 Tab） |
+| 音乐 | `just_audio`（播放）+ `on_audio_query`（本地曲库扫描） |
+| 网络/爬虫 | `http` + `html` + `charset`（GBK 编码） |
 | 设计系统 | 暖奶油粉主题，AppColors + AppTextStyles |
 
 ### 目录结构
@@ -27,23 +29,39 @@ love_space/
 │   │   └── theme/                 # AppColors / AppTextStyles / AppTheme
 │   ├── core/                      # 跨层共享的工具和常量
 │   │   ├── constants/             # 种子数据等常量
-│   │   └── utils/                 # 问候语 / 日期工具 / 打卡计算
+│   │   ├── network/               # AppHttpClient（重试/UA/编码检测）/ UserAgentRotator
+│   │   └── utils/                 # 问候语 / 日期工具 / 打卡计算 / 标签解析
 │   ├── data/
 │   │   ├── models/                # Isar @collection 模型
 │   │   ├── database/              # isar_provider.dart / seed_service.dart
-│   │   ├── repositories/          # 每模型一个 Repository（CRUD + Stream）
+│   │   ├── crawler/               # BaseCrawler / BiqugeCrawler / ContentCleaner / DTO
+│   │   ├── repositories/          # 每模型一个 Repository（CRUD + Stream）+ CrawlRepository 协调器
 │   │   └── providers/             # Riverpod Provider 集中定义
 │   ├── features/                  # 按业务模块划分
-│   │   ├── home/                  # 首页（时光）
-│   │   ├── album/                 # 相册
+│   │   ├── home/                  # 首页（时光 + 打卡）
+│   │   ├── album/                 # 相册（网格 + 时间轴）
 │   │   ├── wishes/                # 愿望清单
-│   │   └── profile/               # 我的
+│   │   ├── novel/                 # 小说（书架 + 爬虫 + 阅读器）
+│   │   ├── memo/                  # 备忘录
+│   │   ├── music/                 # 音乐（播放器 + 曲库）
+│   │   └── profile/               # 我的（设置）
 │   └── shared/                    # 跨模块共享的组件
 │       ├── layouts/               # MainShell（主壳层）
 │       ├── widgets/               # PillNavBar / SectionHeader / AppSnackbar / ConfirmDialog
 │       └── utils/                 # ImagePickerHelper
 └── test/                          # 测试
 ```
+
+### 模块职责速览
+| 模块 | 职责 | 关键文件 |
+|---|---|---|
+| home | 问候语、纪念日卡片、每日打卡（幂等+streak）、时光线 | `home_page.dart` |
+| album | 照片九宫格、分类筛选、照片时间轴、全屏查看器 | `album_page.dart` / `photo_timeline_page.dart` |
+| wishes | 愿望清单、完成统计、进度卡、完成记录到时光线 | `wishes_page.dart` |
+| novel | 书架、搜索/分类添加、爬虫增量更新、滚动/翻页阅读器 | `novel_page.dart` / `novel_reader_page.dart` |
+| memo | 快速输入、#标签筛选、置顶、作者双头像 | `memo_page.dart` |
+| music | 本地曲库扫描、播放后端抽象、迷你播放条、全屏播放页 | `music_player_page.dart` |
+| profile | 情侣信息、隐私开关、统计行、设置 | `profile_page.dart` |
 
 ---
 
@@ -421,9 +439,10 @@ try {
 ### 9.1 测试文件位置
 ```
 test/
-├── widget_test.dart           # 冒烟测试
-└── repositories/              # 数据层单元测试
-    └── wish_repository_test.dart
+├── widget_test.dart               # 冒烟测试
+├── music/                         # 播放器控制器 / 权限时机
+└── repositories/                  # 数据层单元测试
+    └── data_repositories_test.dart
 ```
 
 ### 9.2 Provider 测试覆盖
@@ -499,7 +518,7 @@ test('add wish should persist to database', () async {
 1. 在 `NavTab` 枚举中新增值（`pill_nav_bar.dart`）
 2. 在 `MainShell` 的 `IndexedStack.children` 中添加页面
 3. 在 `NavTabX` extension 中添加 `label` 和 `icon`
-4. 在 `data/providers/data_providers.dart` 添加相关 Provider
+4. 在 `data/providers/data_providers.dart` 添加相关 Provider（含 `currentTabProvider`）
 
 ### Q: 如何添加新的数据模型？
 1. 在 `data/models/` 创建 `@collection` 类

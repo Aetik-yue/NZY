@@ -2,7 +2,7 @@ name: love_space
 description: "以越之名 · 情侣恋爱空间"
 publish_to: 'none'
 
-version: 1.0.5+6
+version: 1.0.8+9
 
 environment:
   sdk: ^3.5.4
@@ -14,20 +14,6 @@ dependencies:
 
   # 状态管理
   flutter_riverpod: ^2.5.1
-
-  # 路由
-  go_router: ^14.2.0
-
-  # 本地存储
-  shared_preferences: ^2.3.0
-
-  # 字体
-  # 图片
-  cached_network_image: ^3.4.1
-
-  # 工具
-  intl: ^0.20.2
-  uuid: ^4.4.2
 
   # 本地数据库
   isar: ^3.1.0
@@ -45,6 +31,9 @@ dependencies:
   http: ^1.2.1
   html: ^0.15.4
   charset: ^2.0.1  # GBK 编码支持（笔趣阁站点使用 GBK）
+
+  # 阅读器屏幕常亮
+  wakelock_plus: ^1.2.8
 
   # 本地化（中文日期选择器）
   flutter_localizations:
