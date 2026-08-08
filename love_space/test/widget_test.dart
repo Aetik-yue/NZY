@@ -1,4 +1,5 @@
 // 冒烟测试：验证应用能正常构建并渲染首页，且所有 Tab 均不落入错误态
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -8,6 +9,7 @@ import 'package:love_space/data/models/timeline_event.dart';
 import 'package:love_space/data/models/app_settings.dart';
 import 'package:love_space/data/models/reader_settings.dart';
 import 'package:love_space/core/utils/date_utils.dart';
+import 'package:love_space/features/games/breakout/breakout_page.dart';
 import 'package:love_space/features/music/providers/audio_backend.dart';
 import 'package:love_space/features/music/providers/music_player_provider.dart';
 import 'package:love_space/features/music/providers/music_library_provider.dart';
@@ -144,5 +146,14 @@ void main() {
     expect(container.read(currentTabProvider), NavTab.novel);
     // 小说页已可见（书架空态）
     expect(find.text('书架还空空的'), findsOneWidget);
+  });
+
+  testWidgets('BreakoutPage renders with ready overlay', (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(home: BreakoutPage()),
+    );
+    await tester.pump();
+    expect(find.text('打砖块'), findsOneWidget);
+    expect(find.text('准备好了吗'), findsOneWidget); // ready 遮罩
   });
 }
