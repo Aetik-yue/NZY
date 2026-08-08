@@ -6,6 +6,8 @@ import '../../../../data/models/memo.dart';
 import '../../../../data/providers/data_providers.dart';
 import '../../../../shared/widgets/app_snackbar.dart';
 import '../../../../shared/widgets/confirm_dialog.dart';
+import 'widgets/todo_fields.dart';
+import 'widgets/memo_edit_fields.dart';
 
 /// 备忘录编辑/新建页
 ///
@@ -26,18 +28,16 @@ class _MemoEditPageState extends ConsumerState<MemoEditPage> {
   bool _isEditing = false;
   bool _loaded = false;
 
+  // 待办属性：截止日期 / 优先级（新建默认 none + 无截止）
+  DateTime? _selectedDueDate;
+  TodoPriority _selectedPriority = TodoPriority.none;
+
   // 加载时的原始内容（用于未保存修改检测）
   String _originalContent = '';
   int _originalAuthor = 1;
   int _originalColor = 0xFFFF8FB1;
-
-  // 存库需要 int 值（Color.value 已弃用，用 toARGB32 转换）
-  static final _presetColors = [
-    AppColors.accentRose.toARGB32(), // 玫瑰粉
-    AppColors.accentPink.toARGB32(), // 柔粉
-    AppColors.accentPeach.toARGB32(), // 桃色
-    AppColors.accentMauve.toARGB32(), // 锦葵紫
-  ];
+  DateTime? _originalDueDate;
+  TodoPriority _originalPriority = TodoPriority.none;
 
   /// 是否存在未保存的修改
   bool get _hasChanges {
@@ -46,7 +46,9 @@ class _MemoEditPageState extends ConsumerState<MemoEditPage> {
     }
     return _controller.text != _originalContent ||
         _selectedAuthor != _originalAuthor ||
-        _selectedColor != _originalColor;
+        _selectedColor != _originalColor ||
+        _selectedDueDate != _originalDueDate ||
+        _selectedPriority != _originalPriority;
   }
 
   @override
@@ -75,9 +77,13 @@ class _MemoEditPageState extends ConsumerState<MemoEditPage> {
       _controller.text = memo.content;
       _selectedAuthor = memo.author;
       _selectedColor = memo.colorValue;
+      _selectedDueDate = memo.dueDate;
+      _selectedPriority = memo.priority;
       _originalContent = memo.content;
       _originalAuthor = memo.author;
       _originalColor = memo.colorValue;
+      _originalDueDate = memo.dueDate;
+      _originalPriority = memo.priority;
       _loaded = true;
     });
   }
@@ -115,6 +121,8 @@ class _MemoEditPageState extends ConsumerState<MemoEditPage> {
         }
         memo.content = content;
         memo.colorValue = _selectedColor;
+        memo.dueDate = _selectedDueDate;
+        memo.priority = _selectedPriority;
         memo.updatedAt = now;
         await repo.update(memo);
       } else {
@@ -123,7 +131,10 @@ class _MemoEditPageState extends ConsumerState<MemoEditPage> {
           ..author = _selectedAuthor
           ..isPinned = false
           ..colorValue = _selectedColor
-          ..createdAt = now);
+          ..createdAt = now
+          ..done = false
+          ..dueDate = _selectedDueDate
+          ..priority = _selectedPriority);
       }
 
       if (!mounted) return;
@@ -172,30 +183,7 @@ class _MemoEditPageState extends ConsumerState<MemoEditPage> {
   /// 拦截返回：有未保存修改时询问
   Future<void> _handlePopInvoked(bool didPop) async {
     if (didPop || !_hasChanges) return;
-    final leave = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('放弃修改？'),
-        content: const Text('当前内容尚未保存，确定要离开吗？'),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('继续编辑'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            style: FilledButton.styleFrom(
-              backgroundColor: AppColors.accentRose,
-            ),
-            child: const Text('放弃'),
-          ),
-        ],
-      ),
-    );
-    if (leave == true && mounted) {
+    if (await showDiscardChangesDialog(context) && mounted) {
       Navigator.of(context).pop();
     }
   }
@@ -247,121 +235,41 @@ class _MemoEditPageState extends ConsumerState<MemoEditPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // 作者选择器
+                    // 作者选择器（仅新建时）
                     if (!_isEditing) ...[
-                      Text('作者', style: AppTextStyles.label),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          for (var author = 1; author <= 2; author++)
-                            Padding(
-                              padding: const EdgeInsets.only(right: 12),
-                              child: GestureDetector(
-                                onTap: () =>
-                                    setState(() => _selectedAuthor = author),
-                                child: Container(
-                                  width: 40,
-                                  height: 40,
-                                  decoration: BoxDecoration(
-                                    color: _selectedAuthor == author
-                                        ? (author == 1
-                                            ? AppColors.accentRose
-                                            : AppColors.accentPeach)
-                                        : AppColors.bgCard,
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                      color: _selectedAuthor == author
-                                          ? Colors.transparent
-                                          : AppColors.borderSoft,
-                                    ),
-                                  ),
-                                  child: Center(
-                                    child: Text(
-                                      author == 1 ? '越' : '名',
-                                      style: AppTextStyles.body.copyWith(
-                                        color: _selectedAuthor == author
-                                            ? Colors.white
-                                            : AppColors.textSecondary,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                        ],
+                      AuthorSelector(
+                        value: _selectedAuthor,
+                        onChanged: (a) =>
+                            setState(() => _selectedAuthor = a),
                       ),
                       const SizedBox(height: 16),
                     ],
                     // 颜色选择
-                    Text('颜色', style: AppTextStyles.label),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        for (final color in _presetColors)
-                          Padding(
-                            padding: const EdgeInsets.only(right: 12),
-                            child: GestureDetector(
-                              onTap: () =>
-                                  setState(() => _selectedColor = color),
-                              child: Container(
-                                width: 32,
-                                height: 32,
-                                decoration: BoxDecoration(
-                                  color: Color(color),
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: _selectedColor == color
-                                        ? AppColors.textPrimary
-                                        : Colors.transparent,
-                                    width: 2,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                      ],
+                    ColorSelector(
+                      value: _selectedColor,
+                      onChanged: (c) =>
+                          setState(() => _selectedColor = c),
+                    ),
+                    const SizedBox(height: 16),
+                    // 截止日期选择
+                    DueDateField(
+                      value: _selectedDueDate,
+                      onChanged: (d) =>
+                          setState(() => _selectedDueDate = d),
+                    ),
+                    const SizedBox(height: 16),
+                    // 优先级选择
+                    PriorityField(
+                      value: _selectedPriority,
+                      onChanged: (p) =>
+                          setState(() => _selectedPriority = p),
                     ),
                     const SizedBox(height: 16),
                     // 输入框
-                    Expanded(
-                      child: TextField(
-                        controller: _controller,
-                        autofocus: !_isEditing,
-                        maxLines: null,
-                        expands: true,
-                        textAlignVertical: TextAlignVertical.top,
-                        // 触发重建以更新 PopScope.canPop（未保存拦截）
-                        onChanged: (_) => setState(() {}),
-                        decoration: InputDecoration(
-                          hintText: '记录你的想法...#标签',
-                          hintStyle: AppTextStyles.body.copyWith(
-                            color: AppColors.textTertiary,
-                          ),
-                          border: OutlineInputBorder(
-                            borderRadius:
-                                BorderRadius.circular(AppColors.radiusMd),
-                            borderSide:
-                                const BorderSide(color: AppColors.borderSoft),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius:
-                                BorderRadius.circular(AppColors.radiusMd),
-                            borderSide:
-                                const BorderSide(color: AppColors.borderSoft),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius:
-                                BorderRadius.circular(AppColors.radiusMd),
-                            borderSide: const BorderSide(
-                                color: AppColors.accentRose),
-                          ),
-                          contentPadding: const EdgeInsets.all(14),
-                          filled: true,
-                          fillColor: AppColors.bgCard,
-                        ),
-                        style: AppTextStyles.body,
-                      ),
+                    ContentTextField(
+                      controller: _controller,
+                      autofocus: !_isEditing,
+                      onChanged: () => setState(() {}),
                     ),
                     const SizedBox(height: 8),
                     Text('提示：使用 #标签名 添加标签，如 #旅行 #计划',

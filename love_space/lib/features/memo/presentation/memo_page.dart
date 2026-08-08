@@ -9,6 +9,8 @@ import '../../../../shared/widgets/confirm_dialog.dart';
 import 'widgets/quick_capture_bar.dart';
 import 'widgets/memo_search_bar.dart';
 import 'widgets/tag_filter_chips.dart';
+import 'widgets/author_filter_chips.dart';
+import 'widgets/todo_filter_chips.dart';
 import 'widgets/date_group_header.dart';
 import 'widgets/memo_card.dart';
 import 'memo_edit_page.dart';
@@ -60,7 +62,12 @@ class MemoPage extends ConsumerWidget {
             // 作者筛选栏（全部 / 越 / 名）
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-              child: _AuthorFilterChips(),
+              child: AuthorFilterChips(),
+            ),
+            // 待办状态筛选栏（全部 / 待办 / 已完成）
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              child: TodoFilterChips(),
             ),
             // 标签筛选栏（有标签时显示）
             if (allTags.isNotEmpty)
@@ -107,6 +114,7 @@ class _MemoList extends ConsumerWidget {
               memo: m,
               onTap: () => _openEdit(context, m.id),
               onTogglePin: () => _togglePin(context, ref, m.id),
+              onToggleDone: () => _toggleDone(context, ref, m.id),
               onDelete: () => _delete(context, ref, m),
             ),
           const SizedBox(height: 16),
@@ -120,6 +128,7 @@ class _MemoList extends ConsumerWidget {
               memo: m,
               onTap: () => _openEdit(context, m.id),
               onTogglePin: () => _togglePin(context, ref, m.id),
+              onToggleDone: () => _toggleDone(context, ref, m.id),
               onDelete: () => _delete(context, ref, m),
             ),
           const SizedBox(height: 16),
@@ -174,6 +183,16 @@ class _MemoList extends ConsumerWidget {
     }
   }
 
+  Future<void> _toggleDone(
+      BuildContext context, WidgetRef ref, int memoId) async {
+    try {
+      await ref.read(memoRepositoryProvider).toggleDone(memoId);
+    } catch (e) {
+      debugPrint('[MemoList] 切换完成状态失败: $e');
+      if (context.mounted) AppSnackbar.show(context, '操作失败，请重试');
+    }
+  }
+
   Future<void> _delete(BuildContext context, WidgetRef ref, Memo memo) async {
     // 删除前确认（与其他模块保持一致）
     final confirmed = await showConfirmDeleteDialog(
@@ -191,57 +210,6 @@ class _MemoList extends ConsumerWidget {
       debugPrint('[MemoList] 删除失败: $e');
       if (context.mounted) AppSnackbar.show(context, '删除失败，请重试');
     }
-  }
-}
-
-/// 作者筛选胶囊（全部 / 越 / 名）
-class _AuthorFilterChips extends ConsumerWidget {
-  const _AuthorFilterChips();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final selected = ref.watch(memoAuthorFilterProvider);
-    final options = <(int?, String)>[
-      (null, '全部'),
-      (1, '越'),
-      (2, '名'),
-    ];
-    return SizedBox(
-      height: 34,
-      child: Row(
-        children: [
-          for (final (value, label) in options)
-            GestureDetector(
-              onTap: () =>
-                  ref.read(memoAuthorFilterProvider.notifier).state = value,
-              child: Container(
-                margin: const EdgeInsets.only(right: 8),
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: selected == value
-                      ? AppColors.accentRose
-                      : AppColors.bgCard,
-                  borderRadius: BorderRadius.circular(AppColors.radiusPill),
-                  border: selected == value
-                      ? null
-                      : Border.all(color: AppColors.borderSoft),
-                ),
-                child: Text(
-                  label,
-                  style: AppTextStyles.caption.copyWith(
-                    color: selected == value
-                        ? Colors.white
-                        : AppColors.textSecondary,
-                    fontWeight:
-                        selected == value ? FontWeight.w600 : FontWeight.w400,
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
   }
 }
 
