@@ -453,8 +453,12 @@ class BiqugeCrawler implements BaseCrawler {
     final parts = <String>[];
     var title = '';
     var currentUrl = url;
+    // 已抓取 URL 集合：彻底防回链 / 重复分页（与 _nextPageUrl 的 page+1 递进双保险）
+    final seen = <String>{};
     // 防止恶意循环，最多拼接 20 页
     for (var i = 0; i < 20; i++) {
+      // 已抓过此 URL 则终止（回链 / 重复页）
+      if (!seen.add(currentUrl)) break;
       String body;
       try {
         body = await _httpClient.get(currentUrl);
@@ -482,19 +486,28 @@ class BiqugeCrawler implements BaseCrawler {
   ///
   /// biquge2.net 将长章节分页：第1页 `135023.html`，第2页 `135023_1.html`...
   /// 下一章则是不同的 chapterId（如 `135025.html`）。只返回同章分页链接。
+  ///
+  /// 不依赖链接文案：bqgbb.cc 等站点把同章分页按钮文案标成"下一章"会被
+  /// 文案过滤漏掉，致 [fetchChapterContent] 只抓第1页、章节字数被截断。
+  /// 改为遍历所有 a[href]，resolve 后用 [_chapterIdAndPage] 取目标
+  /// chapterId + page，仅当 [_isSameChapterPage]（同章）且
+  /// `page == 当前页 + 1`（严格递进）时返回。这样对"下一章"误标 /
+  /// 图片按钮 / 无文案链接都鲁棒，`page == current + 1` 杜绝回链循环。
   String? _nextPageUrl(String html, String currentUrl) {
+    final current = _chapterIdAndPage(currentUrl);
+    if (current == null) return null;
     final doc = html_parser.parse(html);
-    // 找文本含"下一页"/"继续阅读"的链接
     for (final a in doc.querySelectorAll('a[href]')) {
-      final text = a.text.trim();
-      if (text.contains('下一页') || text.contains('继续阅读') || text.contains('下页')) {
-        final href = a.attributes['href'] ?? '';
-        if (href.isEmpty) continue;
-        final resolved = _resolveUrl(href, currentUrl);
-        // 仅当是同章分页（当前 chapterId_N.html -> chapterId_(N+1).html）才跟随
-        if (_isSameChapterPage(currentUrl, resolved)) {
-          return resolved;
-        }
+      final href = a.attributes['href'] ?? '';
+      if (href.isEmpty) continue;
+      final resolved = _resolveUrl(href, currentUrl);
+      final target = _chapterIdAndPage(resolved);
+      if (target == null) continue;
+      // 同章分页且严格为下一页才跟随：_isSameChapterPage 确保不跨章，
+      // page == current + 1 严格递进，杜绝回链与跨章误入。
+      if (_isSameChapterPage(currentUrl, resolved) &&
+          target.page == current.page + 1) {
+        return resolved;
       }
     }
     return null;
