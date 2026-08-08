@@ -3,6 +3,7 @@ import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_text_styles.dart';
 import 'breakout_model.dart';
 import 'breakout_painter.dart';
+import 'breakout_status_overlay.dart';
 
 /// 打砖块游戏页
 class BreakoutPage extends StatefulWidget {
@@ -178,75 +179,87 @@ class _BreakoutPageState extends State<BreakoutPage>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.bgPrimary,
-      appBar: AppBar(
+    return PopScope(
+      canPop: true,
+      // 退出转场期间停动画循环（系统返回键与 AppBar 返回键均经此回调）
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) _ctrl.stop();
+      },
+      child: Scaffold(
         backgroundColor: AppColors.bgPrimary,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new,
-              size: 20, color: AppColors.textPrimary),
-          onPressed: () {
-            // 退出页面前停动画循环，避免 dispose 后再 tick
-            _ctrl.stop();
-            Navigator.of(context).pop();
-          },
+        appBar: AppBar(
+          backgroundColor: AppColors.bgPrimary,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_ios_new,
+                size: 20, color: AppColors.textPrimary),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+          title: Text('打砖块', style: AppTextStyles.titleMedium),
+          centerTitle: true,
         ),
-        title: Text('打砖块', style: AppTextStyles.titleMedium),
-        centerTitle: true,
-      ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  _hud('分数', '$_score'),
-                  _hud('第 ${_levelIndex + 1} 关',
-                      '/ ${kBreakoutLevels.length}'),
-                  _hud('生命', '❤️×$_lives'),
-                ],
+        body: SafeArea(
+          child: Column(
+            children: [
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _hud('分数', '$_score'),
+                    _hud('第 ${_levelIndex + 1} 关',
+                        '/ ${kBreakoutLevels.length}'),
+                    _hud('生命', '❤️×$_lives'),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 8),
-            Expanded(
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  return GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onPanUpdate: (d) => _onPanUpdate(d, constraints.maxWidth),
-                    onTap: () {
-                      if (_status == BreakoutStatus.playing) {
-                        _pause();
-                      } else if (_status == BreakoutStatus.ready ||
-                          _status == BreakoutStatus.paused) {
-                        _start();
-                      }
-                    },
-                    child: Stack(
-                      children: [
-                        CustomPaint(
-                          size: Size(constraints.maxWidth,
-                              constraints.maxHeight),
-                          painter: BreakoutPainter(
-                            bricks: _bricks,
-                            ball: _ball,
-                            paddle: _paddle,
-                            cols: _cols,
+              const SizedBox(height: 8),
+              Expanded(
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    return GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onPanUpdate: (d) =>
+                          _onPanUpdate(d, constraints.maxWidth),
+                      onTap: () {
+                        if (_status == BreakoutStatus.playing) {
+                          _pause();
+                        } else if (_status == BreakoutStatus.ready ||
+                            _status == BreakoutStatus.paused) {
+                          _start();
+                        }
+                      },
+                      child: Stack(
+                        children: [
+                          CustomPaint(
+                            size: Size(constraints.maxWidth,
+                                constraints.maxHeight),
+                            painter: BreakoutPainter(
+                              bricks: _bricks,
+                              ball: _ball,
+                              paddle: _paddle,
+                              cols: _cols,
+                            ),
                           ),
-                        ),
-                        if (_status != BreakoutStatus.playing)
-                          _statusOverlay(),
-                      ],
-                    ),
-                  );
-                },
+                          if (_status != BreakoutStatus.playing)
+                            BreakoutStatusOverlay(
+                              status: _status,
+                              levelIndex: _levelIndex,
+                              score: _score,
+                              onStart: _start,
+                              onNextLevel: _nextLevel,
+                              onRestart: _restart,
+                            ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
               ),
-            ),
-            const SizedBox(height: 12),
-          ],
+              const SizedBox(height: 12),
+            ],
+          ),
         ),
       ),
     );
@@ -259,57 +272,6 @@ class _BreakoutPageState extends State<BreakoutPage>
         Text(label, style: AppTextStyles.label),
         Text(value, style: AppTextStyles.titleSmall),
       ],
-    );
-  }
-
-  Widget _statusOverlay() {
-    final (title, hint, action) = switch (_status) {
-      BreakoutStatus.ready => ('准备好了吗', '点击屏幕或拖动开始', '开始'),
-      BreakoutStatus.paused => ('已暂停', '点击继续', '继续'),
-      BreakoutStatus.levelClear => ('过关！', '第 ${_levelIndex + 1} 关完成', '下一关'),
-      BreakoutStatus.gameWin => ('通关啦 🎉', '总分 $_score', '再玩一次'),
-      BreakoutStatus.gameOver => ('游戏结束', '得分 $_score', '重新开始'),
-      BreakoutStatus.playing => ('', '', ''),
-    };
-    return Container(
-      color: const Color(0x99000000),
-      child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(title,
-                style: AppTextStyles.titleLarge
-                    .copyWith(color: Colors.white)),
-            const SizedBox(height: 8),
-            Text(hint,
-                style: AppTextStyles.body.copyWith(color: Colors.white70)),
-            const SizedBox(height: 20),
-            FilledButton(
-              onPressed: () {
-                switch (_status) {
-                  case BreakoutStatus.ready:
-                  case BreakoutStatus.paused:
-                    _start();
-                    break;
-                  case BreakoutStatus.levelClear:
-                    _nextLevel();
-                    break;
-                  case BreakoutStatus.gameWin:
-                  case BreakoutStatus.gameOver:
-                    _restart();
-                    break;
-                  case BreakoutStatus.playing:
-                    break;
-                }
-              },
-              style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.accentRose),
-              child: Text(action,
-                  style: AppTextStyles.body.copyWith(color: Colors.white)),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

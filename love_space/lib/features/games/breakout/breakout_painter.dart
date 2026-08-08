@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../../../app/theme/app_colors.dart';
 import 'breakout_model.dart';
 
 /// 打砖块绘制器（逻辑坐标 0..1 -> 实际像素）
@@ -21,8 +23,8 @@ class BreakoutPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    // 背景：深色（经典打砖块暗背景；AppColors 无对应深色令牌，此处为例外）
-    final bgPaint = Paint()..color = const Color(0xFF1A1220);
+    // 背景：深色（经典打砖块暗背景）
+    final bgPaint = Paint()..color = AppColors.gameBgDark;
     canvas.drawRect(Offset.zero & size, bgPaint);
 
     final w = size.width;

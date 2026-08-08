@@ -165,6 +165,12 @@ class AppColors {
     }
   }
 
+  // ──────── 游戏 ────────
+  /// 游戏深色背景（打砖块等经典游戏暗底）#1A1220
+  static const gameBgDark = Color(0xFF1A1220);
+  /// 游戏状态遮罩半透明黑 rgba(0,0,0,0.6)
+  static const gameScrim = Color(0x99000000);
+
   // ──────── 间距（Primitives）────────
   static const spacing2xs = 4.0;
   static const spacingXs = 8.0;
