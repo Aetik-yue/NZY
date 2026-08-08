@@ -10,81 +10,146 @@ import '../music_player_page.dart';
 
 /// 底部常驻迷你播放条
 ///
-/// 有当前曲目时显示；点击打开全屏播放页，播放/暂停按钮独立响应。
-class MiniPlayerBar extends ConsumerWidget {
+/// 有当前曲目且未被用户滑动关闭（[MusicPlayerState.isHidden]）时显示；
+/// 点击打开全屏播放页，播放/暂停按钮独立响应。
+/// 水平滑动跟手位移 + 透明度淡化，松手超阈值（位移>30% 屏宽或速度>800）
+/// 隐藏迷你条（暂停播放，保留曲与进度），否则回弹归位。
+class MiniPlayerBar extends ConsumerStatefulWidget {
   const MiniPlayerBar({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<MiniPlayerBar> createState() => _MiniPlayerBarState();
+}
+
+class _MiniPlayerBarState extends ConsumerState<MiniPlayerBar>
+    with SingleTickerProviderStateMixin {
+  double _dragX = 0;
+  late final AnimationController _springCtrl;
+  // 回弹起点（_dragX 在松手瞬间的值）；listener 据此插值回 0。
+  // 用单条永久 listener + 手动曲线插值，避免每次回弹新建 Tween/Listener 累积。
+  double _springFrom = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _springCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 200),
+    )..addListener(() {
+      // easeOut: t 0->1 减速；值从 _springFrom 线性回弹到 0
+      final t = Curves.easeOut.transform(_springCtrl.value);
+      setState(() => _dragX = _springFrom * (1 - t));
+    });
+  }
+
+  @override
+  void dispose() {
+    _springCtrl.dispose();
+    super.dispose();
+  }
+
+  void _onHorizontalDragUpdate(DragUpdateDetails details) {
+    setState(() => _dragX += details.delta.dx);
+  }
+
+  void _onHorizontalDragEnd(DragEndDetails details) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final velocity = details.primaryVelocity ?? 0;
+    if (_dragX.abs() > screenWidth * 0.3 || velocity.abs() > 800) {
+      ref.read(musicPlayerProvider.notifier).hidePlayer();
+      setState(() => _dragX = 0);
+      return;
+    }
+    // 未超阈值：回弹归位（复用同一 controller + 永久 listener，无累积）
+    _springFrom = _dragX;
+    _springCtrl.forward(from: 0);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final state = ref.watch(musicPlayerProvider);
     final song = state.currentSong;
-    if (song == null) return const SizedBox.shrink();
+    if (song == null || state.isHidden) return const SizedBox.shrink();
+
+    final screenWidth = MediaQuery.of(context).size.width;
+    final opacity = (1 - _dragX.abs() / screenWidth).clamp(0.0, 1.0);
 
     return GestureDetector(
-      onTap: () => MusicPlayerPage.show(context),
       behavior: HitTestBehavior.opaque,
-      child: Container(
-        margin: const EdgeInsets.fromLTRB(12, 0, 12, 4),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: AppColors.bgCard,
-          borderRadius: BorderRadius.circular(AppColors.radiusPill),
-          boxShadow: const [
-            BoxShadow(
-              color: AppColors.shadowCard,
-              blurRadius: 12,
-              offset: Offset(0, 2),
-              spreadRadius: -2,
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            _Cover(song: song, size: 36),
-            const SizedBox(width: 10),
-            _EqualizerBars(playing: state.isPlaying),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(song.title,
-                      style: AppTextStyles.body,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis),
-                  Text(song.artist,
-                      style: AppTextStyles.caption,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis),
-                ],
-              ),
-            ),
-            GestureDetector(
-              onTap: () async {
-                try {
-                  await ref.read(musicPlayerProvider.notifier).togglePlay();
-                } catch (_) {
-                  if (context.mounted) AppSnackbar.show(context, '播放失败');
-                }
-              },
-              child: Container(
-                width: 36,
-                height: 36,
-                decoration: const BoxDecoration(
-                  gradient: AppColors.pinkButtonGradient,
-                  shape: BoxShape.circle,
+      onTap: () => MusicPlayerPage.show(context),
+      onHorizontalDragUpdate: _onHorizontalDragUpdate,
+      onHorizontalDragEnd: _onHorizontalDragEnd,
+      child: Transform.translate(
+        offset: Offset(_dragX, 0),
+        child: Opacity(
+          opacity: opacity,
+          child: Container(
+            margin: const EdgeInsets.fromLTRB(12, 0, 12, 4),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: AppColors.bgCard,
+              borderRadius: BorderRadius.circular(AppColors.radiusPill),
+              boxShadow: const [
+                BoxShadow(
+                  color: AppColors.shadowCard,
+                  blurRadius: 12,
+                  offset: Offset(0, 2),
+                  spreadRadius: -2,
                 ),
-                child: Icon(
-                  state.isPlaying
-                      ? Icons.pause_rounded
-                      : Icons.play_arrow_rounded,
-                  color: AppColors.textOnPink,
-                  size: 22,
-                ),
-              ),
+              ],
             ),
-          ],
+            child: Row(
+              children: [
+                _Cover(song: song, size: 36),
+                const SizedBox(width: 10),
+                _EqualizerBars(playing: state.isPlaying),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(song.title,
+                          style: AppTextStyles.body,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis),
+                      Text(song.artist,
+                          style: AppTextStyles.caption,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis),
+                    ],
+                  ),
+                ),
+                GestureDetector(
+                  onTap: () async {
+                    try {
+                      await ref
+                          .read(musicPlayerProvider.notifier)
+                          .togglePlay();
+                    } catch (_) {
+                      if (context.mounted) AppSnackbar.show(context, '播放失败');
+                    }
+                  },
+                  child: Container(
+                    width: 36,
+                    height: 36,
+                    decoration: const BoxDecoration(
+                      gradient: AppColors.pinkButtonGradient,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      state.isPlaying
+                          ? Icons.pause_rounded
+                          : Icons.play_arrow_rounded,
+                      color: AppColors.textOnPink,
+                      size: 22,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );

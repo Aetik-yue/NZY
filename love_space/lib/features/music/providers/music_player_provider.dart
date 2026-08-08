@@ -37,6 +37,7 @@ class MusicPlayerState {
   final Duration? duration;
   final bool isLoading; // setUrl 期间
   final PlayMode playMode;
+  final bool isHidden; // 用户滑动关闭迷你条后隐藏（保留曲与进度）
 
   const MusicPlayerState({
     this.playlist = const [],
@@ -46,6 +47,7 @@ class MusicPlayerState {
     this.duration,
     this.isLoading = false,
     this.playMode = PlayMode.sequence,
+    this.isHidden = false,
   });
 
   MusicPlayerState copyWith({
@@ -56,6 +58,7 @@ class MusicPlayerState {
     Duration? duration,
     bool? isLoading,
     PlayMode? playMode,
+    bool? isHidden,
   }) =>
       MusicPlayerState(
         playlist: playlist ?? this.playlist,
@@ -65,6 +68,7 @@ class MusicPlayerState {
         duration: duration ?? this.duration,
         isLoading: isLoading ?? this.isLoading,
         playMode: playMode ?? this.playMode,
+        isHidden: isHidden ?? this.isHidden,
       );
 
   MusicSong? get currentSong =>
@@ -290,6 +294,27 @@ class MusicPlayerController extends Notifier<MusicPlayerState> {
       return;
     }
     await _backend.play();
+  }
+
+  /// 隐藏迷你播放条（暂停播放，保留当前曲与进度）
+  ///
+  /// 用户滑动关闭迷你条时调用：pause 后端 + 置 isHidden。
+  /// currentIndex/position/_loadedSongId 保留，下次打开播放页 showPlayer 恢复，
+  /// togglePlay 续播不重载（_loadedSongId 仍匹配）。
+  Future<void> hidePlayer() async {
+    try {
+      await _backend.pause();
+    } catch (e) {
+      debugPrint('隐藏播放器暂停失败: $e');
+    }
+    state = state.copyWith(isHidden: true, isPlaying: false);
+  }
+
+  /// 恢复迷你播放条显示（打开播放页时调用）
+  void showPlayer() {
+    if (state.isHidden) {
+      state = state.copyWith(isHidden: false);
+    }
   }
 
   /// 循环切换播放模式（顺序 -> 随机 -> 单曲 -> 顺序）

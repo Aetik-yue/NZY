@@ -176,6 +176,28 @@ void main() {
         const Duration(seconds: 30));
   });
 
+  test('hidePlayer 暂停并隐藏，保留当前曲与进度', () async {
+    final ctrl = container.read(musicPlayerProvider.notifier);
+    ctrl.setPlaylist([_song(1), _song(2)]);
+    await ctrl.selectSong(0);
+    await ctrl.seekTo(const Duration(seconds: 30));
+    await ctrl.hidePlayer();
+    final state = container.read(musicPlayerProvider);
+    expect(state.isHidden, true);
+    expect(state.isPlaying, false);
+    expect(state.currentIndex, 0); // 保留当前曲
+    expect(state.position, const Duration(seconds: 30)); // 保留进度
+  });
+
+  test('showPlayer 恢复显示', () async {
+    final ctrl = container.read(musicPlayerProvider.notifier);
+    ctrl.setPlaylist([_song(1)]);
+    await ctrl.selectSong(0);
+    await ctrl.hidePlayer();
+    ctrl.showPlayer();
+    expect(container.read(musicPlayerProvider).isHidden, false);
+  });
+
   test('播放完成自动切下一首', () async {
     final ctrl = container.read(musicPlayerProvider.notifier);
     ctrl.setPlaylist([_song(1, dur: const Duration(milliseconds: 500)),

@@ -63,6 +63,8 @@ class _MusicPlayerPageState extends ConsumerState<MusicPlayerPage>
       },
       fireImmediately: true,
     );
+    // 打开播放页时恢复迷你条显示（用户可能滑动关闭过，重新打开应恢复）
+    ref.read(musicPlayerProvider.notifier).showPlayer();
   }
 
   @override
