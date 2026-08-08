@@ -81,10 +81,13 @@ class _ScriptedRandom implements Random {
     _i++;
     return v % max;
   }
+  // 未用方法抛异常快速失败：当前 controller 仅消费 nextInt，若未来代码路径分支到
+  // nextBool/nextDouble，硬编码常量会让测试在错误值下静默通过
   @override
-  bool nextBool() => false;
+  bool nextBool() => throw UnimplementedError('_ScriptedRandom 仅支持 nextInt');
   @override
-  double nextDouble() => 0;
+  double nextDouble() =>
+      throw UnimplementedError('_ScriptedRandom 仅支持 nextInt');
 }
 
 void main() {
@@ -537,5 +540,8 @@ void main() {
     expect(backend.setUrlCalls.where((u) => u == 'file:///song1.mp3').length, 1);
     expect(backend.setUrlCalls,
         ['file:///song1.mp3', 'file:///song2.mp3', 'file:///song3.mp3']);
+    // song1 的 play() 仅首次加载时调用一次，未被 auto-advance 重新触发（坏曲 setUrl
+    // 失败不会走到 play，故 playedUrls 不含 song2/song3）
+    expect(backend.playedUrls, ['file:///song1.mp3']);
   });
 }
