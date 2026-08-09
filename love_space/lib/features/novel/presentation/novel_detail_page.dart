@@ -1,142 +1,23 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_text_styles.dart';
 import '../../../data/providers/data_providers.dart';
-import '../../../data/models/novel.dart';
-import '../../../data/repositories/crawl_repository.dart';
-import '../../../shared/widgets/confirm_dialog.dart';
-import '../../../shared/widgets/app_snackbar.dart';
-import 'widgets/chapter_list_sheet.dart';
-import 'widgets/crawl_progress_sheet.dart';
-import 'novel_reader_page.dart';
+import 'widgets/detail_actions.dart';
+import 'widgets/detail_header.dart';
 
 /// 小说详情页
 ///
 /// 展示封面、标题、作者、简介、标签、章节数，并提供「开始阅读」与「目录」入口。
+/// 头部渲染与操作按钮拆分至 DetailHeader / DetailActions 子 Widget。
 class NovelDetailPage extends ConsumerWidget {
   final int novelId;
 
   const NovelDetailPage({super.key, required this.novelId});
 
-  /// 更新章节（手动触发爬取新章节）
-  Future<void> _updateChapters(
-    BuildContext context,
-    WidgetRef ref,
-    Novel novel,
-  ) async {
-    // 重置爬取状态
-    ref.read(crawlStatusProvider.notifier).state = const CrawlStatus(
-      state: 'fetching',
-      message: '准备更新...',
-    );
-
-    // 弹出进度面板
-    CrawlProgressSheet.show(context, title: '正在更新《${novel.title}》');
-
-    try {
-      // 进度回调（作为参数传入，避免单例可变状态）
-      void onProgress(String message, int current, int total) {
-        if (!context.mounted) return;
-        ref.read(crawlStatusProvider.notifier).state = CrawlStatus(
-          state: 'fetching',
-          message: message,
-          current: current,
-          total: total,
-        );
-      }
-
-      final newCount = await ref.read(crawlRepositoryProvider).updateNovel(
-            novel.id,
-            onProgress: onProgress,
-          );
-
-      if (!context.mounted) return;
-
-      ref.read(crawlStatusProvider.notifier).state = const CrawlStatus(
-        state: 'success',
-        message: '完成',
-      );
-
-      if (newCount == 0) {
-        AppSnackbar.show(context, '暂无新章节');
-      } else {
-        AppSnackbar.show(context, '新增 $newCount 章');
-      }
-    } on CancelledException {
-      // 用户主动取消，不显示错误
-    } catch (e) {
-      if (!context.mounted) return;
-      ref.read(crawlStatusProvider.notifier).state = CrawlStatus(
-        state: 'failed',
-        message: '更新失败：$e',
-      );
-      AppSnackbar.show(context, '更新失败，请稍后重试');
-    }
-  }
-
-  /// 格式化爬取时间
-  String _formatCrawlTime(DateTime time) {
-    final now = DateTime.now();
-    final diff = now.difference(time);
-
-    if (diff.inMinutes < 1) return '刚刚';
-    if (diff.inHours < 1) return '${diff.inMinutes} 分钟前';
-    if (diff.inDays < 1) return '${diff.inHours} 小时前';
-    if (diff.inDays < 7) return '${diff.inDays} 天前';
-
-    return '${time.month}月${time.day}日 ${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
-  }
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final novelsAsync = ref.watch(novelsProvider);
-
-    return novelsAsync.when(
-      data: (novels) {
-        final novel = novels.where((n) => n.id == novelId).firstOrNull;
-        if (novel == null) {
-          return _buildScaffold(
-            context,
-            body: const Center(child: Text('未找到该小说')),
-          );
-        }
-
-        final chaptersAsync = ref.watch(chaptersProvider(novelId));
-        return chaptersAsync.when(
-          data: (chapters) {
-            final resumeIndex = novel.lastChapterIndex < 0 || chapters.isEmpty
-                ? 0
-                : novel.lastChapterIndex.clamp(0, chapters.length - 1);
-            return _buildScaffold(
-              context,
-              body:
-                  _buildBody(context, ref, novel, chapters.length, resumeIndex),
-            );
-          },
-          loading: () => _buildScaffold(
-            context,
-            body:
-                const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-          ),
-          error: (_, __) => _buildScaffold(
-            context,
-            body: const Center(child: Text('章节加载失败')),
-          ),
-        );
-      },
-      loading: () => _buildScaffold(
-        context,
-        body: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-      ),
-      error: (_, __) => _buildScaffold(
-        context,
-        body: const Center(child: Text('加载失败')),
-      ),
-    );
-  }
-
-  Widget _buildScaffold(BuildContext context, {required Widget body}) {
     return Scaffold(
       backgroundColor: AppColors.bgPrimary,
       appBar: AppBar(
@@ -150,226 +31,45 @@ class NovelDetailPage extends ConsumerWidget {
         title: Text('小说详情', style: AppTextStyles.titleSmall),
         centerTitle: true,
       ),
-      body: body,
-    );
-  }
-
-  Widget _buildBody(
-    BuildContext context,
-    WidgetRef ref,
-    Novel novel,
-    int chapterCount,
-    int resumeIndex,
-  ) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 封面 + 基本信息
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 110,
-                height: 150,
-                decoration: BoxDecoration(
-                  color: Color(novel.coverColorValue),
-                  borderRadius: BorderRadius.circular(AppColors.radiusMd),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: AppColors.shadowCard,
-                      blurRadius: 16,
-                      offset: Offset(0, 6),
-                      spreadRadius: -4,
-                    ),
-                  ],
-                ),
-                child: const Center(
-                  child: Icon(
-                    Icons.menu_book_rounded,
-                    color: AppColors.textOnPink,
-                    size: 44,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
+      body: novelsAsync.when(
+        data: (novels) {
+          final novel = novels.where((n) => n.id == novelId).firstOrNull;
+          if (novel == null) {
+            return const Center(child: Text('未找到该小说'));
+          }
+          final chaptersAsync = ref.watch(chaptersProvider(novelId));
+          return chaptersAsync.when(
+            data: (chapters) {
+              final resumeIndex = novel.lastChapterIndex < 0 || chapters.isEmpty
+                  ? 0
+                  : novel.lastChapterIndex.clamp(0, chapters.length - 1);
+              return SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const SizedBox(height: 6),
-                    Text(novel.title, style: AppTextStyles.titleMedium),
-                    const SizedBox(height: 6),
-                    Text(novel.author, style: AppTextStyles.caption),
-                    const SizedBox(height: 10),
-                    Text('共 $chapterCount 章', style: AppTextStyles.label),
+                    DetailHeader(
+                      novel: novel,
+                      chapterCount: chapters.length,
+                    ),
+                    const SizedBox(height: 28),
+                    DetailActions(
+                      novel: novel,
+                      resumeIndex: resumeIndex,
+                      onDeleted: () => Navigator.of(context).pop(),
+                    ),
                   ],
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 18),
-
-          // 标签
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final tag in novel.tags)
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: AppColors.accentPinkSoft,
-                    borderRadius: BorderRadius.circular(AppColors.radiusXs),
-                  ),
-                  child: Text(tag,
-                      style: AppTextStyles.label
-                          .copyWith(color: AppColors.accentRose)),
-                ),
-            ],
-          ),
-          const SizedBox(height: 18),
-
-          // 简介
-          Text('简介', style: AppTextStyles.titleSmall),
-          const SizedBox(height: 8),
-          Text(novel.intro, style: AppTextStyles.body),
-
-          const SizedBox(height: 28),
-
-          // 开始阅读
-          SizedBox(
-            width: double.infinity,
-            height: 50,
-            child: FilledButton(
-              onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => NovelReaderPage(
-                    novelId: novel.id,
-                    initialChapterIndex: resumeIndex,
-                  ),
-                ),
-              ),
-              style: FilledButton.styleFrom(
-                backgroundColor: AppColors.accentRose,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(AppColors.radiusMd),
-                ),
-              ),
-              child: Text(
-                novel.lastChapterIndex < 0 ? '开始阅读' : '继续阅读',
-                style: AppTextStyles.onPink.copyWith(fontSize: 16),
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-
-          // 目录
-          SizedBox(
-            width: double.infinity,
-            height: 48,
-            child: OutlinedButton(
-              onPressed: () => ChapterListSheet.show(
-                context,
-                novelId: novel.id,
-                currentIndex: resumeIndex,
-                onSelect: (index) {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => NovelReaderPage(
-                        novelId: novel.id,
-                        initialChapterIndex: index,
-                      ),
-                    ),
-                  );
-                },
-              ),
-              style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: AppColors.accentRose),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(AppColors.radiusMd),
-                ),
-              ),
-              child: Text(
-                '目录',
-                style: AppTextStyles.body.copyWith(color: AppColors.accentRose),
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-
-          // 更新章节（仅爬虫小说显示）
-          if (novel.sourceUrl != null && novel.sourceKey != null) ...[
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: OutlinedButton.icon(
-                onPressed: novel.crawlStatus == 'crawling'
-                    ? null
-                    : () => _updateChapters(context, ref, novel),
-                icon: const Icon(Icons.refresh_rounded, size: 18),
-                label: const Text('更新章节'),
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: AppColors.accentRose),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(AppColors.radiusMd),
-                  ),
-                  foregroundColor: AppColors.accentRose,
-                ),
-              ),
-            ),
-            if (novel.lastCrawlAt != null) ...[
-              const SizedBox(height: 6),
-              Text(
-                '最后更新时间：${_formatCrawlTime(novel.lastCrawlAt!)}',
-                style: AppTextStyles.label,
-              ),
-            ],
-            const SizedBox(height: 12),
-          ],
-
-          // 删除小说
-          SizedBox(
-            width: double.infinity,
-            height: 48,
-            child: OutlinedButton(
-              onPressed: () async {
-                final confirmed = await showConfirmDeleteDialog(
-                  context,
-                  title: '删除小说',
-                  content: '确定要删除《${novel.title}》吗？所有章节也会被一并删除，此操作无法撤销。',
-                );
-                if (!confirmed || !context.mounted) return;
-                try {
-                  await ref
-                      .read(novelChapterRepositoryProvider)
-                      .deleteByNovel(novel.id);
-                  await ref.read(novelRepositoryProvider).delete(novel.id);
-                  if (!context.mounted) return;
-                  AppSnackbar.show(context, '已删除《${novel.title}》');
-                  Navigator.of(context).pop();
-                } catch (e) {
-                  debugPrint('[NovelDetailPage] 删除失败: $e');
-                  if (context.mounted) {
-                    AppSnackbar.show(context, '删除失败，请重试');
-                  }
-                }
-              },
-              style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: AppColors.accentRose),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(AppColors.radiusMd),
-                ),
-              ),
-              child: Text(
-                '删除小说',
-                style: AppTextStyles.body.copyWith(color: AppColors.accentRose),
-              ),
-            ),
-          ),
-        ],
+              );
+            },
+            loading: () => const Center(
+                child: CircularProgressIndicator(strokeWidth: 2)),
+            error: (_, __) => const Center(child: Text('章节加载失败')),
+          );
+        },
+        loading: () =>
+            const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+        error: (_, __) => const Center(child: Text('加载失败')),
       ),
     );
   }
