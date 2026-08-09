@@ -2,23 +2,64 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_text_styles.dart';
-import '../../../core/utils/anniversary_utils.dart';
-import '../../../core/utils/date_utils.dart';
 import '../../../data/models/anniversary.dart';
 import '../../../data/providers/data_providers.dart';
 import '../../../shared/widgets/app_snackbar.dart';
 import '../../../shared/widgets/confirm_dialog.dart';
 import 'widgets/add_anniversary_sheet.dart';
+import 'widgets/anniversary_timeline_item.dart';
 
-/// 纪念日管理页（二级页）
+/// 纪念日管理页 · 动画时间轴（二级页）
 ///
-/// 展示全部纪念日及倒数状态；点击条目弹操作单（编辑/删除），
-/// 右上角 ＋ 添加新纪念日。
-class AnniversaryPage extends ConsumerWidget {
+/// 进入页面后播放一次入场动画：左侧竖线自上而下延伸，右侧纪念日节点
+/// 依次淡入并从右滑入。点击节点弹操作单（编辑/删除），右上角 ＋ 添加。
+class AnniversaryPage extends ConsumerStatefulWidget {
   const AnniversaryPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<AnniversaryPage> createState() => _AnniversaryPageState();
+}
+
+class _AnniversaryPageState extends ConsumerState<AnniversaryPage>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final ProviderSubscription<AsyncValue<List<Anniversary>>> _dataSub;
+  bool _introPlayed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    );
+    // 首次拿到非空数据后播放一次入场动画。
+    // fireImmediately 兼容数据已缓存（如从首页进入）的场景：若已就绪则立即触发。
+    _dataSub = ref.listenManual<AsyncValue<List<Anniversary>>>(
+      anniversariesProvider,
+      (_, next) {
+        final items = next.valueOrNull;
+        if (!_introPlayed && items != null && items.isNotEmpty) {
+          _introPlayed = true;
+          // 下一帧再 forward，确保时间轴已布局、首帧以 progress=0 渲染
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) _ctrl.forward();
+          });
+        }
+      },
+      fireImmediately: true,
+    );
+  }
+
+  @override
+  void dispose() {
+    _dataSub.close();
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final anniversariesAsync = ref.watch(anniversariesProvider);
     return Scaffold(
       backgroundColor: AppColors.bgPrimary,
@@ -43,15 +84,28 @@ class AnniversaryPage extends ConsumerWidget {
       ),
       body: anniversariesAsync.when(
         data: (items) {
-          if (items.isEmpty) {
-            return _EmptyState();
-          }
-          return ListView.separated(
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
-            itemCount: items.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 12),
-            itemBuilder: (_, i) =>
-                _AnniversaryCard(item: items[i], onTap: () => _showActions(context, ref, items[i])),
+          if (items.isEmpty) return const _EmptyState();
+          // 时间轴按月日升序（年度循环视角，最早的在顶部）
+          final sorted = _sortByMonthDay(items);
+          final n = sorted.length;
+          return SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+            child: Column(
+              children: [
+                for (int i = 0; i < n; i++)
+                  AnimatedBuilder(
+                    animation: _ctrl,
+                    builder: (_, __) => AnniversaryTimelineItem(
+                      item: sorted[i],
+                      index: i,
+                      total: n,
+                      progress: _ctrl.value,
+                      isLast: i == n - 1,
+                      onTap: () => _showActions(context, ref, sorted[i]),
+                    ),
+                  ),
+              ],
+            ),
           );
         },
         loading: () =>
@@ -61,7 +115,18 @@ class AnniversaryPage extends ConsumerWidget {
     );
   }
 
-  /// 点击条目弹操作单：编辑 / 删除
+  /// 按月日升序排序（年度循环视角，1月在最上）
+  List<Anniversary> _sortByMonthDay(List<Anniversary> items) {
+    final copy = List<Anniversary>.of(items);
+    copy.sort((a, b) {
+      final cmp = a.date.month.compareTo(b.date.month);
+      if (cmp != 0) return cmp;
+      return a.date.day.compareTo(b.date.day);
+    });
+    return copy;
+  }
+
+  /// 点击节点弹操作单：编辑 / 删除
   Future<void> _showActions(
     BuildContext context,
     WidgetRef ref,
@@ -132,93 +197,10 @@ class AnniversaryPage extends ConsumerWidget {
   }
 }
 
-/// 单条纪念日卡片
-class _AnniversaryCard extends StatelessWidget {
-  final Anniversary item;
-  final VoidCallback onTap;
-
-  const _AnniversaryCard({required this.item, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final today = DateUtilsX.today();
-    final days = AnniversaryUtils.daysUntil(item.date, today);
-    final years = AnniversaryUtils.anniversaryYearsOf(item.date, today);
-
-    // 副标题：明年 X 周年（若是周年版式）或直接剩余天数
-    final String countdown;
-    if (days == 0) {
-      countdown = '就是今天 🎉';
-    } else if (days == 1) {
-      countdown = '明天就是！';
-    } else {
-      countdown = '还有 $days 天';
-    }
-    final sub = years != null && years > 0 && days != 0
-        ? '$countdown · ${years + 1} 周年'
-        : countdown;
-
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: AppColors.bgCard,
-          borderRadius: BorderRadius.circular(AppColors.radiusCard),
-          boxShadow: const [
-            BoxShadow(
-              color: AppColors.shadowCard,
-              blurRadius: 16,
-              offset: Offset(0, 4),
-              spreadRadius: -4,
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            // 标记圆点
-            Container(
-              width: 14,
-              height: 14,
-              decoration: BoxDecoration(
-                color: Color(item.colorValue),
-                shape: BoxShape.circle,
-              ),
-            ),
-            const SizedBox(width: 14),
-            // 信息
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(item.title, style: AppTextStyles.titleSmall),
-                  const SizedBox(height: 3),
-                  Text(
-                    '${item.date.month}月${item.date.day}日 · $sub',
-                    style: AppTextStyles.caption,
-                  ),
-                  if (item.note.isNotEmpty) ...[
-                    const SizedBox(height: 3),
-                    Text(item.note,
-                        style: AppTextStyles.label,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis),
-                  ],
-                ],
-              ),
-            ),
-            const Icon(Icons.chevron_right_rounded,
-                size: 20, color: AppColors.textTertiary),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 /// 空状态
 class _EmptyState extends StatelessWidget {
+  const _EmptyState();
+
   @override
   Widget build(BuildContext context) {
     return Center(
