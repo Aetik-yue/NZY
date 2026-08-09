@@ -9,6 +9,8 @@ import '../../games/tetris/tetris_page.dart';
 import '../../home/presentation/checkin_history_page.dart';
 import '../../home/presentation/timeline_all_page.dart';
 import '../../memo/presentation/memo_page.dart';
+import '../../tools/random_number_page.dart';
+import '../../tools/stopwatch_page.dart';
 import 'settings_page.dart';
 
 /// 全部功能页（三级入口：低频/长尾功能聚合）
@@ -94,6 +96,29 @@ class AllFeaturesPage extends ConsumerWidget {
             title: '缘分签',
             subtitle: '每日一句爱的占卜',
             color: AppColors.accentCoral,
+          ),
+        ],
+      ),
+      _FeatureGroup(
+        title: '实用工具',
+        items: [
+          _FeatureEntry(
+            icon: Icons.casino_rounded,
+            title: '随机数',
+            subtitle: '自定义范围生成随机数',
+            color: AppColors.accentMauve,
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const RandomNumberPage()),
+            ),
+          ),
+          _FeatureEntry(
+            icon: Icons.timer_rounded,
+            title: '计时器',
+            subtitle: '正计时秒表 · 计圈',
+            color: AppColors.accentCoral,
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const StopwatchPage()),
+            ),
           ),
         ],
       ),
