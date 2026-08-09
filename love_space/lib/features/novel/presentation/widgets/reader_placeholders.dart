@@ -90,12 +90,14 @@ class ReaderChapterEndPage extends StatelessWidget {
   final bool autoAdvancing;
   final bool autoAdvanceFailed;
   final Color textColor;
+  final VoidCallback? onRetry;
 
   const ReaderChapterEndPage({
     super.key,
     required this.autoAdvancing,
     required this.autoAdvanceFailed,
     required this.textColor,
+    this.onRetry,
   });
 
   @override
@@ -112,11 +114,34 @@ class ReaderChapterEndPage extends StatelessWidget {
                   color: AppColors.accentRose,
                 ),
               )
-            : Text(
-                autoAdvanceFailed ? '下一章加载失败，请重试' : '正在加载下一章…',
-                style: AppTextStyles.body.copyWith(color: textColor),
-                textAlign: TextAlign.center,
-              ),
+            : autoAdvanceFailed
+                ? Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '下一章加载失败，请重试',
+                        style: AppTextStyles.body.copyWith(color: textColor),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 16),
+                      FilledButton(
+                        onPressed: onRetry,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: AppColors.accentRose,
+                          shape: RoundedRectangleBorder(
+                            borderRadius:
+                                BorderRadius.circular(AppColors.radiusMd),
+                          ),
+                        ),
+                        child: const Text('重试'),
+                      ),
+                    ],
+                  )
+                : Text(
+                    '正在加载下一章…',
+                    style: AppTextStyles.body.copyWith(color: textColor),
+                    textAlign: TextAlign.center,
+                  ),
       ),
     );
   }
