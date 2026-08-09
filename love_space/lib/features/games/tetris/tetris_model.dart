@@ -181,6 +181,25 @@ int clearLines(TetrisBoard board) {
 /// Block out 检测（spawn 位被占 -> 游戏结束）
 bool isBlockOut(TetrisBoard board, Piece piece) => !isValidPosition(board, piece);
 
+/// Ghost origin 行（方块最大合法下落行）
+int ghostRow(TetrisBoard board, Piece? piece) {
+  if (piece == null) return 0;
+  var row = piece.row;
+  while (isValidPosition(board, piece.copyWith(row: row + 1))) {
+    row++;
+  }
+  return row;
+}
+
+/// 找出所有满行索引
+List<int> fullRows(TetrisBoard board) {
+  final full = <int>[];
+  for (var r = 0; r < kTetrisRows; r++) {
+    if (board[r].every((c) => c != null)) full.add(r);
+  }
+  return full;
+}
+
 /// 消行分值（0..4 行）
 const kLineScores = [0, 100, 300, 500, 800];
 

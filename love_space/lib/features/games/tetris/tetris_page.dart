@@ -3,11 +3,8 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
-import '../../../app/theme/app_colors.dart';
-import '../../../app/theme/app_text_styles.dart';
 import 'tetris_model.dart';
-import 'tetris_painter.dart';
-import 'tetris_status_overlay.dart';
+import 'tetris_play_body.dart';
 
 /// 俄罗斯方块游戏页
 class TetrisPage extends StatefulWidget {
@@ -182,10 +179,7 @@ class _TetrisPageState extends State<TetrisPage>
   /// 硬降：落到底 + 锁定（+2/格）
   void _hardDrop() {
     if (_status != TetrisStatus.playing || _clearing) return;
-    var row = _current!.row;
-    while (isValidPosition(_board, _current!.copyWith(row: row + 1))) {
-      row++;
-    }
+    final row = ghostRow(_board, _current);
     _score += (row - _current!.row) * 2;
     _current = _current!.copyWith(row: row);
     _lockPiece();
@@ -209,16 +203,6 @@ class _TetrisPageState extends State<TetrisPage>
     setState(() {});
   }
 
-  /// Ghost origin 行（最大合法下落行）
-  int _ghostRow() {
-    if (_current == null) return 0;
-    var row = _current!.row;
-    while (isValidPosition(_board, _current!.copyWith(row: row + 1))) {
-      row++;
-    }
-    return row;
-  }
-
   void _lockPiece() {
     final piece = _current!;
     for (final p in piece.absoluteCells()) {
@@ -229,10 +213,7 @@ class _TetrisPageState extends State<TetrisPage>
     _lockAccumMs = 0;
     _lockResets = 0;
     // 检测满行 -> 动画 / 否则直接生成下一块
-    final full = <int>[];
-    for (var r = 0; r < kTetrisRows; r++) {
-      if (_board[r].every((c) => c != null)) full.add(r);
-    }
+    final full = fullRows(_board);
     if (full.isNotEmpty) {
       _clearing = true;
       _clearProgress = 0;
@@ -271,7 +252,7 @@ class _TetrisPageState extends State<TetrisPage>
     _gravityAccumMs = 0;
   }
 
-  void _onPanUpdate(DragUpdateDetails d, double cellW, double cellH) {
+  void _onPanUpdate(DragUpdateDetails d, double cellW) {
     if (_status != TetrisStatus.playing || _clearing) return;
     _dragDx += d.delta.dx;
     _dragDy += d.delta.dy;
@@ -282,188 +263,37 @@ class _TetrisPageState extends State<TetrisPage>
       _dragDx -= cols * cellW;
     }
     // 垂直下拖：软降
-    while (_dragDy >= cellH) {
+    while (_dragDy >= cellW) {
       _softDrop();
-      _dragDy -= cellH;
+      _dragDy -= cellW;
     }
     if (_dragDy < 0) _dragDy = 0; // 上拖忽略
   }
 
   @override
   Widget build(BuildContext context) {
-    return PopScope(
-      canPop: true,
-      onPopInvokedWithResult: (didPop, _) {
-        if (didPop) _ticker.stop();
+    return TetrisPlayBody(
+      score: _score,
+      level: _level,
+      lines: _lines,
+      hold: _hold,
+      nextQueue: _nextQueue,
+      board: _board,
+      current: _current,
+      clearingRows: _clearingRows,
+      clearProgress: _clearProgress,
+      status: _status,
+      onPanUpdate: _onPanUpdate,
+      onRotate: () => _rotate(1),
+      onStart: _start,
+      onPause: _pause,
+      onRestart: () {
+        _reset();
+        setState(() {});
       },
-      child: Scaffold(
-        backgroundColor: AppColors.bgPrimary,
-        appBar: AppBar(
-          backgroundColor: AppColors.bgPrimary,
-          elevation: 0,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back_ios_new, size: 20, color: AppColors.textPrimary),
-            onPressed: () => Navigator.of(context).pop(),
-          ),
-          title: Text('俄罗斯方块', style: AppTextStyles.titleMedium),
-          centerTitle: true,
-          actions: [
-            IconButton(
-              icon: Icon(
-                _status == TetrisStatus.playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                color: AppColors.textPrimary,
-              ),
-              onPressed: () => _status == TetrisStatus.playing ? _pause() : _start(),
-            ),
-          ],
-        ),
-        body: SafeArea(
-          child: LayoutBuilder(
-            builder: (context, c) {
-              final fieldW = c.maxWidth * 0.62;
-              final cellW = fieldW / kTetrisCols;
-              final fieldH = cellW * kTetrisRows;
-              return Column(
-                children: [
-                  // HUD
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
-                      children: [
-                        _hud('分数', '$_score'),
-                        _hud('级别', '$_level'),
-                        _hud('行数', '$_lines'),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Expanded(
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // 左：Hold + 按钮
-                        SizedBox(
-                          width: c.maxWidth * 0.19,
-                          child: Column(
-                            children: [
-                              _panel('HOLD', _hold),
-                              const SizedBox(height: 12),
-                              _actionBtn('HOLD', AppColors.bgBlush, _holdSwap),
-                            ],
-                          ),
-                        ),
-                        // 中：游戏场
-                        SizedBox(
-                          width: fieldW,
-                          height: fieldH,
-                          child: GestureDetector(
-                            behavior: HitTestBehavior.opaque,
-                            onPanUpdate: (d) => _onPanUpdate(d, cellW, cellW),
-                            onTap: () => _rotate(1),
-                            child: Stack(
-                              children: [
-                                CustomPaint(
-                                  size: Size(fieldW, fieldH),
-                                  painter: TetrisPainter(
-                                    board: _board,
-                                    current: _current,
-                                    ghostRow: _ghostRow(),
-                                    clearingRows: _clearingRows,
-                                    clearProgress: _clearProgress,
-                                  ),
-                                ),
-                                if (_status != TetrisStatus.playing)
-                                  TetrisStatusOverlay(
-                                    status: _status,
-                                    score: _score,
-                                    level: _level,
-                                    lines: _lines,
-                                    onStart: _start,
-                                    onRestart: () {
-                                      _reset();
-                                      setState(() {});
-                                    },
-                                  ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        // 右：Next 队列 + Hard Drop
-                        SizedBox(
-                          width: c.maxWidth * 0.19,
-                          child: Column(
-                            children: [
-                              _nextPanel(),
-                              const SizedBox(height: 12),
-                              _actionBtn('DROP', AppColors.accentRose, _hardDrop),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                ],
-              );
-            },
-          ),
-        ),
-      ),
+      onHoldSwap: _holdSwap,
+      onHardDrop: _hardDrop,
+      onPop: () => _ticker.stop(),
     );
   }
-
-  Widget _hud(String label, String value) => Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(label, style: AppTextStyles.label),
-          Text(value, style: AppTextStyles.titleSmall),
-        ],
-      );
-
-  Widget _panel(String title, TetrominoType? type) => Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(title, style: AppTextStyles.label),
-          const SizedBox(height: 4),
-          SizedBox(
-            width: 56,
-            height: 48,
-            child: CustomPaint(painter: TetrominoPainter(type: type)),
-          ),
-        ],
-      );
-
-  Widget _nextPanel() {
-    final next3 = _nextQueue.take(3).toList();
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text('NEXT', style: AppTextStyles.label),
-        const SizedBox(height: 4),
-        for (final t in next3)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 6),
-            child: SizedBox(
-              width: 56,
-              height: 36,
-              child: CustomPaint(painter: TetrominoPainter(type: t)),
-            ),
-          ),
-      ],
-    );
-  }
-
-  Widget _actionBtn(String label, Color bg, VoidCallback onTap) => SizedBox(
-        width: double.infinity,
-        child: FilledButton(
-          onPressed: onTap,
-          style: FilledButton.styleFrom(
-            backgroundColor: bg,
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppColors.radiusSm)),
-          ),
-          child: Text(label, style: AppTextStyles.titleXs.copyWith(color: AppColors.textPrimary)),
-        ),
-      );
 }
