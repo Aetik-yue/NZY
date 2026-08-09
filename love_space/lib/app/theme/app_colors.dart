@@ -28,6 +28,12 @@ class AppColors {
   static const accentCoral = Color(0xFFFFB5A1);
   /// 锦葵紫 #B57DBA
   static const accentMauve = Color(0xFFB57DBA);
+  /// 金色 #F5D78A（俄罗斯方块 O）
+  static const accentGold = Color(0xFFF5D78A);
+  /// 鼠尾草绿 #A8C9A0（俄罗斯方块 S）
+  static const accentSage = Color(0xFFA8C9A0);
+  /// 青色 #8FD4D0（俄罗斯方块 I）
+  static const accentTeal = Color(0xFF8FD4D0);
 
   // ──────── 文字 ────────
   /// 主文字 柔深紫 #33263B
