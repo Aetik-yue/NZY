@@ -217,5 +217,8 @@ Duration gravityInterval(int level) {
 }
 
 /// 生成 spawn 方块（顶部居中）
+///
+/// SRS 居中：I（4 宽 box）col=3 占 cols 3-6；O（2 宽 box）col=4 占 cols 4-5；
+/// 其余 3 宽 box col=3 占 cols 3-5。原 `I ? 3 : 3` 是空操作三元，O 实际偏左 1 格。
 Piece spawnPiece(TetrominoType type) =>
-    Piece(type: type, rotation: 0, row: 0, col: type == TetrominoType.I ? 3 : 3);
+    Piece(type: type, rotation: 0, row: 0, col: type == TetrominoType.O ? 4 : 3);

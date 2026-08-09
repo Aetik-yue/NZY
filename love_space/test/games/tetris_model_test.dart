@@ -27,12 +27,33 @@ void main() {
       expect(cells.length, 4);
       expect(cells.map((p) => p.r).toSet(), {1});
     });
-    test('T 旋转 4 态互不相同', () {
-      final s0 = cellsOf(TetrominoType.T, 0);
-      final s1 = cellsOf(TetrominoType.T, 1);
-      final s2 = cellsOf(TetrominoType.T, 2);
-      final s3 = cellsOf(TetrominoType.T, 3);
-      expect({s0, s1, s2, s3}.length, 4);
+    test('T 旋转 4 态坐标深比较（修复 #13：校验具体坐标而非引用互异）', () {
+      expect(cellsOf(TetrominoType.T, 0), [
+        (r: 0, c: 1), (r: 1, c: 0), (r: 1, c: 1), (r: 1, c: 2),
+      ]);
+      expect(cellsOf(TetrominoType.T, 1), [
+        (r: 1, c: 2), (r: 0, c: 1), (r: 1, c: 1), (r: 2, c: 1),
+      ]);
+      expect(cellsOf(TetrominoType.T, 2), [
+        (r: 2, c: 1), (r: 1, c: 2), (r: 1, c: 1), (r: 1, c: 0),
+      ]);
+      expect(cellsOf(TetrominoType.T, 3), [
+        (r: 1, c: 0), (r: 2, c: 1), (r: 1, c: 1), (r: 0, c: 1),
+      ]);
+    });
+    test('I 旋转 4 态坐标深比较（修复 #13）', () {
+      expect(cellsOf(TetrominoType.I, 0), [
+        (r: 1, c: 0), (r: 1, c: 1), (r: 1, c: 2), (r: 1, c: 3),
+      ]);
+      expect(cellsOf(TetrominoType.I, 1), [
+        (r: 0, c: 2), (r: 1, c: 2), (r: 2, c: 2), (r: 3, c: 2),
+      ]);
+      expect(cellsOf(TetrominoType.I, 2), [
+        (r: 2, c: 3), (r: 2, c: 2), (r: 2, c: 1), (r: 2, c: 0),
+      ]);
+      expect(cellsOf(TetrominoType.I, 3), [
+        (r: 3, c: 1), (r: 2, c: 1), (r: 1, c: 1), (r: 0, c: 1),
+      ]);
     });
     test('O 任意旋转态相同', () {
       expect(cellsOf(TetrominoType.O, 0), cellsOf(TetrominoType.O, 2));
@@ -70,12 +91,30 @@ void main() {
       expect(r, isNotNull);
       expect(r!.rotation, 1);
     });
-    test('靠左墙 T 旋转踢墙成功', () {
+    test('T 旋转撞占位格触发踢墙（非零 kick 偏移，修复 #13）', () {
       final board = emptyBoard();
-      // T 贴左墙（col=0），spawn 态最左格在 col0；CW 后最左格到 col0 仍合法
-      const p = Piece(type: TetrominoType.T, row: 5, col: 0);
+      // T 在 col=1 spawn 态合法；CW 后 0 偏移态会撞 (7,2)，
+      // JLSTZ 表 (0,1) 第 2 项 kick (dc=-1,dr=0) 生效 -> 落到 col=0
+      board[7][2] = TetrominoType.I;
+      const p = Piece(type: TetrominoType.T, rotation: 0, row: 5, col: 1);
+      expect(isValidPosition(board, p), isTrue);
       final r = rotate(board, p, 1);
       expect(r, isNotNull);
+      expect(r!.rotation, 1);
+      expect(r.col, 0); // kick dc=-1
+      expect(r.row, 5); // dr=0
+    });
+    test('I 靠右墙旋转踢墙使用非零偏移', () {
+      final board = emptyBoard();
+      // I 竖态（rotation 1）贴右墙 col=7 合法（绝对列 9）；
+      // CW 到水平态 0 偏移会越右界（col 10），I 表 (1,2) 第 2 项 kick dc=-1 -> col=6
+      const p = Piece(type: TetrominoType.I, rotation: 1, row: 5, col: 7);
+      expect(isValidPosition(board, p), isTrue);
+      final r = rotate(board, p, 1);
+      expect(r, isNotNull);
+      expect(r!.rotation, 2);
+      expect(r.col, 6); // kick dc=-1
+      expect(r.row, 5); // dr=0
     });
     test('被占格完全堵死返回 null', () {
       final board = emptyBoard();

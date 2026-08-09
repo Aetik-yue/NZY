@@ -20,8 +20,10 @@ class TetrisPlayBody extends StatelessWidget {
   final double clearProgress;
   final TetrisStatus status;
 
-  /// 拖动回调（cellW 由内部按屏宽计算后传入）
-  final void Function(DragUpdateDetails d, double cellW) onPanUpdate;
+  /// 水平拖动回调（左右移动，cellW 由内部按屏宽计算后传入）
+  final void Function(DragUpdateDetails d, double cellW) onHorizontalDrag;
+  /// 垂直拖动回调（软降，cellW 由内部按屏宽计算后传入）
+  final void Function(DragUpdateDetails d, double cellW) onVerticalDrag;
   final VoidCallback onRotate;
   final VoidCallback onStart;
   final VoidCallback onPause;
@@ -44,7 +46,8 @@ class TetrisPlayBody extends StatelessWidget {
     required this.clearingRows,
     required this.clearProgress,
     required this.status,
-    required this.onPanUpdate,
+    required this.onHorizontalDrag,
+    required this.onVerticalDrag,
     required this.onRotate,
     required this.onStart,
     required this.onPause,
@@ -107,24 +110,29 @@ class TetrisPlayBody extends StatelessWidget {
                             ),
                           ],
                         ),
-                        // 中：游戏场
-                        TetrisGameField(
-                          fieldW: fieldW,
-                          fieldH: fieldH,
-                          cellW: cellW,
-                          board: board,
-                          current: current,
-                          ghostRow: ghostRow(board, current),
-                          clearingRows: clearingRows,
-                          clearProgress: clearProgress,
-                          status: status,
-                          score: score,
-                          level: level,
-                          lines: lines,
-                          onPanUpdate: (d) => onPanUpdate(d, cellW),
-                          onTap: onRotate,
-                          onStart: onStart,
-                          onRestart: onRestart,
+                        // 中：游戏场（RepaintBoundary 隔离每帧重绘，修复 #11）
+                        RepaintBoundary(
+                          child: TetrisGameField(
+                            fieldW: fieldW,
+                            fieldH: fieldH,
+                            cellW: cellW,
+                            board: board,
+                            current: current,
+                            ghostRow: ghostRow(board, current),
+                            clearingRows: clearingRows,
+                            clearProgress: clearProgress,
+                            status: status,
+                            score: score,
+                            level: level,
+                            lines: lines,
+                            onHorizontalDragUpdate: (d) =>
+                                onHorizontalDrag(d, cellW),
+                            onVerticalDragUpdate: (d) =>
+                                onVerticalDrag(d, cellW),
+                            onTap: onRotate,
+                            onStart: onStart,
+                            onRestart: onRestart,
+                          ),
                         ),
                         // 右：Next 队列 + Hard Drop
                         TetrisSideColumn(

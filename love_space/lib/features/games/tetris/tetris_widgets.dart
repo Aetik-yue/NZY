@@ -144,7 +144,8 @@ class TetrisGameField extends StatelessWidget {
   final int score;
   final int level;
   final int lines;
-  final void Function(DragUpdateDetails) onPanUpdate;
+  final void Function(DragUpdateDetails) onHorizontalDragUpdate;
+  final void Function(DragUpdateDetails) onVerticalDragUpdate;
   final VoidCallback onTap;
   final VoidCallback onStart;
   final VoidCallback onRestart;
@@ -163,7 +164,8 @@ class TetrisGameField extends StatelessWidget {
     required this.score,
     required this.level,
     required this.lines,
-    required this.onPanUpdate,
+    required this.onHorizontalDragUpdate,
+    required this.onVerticalDragUpdate,
     required this.onTap,
     required this.onStart,
     required this.onRestart,
@@ -176,7 +178,9 @@ class TetrisGameField extends StatelessWidget {
       height: fieldH,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onPanUpdate: onPanUpdate,
+        // 水平/垂直轴向专用识别器：纯点按不被任一拖动抢占，tap 旋转保留（修复 #9）
+        onHorizontalDragUpdate: onHorizontalDragUpdate,
+        onVerticalDragUpdate: onVerticalDragUpdate,
         onTap: onTap,
         child: Stack(
           children: [

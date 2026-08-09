@@ -61,7 +61,7 @@ class TetrisPainter extends CustomPainter {
           Paint()
             ..style = PaintingStyle.stroke
             ..strokeWidth = cell * 0.08
-            ..color = current!.type.color.withValues(alpha: 0.35),
+            ..color = current!.type.color.withValues(alpha: 0.22),
         );
       }
     }
@@ -127,16 +127,22 @@ class TetrominoPainter extends CustomPainter {
     if (type == null) return;
     final cells = cellsOf(type!, 0);
     final boxSize = kBoxSize[type!]!;
-    // 预览区给一点边距，方块占 box 的有效行列范围
-    final maxR = cells.map((p) => p.r).reduce((a, b) => a > b ? a : b) + 1;
-    final maxC = cells.map((p) => p.c).reduce((a, b) => a > b ? a : b) + 1;
+    // 紧凑包围盒：按实际 cells 的行列范围居中（修复 I 型预览偏下）
+    // I spawn cells 全在 row 1，按含空行的 box 居中会整体偏下；
+    // 改用 min/max 实际占用范围，去空行/空列后居中。
+    final minR = cells.map((p) => p.r).reduce((a, b) => a < b ? a : b);
+    final maxR = cells.map((p) => p.r).reduce((a, b) => a > b ? a : b);
+    final minC = cells.map((p) => p.c).reduce((a, b) => a < b ? a : b);
+    final maxC = cells.map((p) => p.c).reduce((a, b) => a > b ? a : b);
+    final rows = maxR - minR + 1;
+    final cols = maxC - minC + 1;
     final cell = size.shortestSide / boxSize * 0.8;
-    final offsetX = (size.width - maxC * cell) / 2;
-    final offsetY = (size.height - maxR * cell) / 2;
+    final offsetX = (size.width - cols * cell) / 2;
+    final offsetY = (size.height - rows * cell) / 2;
     for (final p in cells) {
       final rect = Rect.fromLTWH(
-        offsetX + p.c * cell,
-        offsetY + p.r * cell,
+        offsetX + (p.c - minC) * cell,
+        offsetY + (p.r - minR) * cell,
         cell,
         cell,
       );

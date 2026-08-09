@@ -107,13 +107,12 @@ class _TetrisPageState extends State<TetrisPage>
       return;
     }
 
-    final piece = _current!;
-    // gravity（ms 累加）
+    // gravity（ms 累加）：循环内读最新 _current，避免多格塌缩为 1 格（修复 #5）
     _gravityAccumMs += dt * 16.6667;
     final intervalMs = gravityInterval(_level).inMilliseconds;
     while (_gravityAccumMs >= intervalMs) {
       _gravityAccumMs -= intervalMs;
-      final moved = piece.copyWith(row: piece.row + 1);
+      final moved = _current!.copyWith(row: _current!.row + 1);
       if (isValidPosition(_board, moved)) {
         _current = moved;
         _onGround = false;
@@ -122,8 +121,8 @@ class _TetrisPageState extends State<TetrisPage>
         break;
       }
     }
-    // lock delay
-    _onGround = !isValidPosition(_board, piece.copyWith(row: piece.row + 1));
+    // lock delay：复算贴地状态用最新 _current（修复 #7）
+    _onGround = !isValidPosition(_board, _current!.copyWith(row: _current!.row + 1));
     if (_onGround) {
       _lockAccumMs += dt * 16.6667;
       if (_lockAccumMs >= 500) {
@@ -136,11 +135,21 @@ class _TetrisPageState extends State<TetrisPage>
     setState(() {});
   }
 
-  /// 移动（成功且原贴地时重置 lock delay）
+  /// 移动：逐格推进，遇墙/占位即停，避免越墙瞬移（修复 #2）
+  ///
+  /// 拖动量化传入的 [dc] 可能为多格，逐格校验路径确保不穿越障碍；
+  /// 终点被挡时仍保留已推进的格数，不整段失败。
   void _move(int dc) {
     if (_status != TetrisStatus.playing || _clearing) return;
-    final moved = _current!.copyWith(col: _current!.col + dc);
-    if (isValidPosition(_board, moved)) {
+    if (dc == 0) return;
+    final step = dc.sign; // -1 或 1
+    var moved = _current!;
+    for (var i = 0; i < dc.abs(); i++) {
+      final next = moved.copyWith(col: moved.col + step);
+      if (!isValidPosition(_board, next)) break; // 遇阻停，不越墙
+      moved = next;
+    }
+    if (moved.col != _current!.col) {
       _current = moved;
       _resetLockIfGrounded();
       setState(() {});
@@ -196,11 +205,25 @@ class _TetrisPageState extends State<TetrisPage>
       _current = spawnPiece(_hold!);
       _hold = cur;
     }
+    // spawn 新方块后检测 game over：满盘 hold 时新方块 spawn 在重叠位置
+    // 不触发 gameOver 会损坏棋盘（修复 #1）
+    if (isBlockOut(_board, _current!)) {
+      _gameOver();
+      return;
+    }
     _holdUsed = true;
+    _gravityAccumMs = 0; // 修复 #6：hold 后重置重力累计
     _lockAccumMs = 0;
     _lockResets = 0;
     _onGround = false;
     setState(() {});
+  }
+
+  /// 游戏结束：停表 + 清当前方块（避免遮罩下绘制重叠方块）+ 置状态
+  void _gameOver() {
+    _ticker.stop();
+    _current = null;
+    setState(() => _status = TetrisStatus.gameOver);
   }
 
   void _lockPiece() {
@@ -210,6 +233,8 @@ class _TetrisPageState extends State<TetrisPage>
         _board[p.r][p.c] = piece.type;
       }
     }
+    // 已写入棋盘，清除 _current：消行动画期间不再满绘当前方块遮挡闪光（修复 #3）
+    _current = null;
     _lockAccumMs = 0;
     _lockResets = 0;
     // 检测满行 -> 动画 / 否则直接生成下一块
@@ -240,8 +265,7 @@ class _TetrisPageState extends State<TetrisPage>
   void _spawnNext() {
     final next = _spawnFromQueue();
     if (isBlockOut(_board, next)) {
-      _ticker.stop();
-      _status = TetrisStatus.gameOver;
+      _gameOver();
       return;
     }
     _current = next;
@@ -252,17 +276,26 @@ class _TetrisPageState extends State<TetrisPage>
     _gravityAccumMs = 0;
   }
 
-  void _onPanUpdate(DragUpdateDetails d, double cellW) {
+  /// 水平拖动 -> 左右移动（每格宽度 1 列）
+  ///
+  /// 与垂直拖动分离（修复 #9）：原 onPanUpdate 在任意方向位移 >18px 即抢占
+  /// 手势竞技场，点按旋转被小漂移吞。改用 onHorizontalDragUpdate /
+  /// onVerticalDragUpdate 轴向专用识别器，纯点按不被任一拖动识别器认领，
+  /// tap 旋转得以保留。
+  void _onHorizontalDrag(DragUpdateDetails d, double cellW) {
     if (_status != TetrisStatus.playing || _clearing) return;
     _dragDx += d.delta.dx;
-    _dragDy += d.delta.dy;
-    // 水平：每格宽度移动 1 列
     if (_dragDx.abs() >= cellW) {
       final cols = (_dragDx / cellW).truncate();
       _move(cols);
       _dragDx -= cols * cellW;
     }
-    // 垂直下拖：软降
+  }
+
+  /// 垂直下拖 -> 软降；上拖忽略
+  void _onVerticalDrag(DragUpdateDetails d, double cellW) {
+    if (_status != TetrisStatus.playing || _clearing) return;
+    _dragDy += d.delta.dy;
     while (_dragDy >= cellW) {
       _softDrop();
       _dragDy -= cellW;
@@ -283,13 +316,14 @@ class _TetrisPageState extends State<TetrisPage>
       clearingRows: _clearingRows,
       clearProgress: _clearProgress,
       status: _status,
-      onPanUpdate: _onPanUpdate,
+      onHorizontalDrag: _onHorizontalDrag,
+      onVerticalDrag: _onVerticalDrag,
       onRotate: () => _rotate(1),
       onStart: _start,
       onPause: _pause,
       onRestart: () {
         _reset();
-        setState(() {});
+        _start(); // 修复 #12：重开即开始，无需二次点击
       },
       onHoldSwap: _holdSwap,
       onHardDrop: _hardDrop,
