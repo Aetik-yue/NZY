@@ -232,11 +232,15 @@ class _NovelReaderPageState extends ConsumerState<NovelReaderPage> {
 
   void _previous() {
     if (_settings?.pageMode == 1) {
-      if (_pageController.page != null && _pageController.page! > 0) {
+      final page = _pageController.page ?? 0;
+      if (page > 0) {
         _pageController.previousPage(
           duration: const Duration(milliseconds: 250),
           curve: Curves.easeOut,
         );
+      } else {
+        // 已在首页：回退上一章并定位末页
+        _goToPreviousChapterLastPage();
       }
     } else if (_scrollController.hasClients) {
       final h = _scrollController.position.viewportDimension;
@@ -246,6 +250,35 @@ class _NovelReaderPageState extends ConsumerState<NovelReaderPage> {
         curve: Curves.easeOut,
       );
     }
+  }
+
+  /// 翻页模式：page==0 时回退上一章末页
+  ///
+  /// 先确保上一章正文就绪（预取可能已抓到，未抓到则现抓），成功后切章并
+  /// 标记 [_jumpToEndOnRestore]，由 [_maybeRestore] 在 post-frame 跳到末页。
+  /// 失败则 toast 提示且不切章。
+  Future<void> _goToPreviousChapterLastPage() async {
+    final chapters = _latestChapters;
+    if (chapters.isEmpty) return;
+    final effectiveIndex =
+        _currentChapterIndex.clamp(0, chapters.length - 1);
+    if (effectiveIndex <= 0) {
+      if (mounted) AppSnackbar.show(context, '已经是第一章');
+      return;
+    }
+    final prevIndex = effectiveIndex - 1;
+    // 确保上一章正文就绪（预取可能已抓到；未抓到则现抓）
+    final ready = await _ensureChapterBodyReady(chapters, prevIndex);
+    if (!mounted) return;
+    if (ready == null) {
+      if (mounted) AppSnackbar.show(context, '上一章加载失败，请重试');
+      return;
+    }
+    // 用带正文的实例替换后切章，并标记跳末页
+    final refreshed = List.of(chapters);
+    refreshed[prevIndex] = ready;
+    _jumpToEndOnRestore = true;
+    _goToChapter(prevIndex, refreshed);
   }
 
   void _next() {
