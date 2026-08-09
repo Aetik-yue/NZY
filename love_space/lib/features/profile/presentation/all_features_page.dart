@@ -5,6 +5,7 @@ import '../../../app/theme/app_text_styles.dart';
 import '../../../shared/widgets/app_snackbar.dart';
 import '../../anniversary/presentation/anniversary_page.dart';
 import '../../games/breakout/breakout_page.dart';
+import '../../games/tetris/tetris_page.dart';
 import '../../home/presentation/checkin_history_page.dart';
 import '../../home/presentation/timeline_all_page.dart';
 import '../../memo/presentation/memo_page.dart';
@@ -71,6 +72,15 @@ class AllFeaturesPage extends ConsumerWidget {
             color: AppColors.accentRose,
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const BreakoutPage()),
+            ),
+          ),
+          _FeatureEntry(
+            icon: Icons.grid_view_rounded,
+            title: '俄罗斯方块',
+            subtitle: '经典 Tetris · SRS 旋转 + Hold',
+            color: AppColors.accentTeal,
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const TetrisPage()),
             ),
           ),
           const _FeatureEntry(
