@@ -33,6 +33,7 @@ class ReaderSettingsSheet extends ConsumerStatefulWidget {
 class _ReaderSettingsSheetState extends ConsumerState<ReaderSettingsSheet> {
   double _fontSize = 18;
   double _lineHeight = 1.6;
+  double _paragraphSpacing = 12;
   int _pageMode = 0;
   int _bgTheme = 0;
   bool _keepScreenOn = true;
@@ -54,6 +55,7 @@ class _ReaderSettingsSheetState extends ConsumerState<ReaderSettingsSheet> {
     current
       ..fontSize = _fontSize
       ..lineHeight = _lineHeight
+      ..paragraphSpacing = _paragraphSpacing
       ..pageMode = _pageMode
       ..bgTheme = _bgTheme
       ..keepScreenOn = _keepScreenOn;
@@ -66,6 +68,10 @@ class _ReaderSettingsSheetState extends ConsumerState<ReaderSettingsSheet> {
     _cachedSettings = settings;
     _fontSize = settings.fontSize;
     _lineHeight = settings.lineHeight;
+    // 老数据 paragraphSpacing 为 0（Isar 新增字段向前兼容），兜底为默认 12
+    _paragraphSpacing = settings.paragraphSpacing == 0
+        ? 12
+        : settings.paragraphSpacing;
     _pageMode = settings.pageMode;
     _bgTheme = settings.bgTheme;
     _keepScreenOn = settings.keepScreenOn;
@@ -80,6 +86,7 @@ class _ReaderSettingsSheetState extends ConsumerState<ReaderSettingsSheet> {
       current
         ..fontSize = _fontSize
         ..lineHeight = _lineHeight
+        ..paragraphSpacing = _paragraphSpacing
         ..pageMode = _pageMode
         ..bgTheme = _bgTheme
         ..keepScreenOn = _keepScreenOn;
@@ -145,6 +152,20 @@ class _ReaderSettingsSheetState extends ConsumerState<ReaderSettingsSheet> {
                     activeColor: AppColors.accentRose,
                     onChanged: (v) {
                       setState(() => _lineHeight = v);
+                      _save();
+                    },
+                  ),
+
+                  // 段距
+                  _buildLabel('段距 ${_paragraphSpacing.round()}'),
+                  Slider(
+                    value: _paragraphSpacing,
+                    min: 8,
+                    max: 24,
+                    divisions: 16,
+                    activeColor: AppColors.accentRose,
+                    onChanged: (v) {
+                      setState(() => _paragraphSpacing = v);
                       _save();
                     },
                   ),

@@ -58,6 +58,7 @@ class _NovelReaderPageState extends ConsumerState<NovelReaderPage> {
   double? _paginateHeight;
   double? _paginateFontSize;
   double? _paginateLineHeight;
+  double? _paginateParagraphSpacing;
 
   // 滚动模式连续阅读：已追加渲染的章节 + 每章起始滚动偏移（用于章内进度换算）
   List<NovelChapter> _scrollChapters = [];
@@ -680,16 +681,18 @@ class _NovelReaderPageState extends ConsumerState<NovelReaderPage> {
               _paginateWidth != availWidth ||
               _paginateHeight != availHeight ||
               _paginateFontSize != settings.fontSize ||
-              _paginateLineHeight != settings.lineHeight) {
+              _paginateLineHeight != settings.lineHeight ||
+              _paginateParagraphSpacing != settings.paragraphSpacing) {
             _pages = paginateChapter(
               content, availWidth, availHeight,
-              settings.fontSize, settings.lineHeight,
+              settings.fontSize, settings.lineHeight, settings.paragraphSpacing,
             );
             _paginateContent = content;
             _paginateWidth = availWidth;
             _paginateHeight = availHeight;
             _paginateFontSize = settings.fontSize;
             _paginateLineHeight = settings.lineHeight;
+            _paginateParagraphSpacing = settings.paragraphSpacing;
           }
           final isLastChapter = effectiveIndex >= chapters.length - 1;
           final itemCount = _pages.length + (isLastChapter ? 0 : 1);
@@ -874,15 +877,7 @@ class _NovelReaderPageState extends ConsumerState<NovelReaderPage> {
               ),
             ),
             const SizedBox(height: 16),
-            Text(
-              c.content,
-              style: TextStyle(
-                fontSize: settings.fontSize,
-                height: settings.lineHeight,
-                color: textColor,
-                fontFamily: AppTextStyles.cjkFontFamily,
-              ),
-            ),
+            ..._buildParagraphs(c.content, settings, textColor),
             const SizedBox(height: 32),
           ],
           if (_scrollFetchingNext) ...[
@@ -911,6 +906,29 @@ class _NovelReaderPageState extends ConsumerState<NovelReaderPage> {
         ],
       ),
     );
+  }
+
+  /// 按段落（`\n`）分段渲染正文，段间留 [ReaderSettings.paragraphSpacing] 间距
+  List<Widget> _buildParagraphs(
+    String content,
+    ReaderSettings settings,
+    Color color,
+  ) {
+    final parts = content.split('\n');
+    return [
+      for (var i = 0; i < parts.length; i++) ...[
+        if (i > 0) SizedBox(height: settings.paragraphSpacing),
+        Text(
+          parts[i],
+          style: TextStyle(
+            fontSize: settings.fontSize,
+            height: settings.lineHeight,
+            color: color,
+            fontFamily: AppTextStyles.cjkFontFamily,
+          ),
+        ),
+      ],
+    ];
   }
 
   /// 翻页模式章末的“下一章”页（加载中 / 失败提示，失败态可重试）
