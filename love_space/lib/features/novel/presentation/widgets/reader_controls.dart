@@ -54,27 +54,37 @@ class ReaderTopBar extends StatelessWidget {
   }
 }
 
-/// 阅读器底部工具栏（上一章 / 进度 / 设置 / 下一章）
+/// 阅读器底部工具栏（上一章 / 进度 / 设置 / 下一章 + 跳章滑块）
 class ReaderBottomBar extends StatelessWidget {
   final int theme;
   final String progressLabel;
+  final int chapterCount;
+  final int currentChapter;
   final VoidCallback? onPrev;
   final VoidCallback onSettings;
   final VoidCallback? onNext;
+
+  /// 拖动滑块结束时按目标章序号跳章
+  final ValueChanged<int> onSeekChapter;
 
   const ReaderBottomBar({
     super.key,
     required this.theme,
     required this.progressLabel,
+    required this.chapterCount,
+    required this.currentChapter,
     required this.onPrev,
     required this.onSettings,
     required this.onNext,
+    required this.onSeekChapter,
   });
 
   @override
   Widget build(BuildContext context) {
     final textColor = AppColors.readerTextOn(theme);
     final paddingBottom = MediaQuery.of(context).padding.bottom;
+    // 仅一章时滑块无意义，隐藏
+    final showSlider = chapterCount > 1;
     return Container(
       padding: EdgeInsets.only(
         bottom: paddingBottom + 8,
@@ -83,36 +93,56 @@ class ReaderBottomBar extends StatelessWidget {
         right: 12,
       ),
       color: AppColors.readerBg(theme).withValues(alpha: 0.95),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          ReaderBarButton(
-            icon: Icons.chevron_left_rounded,
-            label: '上一章',
-            color: textColor,
-            onTap: onPrev,
-          ),
-          Text(
-            progressLabel,
-            style: AppTextStyles.label.copyWith(color: textColor),
-          ),
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               ReaderBarButton(
-                icon: Icons.settings_rounded,
-                label: '设置',
+                icon: Icons.chevron_left_rounded,
+                label: '上一章',
                 color: textColor,
-                onTap: onSettings,
+                onTap: onPrev,
               ),
-              const SizedBox(width: 4),
-              ReaderBarButton(
-                icon: Icons.chevron_right_rounded,
-                label: '下一章',
-                color: textColor,
-                onTap: onNext,
+              Text(
+                progressLabel,
+                style: AppTextStyles.label.copyWith(color: textColor),
+              ),
+              Row(
+                children: [
+                  ReaderBarButton(
+                    icon: Icons.settings_rounded,
+                    label: '设置',
+                    color: textColor,
+                    onTap: onSettings,
+                  ),
+                  const SizedBox(width: 4),
+                  ReaderBarButton(
+                    icon: Icons.chevron_right_rounded,
+                    label: '下一章',
+                    color: textColor,
+                    onTap: onNext,
+                  ),
+                ],
               ),
             ],
           ),
+          if (showSlider) ...[
+            const SizedBox(height: 4),
+            Slider(
+              // 拖动中不跳章（避免频繁切章），松手时才 onChangeEnd 跳
+              value: currentChapter
+                  .toDouble()
+                  .clamp(0, (chapterCount - 1).toDouble()),
+              min: 0,
+              max: (chapterCount - 1).toDouble(),
+              divisions: chapterCount - 1,
+              activeColor: AppColors.accentRose,
+              onChanged: (_) {},
+              onChangeEnd: (v) => onSeekChapter(v.round()),
+            ),
+          ],
         ],
       ),
     );

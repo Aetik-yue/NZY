@@ -40,6 +40,8 @@ class _NovelReaderPageState extends ConsumerState<NovelReaderPage> {
   int _currentChapterIndex = 0;
   bool _showToolbars = true;
   bool _restored = false;
+  // 翻页模式上一章衔接：切到上一章后恢复时跳到末页（而非按保存进度）
+  bool _jumpToEndOnRestore = false;
   List<String> _pages = [];
   Novel? _novel;
   ReaderSettings? _settings;
@@ -291,10 +293,14 @@ class _NovelReaderPageState extends ConsumerState<NovelReaderPage> {
     if (settings.pageMode == 1) {
       // hasClients 防御：正文为空时展示占位（无 PageView），此时不可定位
       if (_pages.isNotEmpty && _pageController.hasClients) {
-        final target = (restoreRatio * _pages.length)
-            .round()
-            .clamp(0, _pages.length - 1);
+        // 上一章衔接：_jumpToEndOnRestore 置位时跳到末页，否则按保存进度恢复
+        final target = _jumpToEndOnRestore
+            ? _pages.length - 1
+            : (restoreRatio * _pages.length)
+                .round()
+                .clamp(0, _pages.length - 1);
         _pageController.jumpToPage(target);
+        _jumpToEndOnRestore = false; // 消费标志
       }
     } else if (_scrollController.hasClients &&
         _scrollController.position.maxScrollExtent > 0) {
@@ -539,6 +545,19 @@ class _NovelReaderPageState extends ConsumerState<NovelReaderPage> {
     _goToChapter(nextIndex, refreshed);
   }
 
+  /// 预取下一章正文（post-frame 钩子调用，fire-and-forget）
+  ///
+  /// 复用 _ensureChapterBodyReady 的幂等守卫；写回 DB 后 chaptersProvider 流
+  /// 自动刷新，用户翻章时正文已就绪，消除切章 loading。失败静默（仅 debugPrint）。
+  void _prefetchNextChapter(List<NovelChapter> chapters, int index) {
+    final next = index + 1;
+    if (next >= chapters.length) return; // 已是最后一章
+    final chapter = chapters[next];
+    if (chapter.content.isNotEmpty) return; // 已有正文
+    // fire-and-forget；_ensureChapterBodyReady 内部已 try-catch + debugPrint
+    unawaited(_ensureChapterBodyReady(chapters, next));
+  }
+
   // ──────── 构建 ────────
 
   @override
@@ -603,6 +622,7 @@ class _NovelReaderPageState extends ConsumerState<NovelReaderPage> {
       if (!mounted) return;
       _maybeRestore(settings, effectiveIndex);
       _ensureChapterContent(chapters, effectiveIndex);
+      _prefetchNextChapter(chapters, effectiveIndex);
     });
 
     // 供滚动监听 / 自动翻章使用的最新章节列表
@@ -667,7 +687,12 @@ class _NovelReaderPageState extends ConsumerState<NovelReaderPage> {
                   ),
                 );
               }
-              return _buildChapterEndPage(textColor);
+              return _buildChapterEndPage(
+                textColor,
+                _autoAdvanceFailed
+                    ? () => _handleNextChapterPage(chapters, effectiveIndex)
+                    : null,
+              );
             },
           );
         },
@@ -717,6 +742,8 @@ class _NovelReaderPageState extends ConsumerState<NovelReaderPage> {
                 theme: theme,
                 progressLabel:
                     '第 ${chapters.isEmpty ? 0 : effectiveIndex + 1}/${chapters.length} 章 · ${(_currentRatio() * 100).round()}%',
+                chapterCount: chapters.length,
+                currentChapter: chapters.isEmpty ? 0 : effectiveIndex,
                 onPrev: (chapters.isEmpty || effectiveIndex <= 0)
                     ? null
                     : () => _goToChapter(effectiveIndex - 1, chapters),
@@ -725,6 +752,7 @@ class _NovelReaderPageState extends ConsumerState<NovelReaderPage> {
                         effectiveIndex >= chapters.length - 1)
                     ? null
                     : () => _goToChapter(effectiveIndex + 1, chapters),
+                onSeekChapter: (i) => _goToChapter(i, chapters),
               ),
             ),
         ],
@@ -852,12 +880,13 @@ class _NovelReaderPageState extends ConsumerState<NovelReaderPage> {
     );
   }
 
-  /// 翻页模式章末的“下一章”页（加载中 / 失败提示）
-  Widget _buildChapterEndPage(Color textColor) {
+  /// 翻页模式章末的“下一章”页（加载中 / 失败提示，失败态可重试）
+  Widget _buildChapterEndPage(Color textColor, VoidCallback? onRetry) {
     return ReaderChapterEndPage(
       autoAdvancing: _autoAdvancing,
       autoAdvanceFailed: _autoAdvanceFailed,
       textColor: textColor,
+      onRetry: onRetry,
     );
   }
 }
