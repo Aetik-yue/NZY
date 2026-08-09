@@ -13,6 +13,7 @@ class ReaderSettingsRepository {
     final defaults = ReaderSettings()
       ..fontSize = 18
       ..lineHeight = 1.6
+      ..paragraphSpacing = 12
       ..pageMode = 0
       ..bgTheme = 0
       ..keepScreenOn = true;

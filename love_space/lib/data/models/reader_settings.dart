@@ -15,6 +15,9 @@ class ReaderSettings {
   /// 行距倍率（1.2~2.0）
   late double lineHeight;
 
+  /// 段间距（8~24，默认 12）
+  late double paragraphSpacing;
+
   /// 翻页模式：0=滚动 / 1=翻页
   late int pageMode;
 

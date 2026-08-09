@@ -41,6 +41,11 @@ const ReaderSettingsSchema = CollectionSchema(
       id: 4,
       name: r'pageMode',
       type: IsarType.long,
+    ),
+    r'paragraphSpacing': PropertySchema(
+      id: 5,
+      name: r'paragraphSpacing',
+      type: IsarType.double,
     )
   },
   estimateSize: _readerSettingsEstimateSize,
@@ -77,6 +82,7 @@ void _readerSettingsSerialize(
   writer.writeBool(offsets[2], object.keepScreenOn);
   writer.writeDouble(offsets[3], object.lineHeight);
   writer.writeLong(offsets[4], object.pageMode);
+  writer.writeDouble(offsets[5], object.paragraphSpacing);
 }
 
 ReaderSettings _readerSettingsDeserialize(
@@ -92,6 +98,7 @@ ReaderSettings _readerSettingsDeserialize(
   object.keepScreenOn = reader.readBool(offsets[2]);
   object.lineHeight = reader.readDouble(offsets[3]);
   object.pageMode = reader.readLong(offsets[4]);
+  object.paragraphSpacing = reader.readDouble(offsets[5]);
   return object;
 }
 
@@ -112,6 +119,8 @@ P _readerSettingsDeserializeProp<P>(
       return (reader.readDouble(offset)) as P;
     case 4:
       return (reader.readLong(offset)) as P;
+    case 5:
+      return (reader.readDouble(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
   }
@@ -521,6 +530,72 @@ extension ReaderSettingsQueryFilter
       ));
     });
   }
+
+  QueryBuilder<ReaderSettings, ReaderSettings, QAfterFilterCondition>
+      paragraphSpacingEqualTo(
+    double value, {
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'paragraphSpacing',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<ReaderSettings, ReaderSettings, QAfterFilterCondition>
+      paragraphSpacingGreaterThan(
+    double value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'paragraphSpacing',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<ReaderSettings, ReaderSettings, QAfterFilterCondition>
+      paragraphSpacingLessThan(
+    double value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'paragraphSpacing',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<ReaderSettings, ReaderSettings, QAfterFilterCondition>
+      paragraphSpacingBetween(
+    double lower,
+    double upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'paragraphSpacing',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        epsilon: epsilon,
+      ));
+    });
+  }
 }
 
 extension ReaderSettingsQueryObject
@@ -595,6 +670,20 @@ extension ReaderSettingsQuerySortBy
       sortByPageModeDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'pageMode', Sort.desc);
+    });
+  }
+
+  QueryBuilder<ReaderSettings, ReaderSettings, QAfterSortBy>
+      sortByParagraphSpacing() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'paragraphSpacing', Sort.asc);
+    });
+  }
+
+  QueryBuilder<ReaderSettings, ReaderSettings, QAfterSortBy>
+      sortByParagraphSpacingDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'paragraphSpacing', Sort.desc);
     });
   }
 }
@@ -679,6 +768,20 @@ extension ReaderSettingsQuerySortThenBy
       return query.addSortBy(r'pageMode', Sort.desc);
     });
   }
+
+  QueryBuilder<ReaderSettings, ReaderSettings, QAfterSortBy>
+      thenByParagraphSpacing() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'paragraphSpacing', Sort.asc);
+    });
+  }
+
+  QueryBuilder<ReaderSettings, ReaderSettings, QAfterSortBy>
+      thenByParagraphSpacingDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'paragraphSpacing', Sort.desc);
+    });
+  }
 }
 
 extension ReaderSettingsQueryWhereDistinct
@@ -712,6 +815,13 @@ extension ReaderSettingsQueryWhereDistinct
   QueryBuilder<ReaderSettings, ReaderSettings, QDistinct> distinctByPageMode() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'pageMode');
+    });
+  }
+
+  QueryBuilder<ReaderSettings, ReaderSettings, QDistinct>
+      distinctByParagraphSpacing() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'paragraphSpacing');
     });
   }
 }
@@ -751,6 +861,13 @@ extension ReaderSettingsQueryProperty
   QueryBuilder<ReaderSettings, int, QQueryOperations> pageModeProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'pageMode');
+    });
+  }
+
+  QueryBuilder<ReaderSettings, double, QQueryOperations>
+      paragraphSpacingProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'paragraphSpacing');
     });
   }
 }
