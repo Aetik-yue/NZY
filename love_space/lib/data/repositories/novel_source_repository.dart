@@ -7,8 +7,7 @@ class NovelSourceRepository {
   final Isar _isar;
 
   /// 查询所有爬取源
-  Future<List<NovelSource>> getAll() =>
-      _isar.novelSources.where().findAll();
+  Future<List<NovelSource>> getAll() => _isar.novelSources.where().findAll();
 
   /// 监听所有爬取源的变化（实时流）
   Stream<List<NovelSource>> watchAll() =>

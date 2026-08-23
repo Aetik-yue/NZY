@@ -17,40 +17,55 @@ const AnniversarySchema = CollectionSchema(
   name: r'Anniversary',
   id: 8940600037120533401,
   properties: {
-    r'colorValue': PropertySchema(
+    r'cloudId': PropertySchema(
       id: 0,
+      name: r'cloudId',
+      type: IsarType.string,
+    ),
+    r'colorValue': PropertySchema(
+      id: 1,
       name: r'colorValue',
       type: IsarType.long,
     ),
     r'createdAt': PropertySchema(
-      id: 1,
+      id: 2,
       name: r'createdAt',
       type: IsarType.dateTime,
     ),
     r'date': PropertySchema(
-      id: 2,
+      id: 3,
       name: r'date',
       type: IsarType.dateTime,
     ),
     r'note': PropertySchema(
-      id: 3,
+      id: 4,
       name: r'note',
       type: IsarType.string,
     ),
+    r'ownerId': PropertySchema(
+      id: 5,
+      name: r'ownerId',
+      type: IsarType.string,
+    ),
     r'remindDays': PropertySchema(
-      id: 4,
+      id: 6,
       name: r'remindDays',
       type: IsarType.long,
     ),
     r'remindEnabled': PropertySchema(
-      id: 5,
+      id: 7,
       name: r'remindEnabled',
       type: IsarType.bool,
     ),
     r'title': PropertySchema(
-      id: 6,
+      id: 8,
       name: r'title',
       type: IsarType.string,
+    ),
+    r'updatedAt': PropertySchema(
+      id: 9,
+      name: r'updatedAt',
+      type: IsarType.dateTime,
     )
   },
   estimateSize: _anniversaryEstimateSize,
@@ -73,7 +88,19 @@ int _anniversaryEstimateSize(
   Map<Type, List<int>> allOffsets,
 ) {
   var bytesCount = offsets.last;
+  {
+    final value = object.cloudId;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
   bytesCount += 3 + object.note.length * 3;
+  {
+    final value = object.ownerId;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
   bytesCount += 3 + object.title.length * 3;
   return bytesCount;
 }
@@ -84,13 +111,16 @@ void _anniversarySerialize(
   List<int> offsets,
   Map<Type, List<int>> allOffsets,
 ) {
-  writer.writeLong(offsets[0], object.colorValue);
-  writer.writeDateTime(offsets[1], object.createdAt);
-  writer.writeDateTime(offsets[2], object.date);
-  writer.writeString(offsets[3], object.note);
-  writer.writeLong(offsets[4], object.remindDays);
-  writer.writeBool(offsets[5], object.remindEnabled);
-  writer.writeString(offsets[6], object.title);
+  writer.writeString(offsets[0], object.cloudId);
+  writer.writeLong(offsets[1], object.colorValue);
+  writer.writeDateTime(offsets[2], object.createdAt);
+  writer.writeDateTime(offsets[3], object.date);
+  writer.writeString(offsets[4], object.note);
+  writer.writeString(offsets[5], object.ownerId);
+  writer.writeLong(offsets[6], object.remindDays);
+  writer.writeBool(offsets[7], object.remindEnabled);
+  writer.writeString(offsets[8], object.title);
+  writer.writeDateTime(offsets[9], object.updatedAt);
 }
 
 Anniversary _anniversaryDeserialize(
@@ -100,14 +130,17 @@ Anniversary _anniversaryDeserialize(
   Map<Type, List<int>> allOffsets,
 ) {
   final object = Anniversary();
-  object.colorValue = reader.readLong(offsets[0]);
-  object.createdAt = reader.readDateTime(offsets[1]);
-  object.date = reader.readDateTime(offsets[2]);
+  object.cloudId = reader.readStringOrNull(offsets[0]);
+  object.colorValue = reader.readLong(offsets[1]);
+  object.createdAt = reader.readDateTime(offsets[2]);
+  object.date = reader.readDateTime(offsets[3]);
   object.id = id;
-  object.note = reader.readString(offsets[3]);
-  object.remindDays = reader.readLong(offsets[4]);
-  object.remindEnabled = reader.readBool(offsets[5]);
-  object.title = reader.readString(offsets[6]);
+  object.note = reader.readString(offsets[4]);
+  object.ownerId = reader.readStringOrNull(offsets[5]);
+  object.remindDays = reader.readLong(offsets[6]);
+  object.remindEnabled = reader.readBool(offsets[7]);
+  object.title = reader.readString(offsets[8]);
+  object.updatedAt = reader.readDateTimeOrNull(offsets[9]);
   return object;
 }
 
@@ -119,19 +152,25 @@ P _anniversaryDeserializeProp<P>(
 ) {
   switch (propertyId) {
     case 0:
-      return (reader.readLong(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 1:
-      return (reader.readDateTime(offset)) as P;
+      return (reader.readLong(offset)) as P;
     case 2:
       return (reader.readDateTime(offset)) as P;
     case 3:
-      return (reader.readString(offset)) as P;
+      return (reader.readDateTime(offset)) as P;
     case 4:
-      return (reader.readLong(offset)) as P;
-    case 5:
-      return (reader.readBool(offset)) as P;
-    case 6:
       return (reader.readString(offset)) as P;
+    case 5:
+      return (reader.readStringOrNull(offset)) as P;
+    case 6:
+      return (reader.readLong(offset)) as P;
+    case 7:
+      return (reader.readBool(offset)) as P;
+    case 8:
+      return (reader.readString(offset)) as P;
+    case 9:
+      return (reader.readDateTimeOrNull(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
   }
@@ -230,6 +269,158 @@ extension AnniversaryQueryWhere
 
 extension AnniversaryQueryFilter
     on QueryBuilder<Anniversary, Anniversary, QFilterCondition> {
+  QueryBuilder<Anniversary, Anniversary, QAfterFilterCondition>
+      cloudIdIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'cloudId',
+      ));
+    });
+  }
+
+  QueryBuilder<Anniversary, Anniversary, QAfterFilterCondition>
+      cloudIdIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'cloudId',
+      ));
+    });
+  }
+
+  QueryBuilder<Anniversary, Anniversary, QAfterFilterCondition> cloudIdEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'cloudId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Anniversary, Anniversary, QAfterFilterCondition>
+      cloudIdGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'cloudId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Anniversary, Anniversary, QAfterFilterCondition> cloudIdLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'cloudId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Anniversary, Anniversary, QAfterFilterCondition> cloudIdBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'cloudId',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Anniversary, Anniversary, QAfterFilterCondition>
+      cloudIdStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'cloudId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Anniversary, Anniversary, QAfterFilterCondition> cloudIdEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'cloudId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Anniversary, Anniversary, QAfterFilterCondition> cloudIdContains(
+      String value,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'cloudId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Anniversary, Anniversary, QAfterFilterCondition> cloudIdMatches(
+      String pattern,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'cloudId',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Anniversary, Anniversary, QAfterFilterCondition>
+      cloudIdIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'cloudId',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<Anniversary, Anniversary, QAfterFilterCondition>
+      cloudIdIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'cloudId',
+        value: '',
+      ));
+    });
+  }
+
   QueryBuilder<Anniversary, Anniversary, QAfterFilterCondition>
       colorValueEqualTo(int value) {
     return QueryBuilder.apply(this, (query) {
@@ -580,6 +771,158 @@ extension AnniversaryQueryFilter
   }
 
   QueryBuilder<Anniversary, Anniversary, QAfterFilterCondition>
+      ownerIdIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'ownerId',
+      ));
+    });
+  }
+
+  QueryBuilder<Anniversary, Anniversary, QAfterFilterCondition>
+      ownerIdIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'ownerId',
+      ));
+    });
+  }
+
+  QueryBuilder<Anniversary, Anniversary, QAfterFilterCondition> ownerIdEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'ownerId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Anniversary, Anniversary, QAfterFilterCondition>
+      ownerIdGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'ownerId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Anniversary, Anniversary, QAfterFilterCondition> ownerIdLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'ownerId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Anniversary, Anniversary, QAfterFilterCondition> ownerIdBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'ownerId',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Anniversary, Anniversary, QAfterFilterCondition>
+      ownerIdStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'ownerId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Anniversary, Anniversary, QAfterFilterCondition> ownerIdEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'ownerId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Anniversary, Anniversary, QAfterFilterCondition> ownerIdContains(
+      String value,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'ownerId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Anniversary, Anniversary, QAfterFilterCondition> ownerIdMatches(
+      String pattern,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'ownerId',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Anniversary, Anniversary, QAfterFilterCondition>
+      ownerIdIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'ownerId',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<Anniversary, Anniversary, QAfterFilterCondition>
+      ownerIdIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'ownerId',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<Anniversary, Anniversary, QAfterFilterCondition>
       remindDaysEqualTo(int value) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.equalTo(
@@ -776,6 +1119,80 @@ extension AnniversaryQueryFilter
       ));
     });
   }
+
+  QueryBuilder<Anniversary, Anniversary, QAfterFilterCondition>
+      updatedAtIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'updatedAt',
+      ));
+    });
+  }
+
+  QueryBuilder<Anniversary, Anniversary, QAfterFilterCondition>
+      updatedAtIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'updatedAt',
+      ));
+    });
+  }
+
+  QueryBuilder<Anniversary, Anniversary, QAfterFilterCondition>
+      updatedAtEqualTo(DateTime? value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'updatedAt',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Anniversary, Anniversary, QAfterFilterCondition>
+      updatedAtGreaterThan(
+    DateTime? value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'updatedAt',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Anniversary, Anniversary, QAfterFilterCondition>
+      updatedAtLessThan(
+    DateTime? value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'updatedAt',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Anniversary, Anniversary, QAfterFilterCondition>
+      updatedAtBetween(
+    DateTime? lower,
+    DateTime? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'updatedAt',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
 }
 
 extension AnniversaryQueryObject
@@ -786,6 +1203,18 @@ extension AnniversaryQueryLinks
 
 extension AnniversaryQuerySortBy
     on QueryBuilder<Anniversary, Anniversary, QSortBy> {
+  QueryBuilder<Anniversary, Anniversary, QAfterSortBy> sortByCloudId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'cloudId', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Anniversary, Anniversary, QAfterSortBy> sortByCloudIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'cloudId', Sort.desc);
+    });
+  }
+
   QueryBuilder<Anniversary, Anniversary, QAfterSortBy> sortByColorValue() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'colorValue', Sort.asc);
@@ -834,6 +1263,18 @@ extension AnniversaryQuerySortBy
     });
   }
 
+  QueryBuilder<Anniversary, Anniversary, QAfterSortBy> sortByOwnerId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'ownerId', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Anniversary, Anniversary, QAfterSortBy> sortByOwnerIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'ownerId', Sort.desc);
+    });
+  }
+
   QueryBuilder<Anniversary, Anniversary, QAfterSortBy> sortByRemindDays() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'remindDays', Sort.asc);
@@ -870,10 +1311,34 @@ extension AnniversaryQuerySortBy
       return query.addSortBy(r'title', Sort.desc);
     });
   }
+
+  QueryBuilder<Anniversary, Anniversary, QAfterSortBy> sortByUpdatedAt() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'updatedAt', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Anniversary, Anniversary, QAfterSortBy> sortByUpdatedAtDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'updatedAt', Sort.desc);
+    });
+  }
 }
 
 extension AnniversaryQuerySortThenBy
     on QueryBuilder<Anniversary, Anniversary, QSortThenBy> {
+  QueryBuilder<Anniversary, Anniversary, QAfterSortBy> thenByCloudId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'cloudId', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Anniversary, Anniversary, QAfterSortBy> thenByCloudIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'cloudId', Sort.desc);
+    });
+  }
+
   QueryBuilder<Anniversary, Anniversary, QAfterSortBy> thenByColorValue() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'colorValue', Sort.asc);
@@ -934,6 +1399,18 @@ extension AnniversaryQuerySortThenBy
     });
   }
 
+  QueryBuilder<Anniversary, Anniversary, QAfterSortBy> thenByOwnerId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'ownerId', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Anniversary, Anniversary, QAfterSortBy> thenByOwnerIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'ownerId', Sort.desc);
+    });
+  }
+
   QueryBuilder<Anniversary, Anniversary, QAfterSortBy> thenByRemindDays() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'remindDays', Sort.asc);
@@ -970,10 +1447,29 @@ extension AnniversaryQuerySortThenBy
       return query.addSortBy(r'title', Sort.desc);
     });
   }
+
+  QueryBuilder<Anniversary, Anniversary, QAfterSortBy> thenByUpdatedAt() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'updatedAt', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Anniversary, Anniversary, QAfterSortBy> thenByUpdatedAtDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'updatedAt', Sort.desc);
+    });
+  }
 }
 
 extension AnniversaryQueryWhereDistinct
     on QueryBuilder<Anniversary, Anniversary, QDistinct> {
+  QueryBuilder<Anniversary, Anniversary, QDistinct> distinctByCloudId(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'cloudId', caseSensitive: caseSensitive);
+    });
+  }
+
   QueryBuilder<Anniversary, Anniversary, QDistinct> distinctByColorValue() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'colorValue');
@@ -999,6 +1495,13 @@ extension AnniversaryQueryWhereDistinct
     });
   }
 
+  QueryBuilder<Anniversary, Anniversary, QDistinct> distinctByOwnerId(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'ownerId', caseSensitive: caseSensitive);
+    });
+  }
+
   QueryBuilder<Anniversary, Anniversary, QDistinct> distinctByRemindDays() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'remindDays');
@@ -1017,6 +1520,12 @@ extension AnniversaryQueryWhereDistinct
       return query.addDistinctBy(r'title', caseSensitive: caseSensitive);
     });
   }
+
+  QueryBuilder<Anniversary, Anniversary, QDistinct> distinctByUpdatedAt() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'updatedAt');
+    });
+  }
 }
 
 extension AnniversaryQueryProperty
@@ -1024,6 +1533,12 @@ extension AnniversaryQueryProperty
   QueryBuilder<Anniversary, int, QQueryOperations> idProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'id');
+    });
+  }
+
+  QueryBuilder<Anniversary, String?, QQueryOperations> cloudIdProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'cloudId');
     });
   }
 
@@ -1051,6 +1566,12 @@ extension AnniversaryQueryProperty
     });
   }
 
+  QueryBuilder<Anniversary, String?, QQueryOperations> ownerIdProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'ownerId');
+    });
+  }
+
   QueryBuilder<Anniversary, int, QQueryOperations> remindDaysProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'remindDays');
@@ -1066,6 +1587,12 @@ extension AnniversaryQueryProperty
   QueryBuilder<Anniversary, String, QQueryOperations> titleProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'title');
+    });
+  }
+
+  QueryBuilder<Anniversary, DateTime?, QQueryOperations> updatedAtProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'updatedAt');
     });
   }
 }

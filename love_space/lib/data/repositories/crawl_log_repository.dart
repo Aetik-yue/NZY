@@ -25,8 +25,7 @@ class CrawlLogRepository {
       _isar.writeTxn(() async => _isar.crawlLogs.put(log));
 
   /// 删除某小说的全部日志
-  Future<void> deleteByNovel(int novelId) =>
-      _isar.writeTxn(() async {
+  Future<void> deleteByNovel(int novelId) => _isar.writeTxn(() async {
         await _isar.crawlLogs.where().novelIdEqualTo(novelId).deleteAll();
       });
 }

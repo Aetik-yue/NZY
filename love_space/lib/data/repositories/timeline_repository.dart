@@ -17,12 +17,16 @@ class TimelineRepository {
       .watch(fireImmediately: true);
 
   /// 新增事件
-  Future<void> add(TimelineEvent event) =>
-      _isar.writeTxn(() async => _isar.timelineEvents.put(event));
+  Future<void> add(TimelineEvent event) => _isar.writeTxn(() async {
+        event.updatedAt = DateTime.now();
+        await _isar.timelineEvents.put(event);
+      });
 
   /// 编辑事件
-  Future<void> update(TimelineEvent event) =>
-      _isar.writeTxn(() async => _isar.timelineEvents.put(event));
+  Future<void> update(TimelineEvent event) => _isar.writeTxn(() async {
+        event.updatedAt = DateTime.now();
+        await _isar.timelineEvents.put(event);
+      });
 
   /// 删除事件
   Future<void> delete(Id id) =>

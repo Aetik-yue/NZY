@@ -4,6 +4,7 @@ import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_text_styles.dart';
 import '../../../../data/models/memo.dart';
 import '../../../../data/providers/data_providers.dart';
+import '../../../../data/sync/sync_providers.dart';
 import '../../../../shared/widgets/app_snackbar.dart';
 import '../../../../shared/widgets/confirm_dialog.dart';
 import 'widgets/quick_capture_bar.dart';
@@ -29,9 +30,8 @@ class MemoPage extends ConsumerWidget {
     final searchQuery = ref.watch(memoSearchProvider);
     final tagFilter = ref.watch(memoTagFilterProvider);
     final authorFilter = ref.watch(memoAuthorFilterProvider);
-    final isSearchResult = searchQuery.isNotEmpty ||
-        tagFilter != null ||
-        authorFilter != null;
+    final isSearchResult =
+        searchQuery.isNotEmpty || tagFilter != null || authorFilter != null;
 
     return Scaffold(
       backgroundColor: AppColors.bgPrimary,
@@ -201,9 +201,16 @@ class _MemoList extends ConsumerWidget {
     );
     if (!confirmed || !context.mounted) return;
     try {
+      final cloudId = memo.cloudId;
       await ref.read(memoRepositoryProvider).delete(memo.id);
+      if (cloudId != null) {
+        ref.read(syncEngineProvider).markDeleted(cloudId);
+      }
       if (!context.mounted) return;
       AppSnackbar.showUndo(context, '已删除', () async {
+        if (cloudId != null) {
+          ref.read(syncEngineProvider).restoreDeleted(cloudId);
+        }
         await ref.read(memoRepositoryProvider).add(memo);
       });
     } catch (e) {
@@ -232,7 +239,9 @@ class _EmptyState extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
-            isSearchResult ? Icons.search_off_rounded : Icons.sticky_note_2_outlined,
+            isSearchResult
+                ? Icons.search_off_rounded
+                : Icons.sticky_note_2_outlined,
             size: 64,
             color: AppColors.accentPinkSoft,
           ),

@@ -9,11 +9,13 @@ import '../../../shared/widgets/section_header.dart';
 import '../../../shared/widgets/app_snackbar.dart';
 import '../../../shared/widgets/confirm_dialog.dart';
 import '../../../data/providers/data_providers.dart';
+import '../../../data/sync/sync_providers.dart';
 import '../../../shared/widgets/pill_nav_bar.dart';
 import '../../anniversary/presentation/anniversary_page.dart';
 import '../../music/presentation/music_player_page.dart';
-import '../../pomodoro/presentation/pomodoro_page.dart';
 import '../../profile/presentation/all_features_page.dart';
+import '../../pomodoro/presentation/pomodoro_page.dart';
+import '../../secrets/presentation/secrets_page.dart';
 import 'widgets/add_timeline_sheet.dart';
 import 'widgets/timeline_detail_sheet.dart';
 import 'checkin_history_page.dart';
@@ -57,7 +59,8 @@ class _GreetingHeader extends ConsumerWidget {
     final greeting = ref.watch(greetingProvider);
     final days = ref.watch(daysTogetherProvider);
     // 隐私开关：隐藏在一起天数
-    final hideDays = ref.watch(appSettingsProvider).valueOrNull?.hideDaysTogether ?? false;
+    final hideDays =
+        ref.watch(appSettingsProvider).valueOrNull?.hideDaysTogether ?? false;
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -170,7 +173,8 @@ class _AnniversaryHeroCard extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text('我们在一起', style: AppTextStyles.onPink.copyWith(fontSize: 15)),
+                Text('我们在一起',
+                    style: AppTextStyles.onPink.copyWith(fontSize: 15)),
                 const SizedBox(height: 6),
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.baseline,
@@ -245,8 +249,7 @@ class _NextAnniversaryCard extends ConsumerWidget {
                   size: 18, color: AppColors.accentRose),
               const SizedBox(width: 8),
               Expanded(
-                child: Text('添加纪念日，不错过每个特别的日子',
-                    style: AppTextStyles.bodySmall),
+                child: Text('添加纪念日，不错过每个特别的日子', style: AppTextStyles.bodySmall),
               ),
               const Icon(Icons.chevron_right_rounded,
                   size: 18, color: AppColors.textTertiary),
@@ -260,7 +263,8 @@ class _NextAnniversaryCard extends ConsumerWidget {
     final days = AnniversaryUtils.daysUntil(next.date, DateUtilsX.today());
     final isUpcoming = upcoming != null && upcoming.id == next.id;
     final countdown = AnniversaryUtils.countdownText(days);
-    final years = AnniversaryUtils.anniversaryYearsOf(next.date, DateUtilsX.today());
+    final years =
+        AnniversaryUtils.anniversaryYearsOf(next.date, DateUtilsX.today());
 
     return GestureDetector(
       onTap: () => Navigator.of(context).push(
@@ -273,9 +277,7 @@ class _NextAnniversaryCard extends ConsumerWidget {
           gradient: isUpcoming ? AppColors.pinkButtonGradient : null,
           color: isUpcoming ? null : AppColors.bgCard,
           borderRadius: BorderRadius.circular(AppColors.radiusSm),
-          border: isUpcoming
-              ? null
-              : Border.all(color: AppColors.borderSoft),
+          border: isUpcoming ? null : Border.all(color: AppColors.borderSoft),
           boxShadow: isUpcoming
               ? const [
                   BoxShadow(
@@ -301,10 +303,9 @@ class _NextAnniversaryCard extends ConsumerWidget {
                 children: [
                   Text(
                     isUpcoming ? '即将到来：${next.title}' : '下一个纪念日：${next.title}',
-                    style: (isUpcoming
-                            ? AppTextStyles.onPink
-                            : AppTextStyles.body)
-                        .copyWith(fontWeight: FontWeight.w600),
+                    style:
+                        (isUpcoming ? AppTextStyles.onPink : AppTextStyles.body)
+                            .copyWith(fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 2),
                   Text(
@@ -366,7 +367,11 @@ class _CheckinCardState extends ConsumerState<_CheckinCard> {
                   c.date.day == today.day)
               .firstOrNull;
           if (todayCheckin != null) {
+            final cloudId = todayCheckin.cloudId;
             await repository.delete(todayCheckin.id);
+            if (cloudId != null) {
+              ref.read(syncEngineProvider).markDeleted(cloudId);
+            }
           }
         });
         return;
@@ -432,9 +437,7 @@ class _CheckinCardState extends ConsumerState<_CheckinCard> {
               width: 64,
               height: 64,
               decoration: BoxDecoration(
-                gradient: checkedToday
-                    ? null
-                    : AppColors.pinkButtonGradient,
+                gradient: checkedToday ? null : AppColors.pinkButtonGradient,
                 color: checkedToday ? AppColors.bgCard : null,
                 shape: BoxShape.circle,
                 border: checkedToday
@@ -460,9 +463,7 @@ class _CheckinCardState extends ConsumerState<_CheckinCard> {
                     )
                   : Icon(
                       checkedToday ? Icons.check_rounded : Icons.favorite,
-                      color: checkedToday
-                          ? AppColors.accentRose
-                          : Colors.white,
+                      color: checkedToday ? AppColors.accentRose : Colors.white,
                       size: 28,
                     ),
             ),
@@ -516,6 +517,14 @@ class _QuickActions extends ConsumerWidget {
         bg: AppColors.accentPinkSoft,
         onTap: () => Navigator.of(context).push(
           MaterialPageRoute(builder: (_) => const AnniversaryPage()),
+        ),
+      ),
+      _QuickAction(
+        icon: Icons.forum_rounded,
+        label: '悄悄话',
+        bg: AppColors.accentPeach,
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const SecretsPage()),
         ),
       ),
       // 「更多」固定收尾：跳转全部功能页，承载后续新增的低频功能
@@ -649,8 +658,7 @@ class _TimelineSection extends ConsumerWidget {
                 );
               }
               // 首页只展示最新 3 条，其余进全量页
-              final visible =
-                  events.length > 3 ? events.sublist(0, 3) : events;
+              final visible = events.length > 3 ? events.sublist(0, 3) : events;
               return Column(
                 children: [
                   for (var i = 0; i < visible.length; i++) ...[
@@ -675,12 +683,21 @@ class _TimelineSection extends ConsumerWidget {
                         if (!confirmed || !context.mounted) return;
                         try {
                           final eventToDelete = visible[i];
+                          final cloudId = eventToDelete.cloudId;
                           await ref
                               .read(timelineRepositoryProvider)
                               .delete(eventToDelete.id);
+                          if (cloudId != null) {
+                            ref.read(syncEngineProvider).markDeleted(cloudId);
+                          }
                           if (!context.mounted) return;
                           AppSnackbar.showUndo(context, '时光已删除', () async {
                             try {
+                              if (cloudId != null) {
+                                ref
+                                    .read(syncEngineProvider)
+                                    .restoreDeleted(cloudId);
+                              }
                               await ref
                                   .read(timelineRepositoryProvider)
                                   .add(eventToDelete);
@@ -779,8 +796,8 @@ class _TimelineItem extends StatelessWidget {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.delete_outline,
-                  color: AppColors.accentRose),
+              leading:
+                  const Icon(Icons.delete_outline, color: AppColors.accentRose),
               title: const Text('删除'),
               onTap: () {
                 Navigator.of(context).pop();

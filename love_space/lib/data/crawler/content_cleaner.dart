@@ -122,8 +122,8 @@ class ContentCleaner {
   /// 但有时也会混在正文里。此方法尝试提取第一个看起来像标题的行。
   String extractTitle(String raw, {String fallback = ''}) {
     // 尝试从 h1 标签提取
-    final h1Match = RegExp(r'<h1[^>]*>([^<]+)</h1>', caseSensitive: false)
-        .firstMatch(raw);
+    final h1Match =
+        RegExp(r'<h1[^>]*>([^<]+)</h1>', caseSensitive: false).firstMatch(raw);
     if (h1Match != null) {
       final title = _decodeHtmlEntities(h1Match.group(1)!.trim());
       if (title.isNotEmpty) return title;

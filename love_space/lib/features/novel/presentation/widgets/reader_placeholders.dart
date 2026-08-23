@@ -61,8 +61,7 @@ class ReaderEmptyContent extends StatelessWidget {
                     style: FilledButton.styleFrom(
                       backgroundColor: AppColors.accentRose,
                       shape: RoundedRectangleBorder(
-                        borderRadius:
-                            BorderRadius.circular(AppColors.radiusMd),
+                        borderRadius: BorderRadius.circular(AppColors.radiusMd),
                       ),
                     ),
                     child: const Text('重试'),

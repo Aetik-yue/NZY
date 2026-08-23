@@ -42,7 +42,8 @@ class _CrawlProgressSheetState extends ConsumerState<CrawlProgressSheet> {
     final status = ref.watch(crawlStatusProvider);
 
     // 成功或失败后自动关闭（只触发一次）
-    if (!_autoClosed && (status.state == 'success' || status.state == 'failed')) {
+    if (!_autoClosed &&
+        (status.state == 'success' || status.state == 'failed')) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted || _autoClosed) return;
         _autoClosed = true;
@@ -107,7 +108,8 @@ class _CrawlProgressSheetState extends ConsumerState<CrawlProgressSheet> {
                   value: progress,
                   minHeight: 6,
                   backgroundColor: AppColors.accentPinkSoft,
-                  valueColor: const AlwaysStoppedAnimation(AppColors.accentRose),
+                  valueColor:
+                      const AlwaysStoppedAnimation(AppColors.accentRose),
                 ),
               )
             else if (status.state == 'fetching' || status.state == 'searching')

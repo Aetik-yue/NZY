@@ -52,7 +52,8 @@ mixin _ReaderChapterFetcher on _ReaderProgress {
     try {
       final content = await ref
           .read(crawlRepositoryProvider)
-          .fetchChapterContent(chapterUrl: sourceUrl, novelSourceKey: sourceKey);
+          .fetchChapterContent(
+              chapterUrl: sourceUrl, novelSourceKey: sourceKey);
       if (!mounted) return;
       if (content.isEmpty) {
         setState(() {
@@ -103,7 +104,8 @@ mixin _ReaderChapterFetcher on _ReaderProgress {
     try {
       final content = await ref
           .read(crawlRepositoryProvider)
-          .fetchChapterContent(chapterUrl: sourceUrl, novelSourceKey: sourceKey);
+          .fetchChapterContent(
+              chapterUrl: sourceUrl, novelSourceKey: sourceKey);
       if (content.isEmpty) return null;
       await ref
           .read(novelChapterRepositoryProvider)

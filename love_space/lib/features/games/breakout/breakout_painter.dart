@@ -50,12 +50,12 @@ class BreakoutPainter extends CustomPainter {
       );
     }
 
-    // 挡板：白色圆角矩形（y=0.92 与游戏页碰撞逻辑一致）
+    // 挡板：白色圆角矩形（y 跟随挡板垂直移动，高 kPaddleHeight 与碰撞逻辑一致）
     final paddleRect = Rect.fromLTWH(
       paddle.x * w,
-      h * 0.92,
+      paddle.y * h,
       paddle.width * w,
-      h * 0.025,
+      h * kPaddleHeight,
     );
     canvas.drawRRect(
       RRect.fromRectAndRadius(paddleRect, Radius.circular(h * 0.012)),

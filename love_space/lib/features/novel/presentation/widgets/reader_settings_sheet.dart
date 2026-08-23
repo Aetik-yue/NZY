@@ -69,9 +69,8 @@ class _ReaderSettingsSheetState extends ConsumerState<ReaderSettingsSheet> {
     _fontSize = settings.fontSize;
     _lineHeight = settings.lineHeight;
     // 老数据 paragraphSpacing 为 0（Isar 新增字段向前兼容），兜底为默认 12
-    _paragraphSpacing = settings.paragraphSpacing == 0
-        ? 12
-        : settings.paragraphSpacing;
+    _paragraphSpacing =
+        settings.paragraphSpacing == 0 ? 12 : settings.paragraphSpacing;
     _pageMode = settings.pageMode;
     _bgTheme = settings.bgTheme;
     _keepScreenOn = settings.keepScreenOn;

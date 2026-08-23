@@ -17,30 +17,45 @@ const WishSchema = CollectionSchema(
   name: r'Wish',
   id: -5735255885046358693,
   properties: {
-    r'createdAt': PropertySchema(
+    r'cloudId': PropertySchema(
       id: 0,
+      name: r'cloudId',
+      type: IsarType.string,
+    ),
+    r'createdAt': PropertySchema(
+      id: 1,
       name: r'createdAt',
       type: IsarType.dateTime,
     ),
     r'description': PropertySchema(
-      id: 1,
+      id: 2,
       name: r'description',
       type: IsarType.string,
     ),
     r'done': PropertySchema(
-      id: 2,
+      id: 3,
       name: r'done',
       type: IsarType.bool,
     ),
     r'iconCodePoint': PropertySchema(
-      id: 3,
+      id: 4,
       name: r'iconCodePoint',
       type: IsarType.long,
     ),
+    r'ownerId': PropertySchema(
+      id: 5,
+      name: r'ownerId',
+      type: IsarType.string,
+    ),
     r'title': PropertySchema(
-      id: 4,
+      id: 6,
       name: r'title',
       type: IsarType.string,
+    ),
+    r'updatedAt': PropertySchema(
+      id: 7,
+      name: r'updatedAt',
+      type: IsarType.dateTime,
     )
   },
   estimateSize: _wishEstimateSize,
@@ -63,7 +78,19 @@ int _wishEstimateSize(
   Map<Type, List<int>> allOffsets,
 ) {
   var bytesCount = offsets.last;
+  {
+    final value = object.cloudId;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
   bytesCount += 3 + object.description.length * 3;
+  {
+    final value = object.ownerId;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
   bytesCount += 3 + object.title.length * 3;
   return bytesCount;
 }
@@ -74,11 +101,14 @@ void _wishSerialize(
   List<int> offsets,
   Map<Type, List<int>> allOffsets,
 ) {
-  writer.writeDateTime(offsets[0], object.createdAt);
-  writer.writeString(offsets[1], object.description);
-  writer.writeBool(offsets[2], object.done);
-  writer.writeLong(offsets[3], object.iconCodePoint);
-  writer.writeString(offsets[4], object.title);
+  writer.writeString(offsets[0], object.cloudId);
+  writer.writeDateTime(offsets[1], object.createdAt);
+  writer.writeString(offsets[2], object.description);
+  writer.writeBool(offsets[3], object.done);
+  writer.writeLong(offsets[4], object.iconCodePoint);
+  writer.writeString(offsets[5], object.ownerId);
+  writer.writeString(offsets[6], object.title);
+  writer.writeDateTime(offsets[7], object.updatedAt);
 }
 
 Wish _wishDeserialize(
@@ -88,12 +118,15 @@ Wish _wishDeserialize(
   Map<Type, List<int>> allOffsets,
 ) {
   final object = Wish();
-  object.createdAt = reader.readDateTime(offsets[0]);
-  object.description = reader.readString(offsets[1]);
-  object.done = reader.readBool(offsets[2]);
-  object.iconCodePoint = reader.readLong(offsets[3]);
+  object.cloudId = reader.readStringOrNull(offsets[0]);
+  object.createdAt = reader.readDateTime(offsets[1]);
+  object.description = reader.readString(offsets[2]);
+  object.done = reader.readBool(offsets[3]);
+  object.iconCodePoint = reader.readLong(offsets[4]);
   object.id = id;
-  object.title = reader.readString(offsets[4]);
+  object.ownerId = reader.readStringOrNull(offsets[5]);
+  object.title = reader.readString(offsets[6]);
+  object.updatedAt = reader.readDateTimeOrNull(offsets[7]);
   return object;
 }
 
@@ -105,15 +138,21 @@ P _wishDeserializeProp<P>(
 ) {
   switch (propertyId) {
     case 0:
-      return (reader.readDateTime(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 1:
-      return (reader.readString(offset)) as P;
+      return (reader.readDateTime(offset)) as P;
     case 2:
-      return (reader.readBool(offset)) as P;
-    case 3:
-      return (reader.readLong(offset)) as P;
-    case 4:
       return (reader.readString(offset)) as P;
+    case 3:
+      return (reader.readBool(offset)) as P;
+    case 4:
+      return (reader.readLong(offset)) as P;
+    case 5:
+      return (reader.readStringOrNull(offset)) as P;
+    case 6:
+      return (reader.readString(offset)) as P;
+    case 7:
+      return (reader.readDateTimeOrNull(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
   }
@@ -207,6 +246,150 @@ extension WishQueryWhere on QueryBuilder<Wish, Wish, QWhereClause> {
 }
 
 extension WishQueryFilter on QueryBuilder<Wish, Wish, QFilterCondition> {
+  QueryBuilder<Wish, Wish, QAfterFilterCondition> cloudIdIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'cloudId',
+      ));
+    });
+  }
+
+  QueryBuilder<Wish, Wish, QAfterFilterCondition> cloudIdIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'cloudId',
+      ));
+    });
+  }
+
+  QueryBuilder<Wish, Wish, QAfterFilterCondition> cloudIdEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'cloudId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Wish, Wish, QAfterFilterCondition> cloudIdGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'cloudId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Wish, Wish, QAfterFilterCondition> cloudIdLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'cloudId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Wish, Wish, QAfterFilterCondition> cloudIdBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'cloudId',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Wish, Wish, QAfterFilterCondition> cloudIdStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'cloudId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Wish, Wish, QAfterFilterCondition> cloudIdEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'cloudId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Wish, Wish, QAfterFilterCondition> cloudIdContains(String value,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'cloudId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Wish, Wish, QAfterFilterCondition> cloudIdMatches(String pattern,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'cloudId',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Wish, Wish, QAfterFilterCondition> cloudIdIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'cloudId',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<Wish, Wish, QAfterFilterCondition> cloudIdIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'cloudId',
+        value: '',
+      ));
+    });
+  }
+
   QueryBuilder<Wish, Wish, QAfterFilterCondition> createdAtEqualTo(
       DateTime value) {
     return QueryBuilder.apply(this, (query) {
@@ -504,6 +687,150 @@ extension WishQueryFilter on QueryBuilder<Wish, Wish, QFilterCondition> {
     });
   }
 
+  QueryBuilder<Wish, Wish, QAfterFilterCondition> ownerIdIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'ownerId',
+      ));
+    });
+  }
+
+  QueryBuilder<Wish, Wish, QAfterFilterCondition> ownerIdIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'ownerId',
+      ));
+    });
+  }
+
+  QueryBuilder<Wish, Wish, QAfterFilterCondition> ownerIdEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'ownerId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Wish, Wish, QAfterFilterCondition> ownerIdGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'ownerId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Wish, Wish, QAfterFilterCondition> ownerIdLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'ownerId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Wish, Wish, QAfterFilterCondition> ownerIdBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'ownerId',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Wish, Wish, QAfterFilterCondition> ownerIdStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'ownerId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Wish, Wish, QAfterFilterCondition> ownerIdEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'ownerId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Wish, Wish, QAfterFilterCondition> ownerIdContains(String value,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'ownerId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Wish, Wish, QAfterFilterCondition> ownerIdMatches(String pattern,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'ownerId',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Wish, Wish, QAfterFilterCondition> ownerIdIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'ownerId',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<Wish, Wish, QAfterFilterCondition> ownerIdIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'ownerId',
+        value: '',
+      ));
+    });
+  }
+
   QueryBuilder<Wish, Wish, QAfterFilterCondition> titleEqualTo(
     String value, {
     bool caseSensitive = true,
@@ -631,6 +958,75 @@ extension WishQueryFilter on QueryBuilder<Wish, Wish, QFilterCondition> {
       ));
     });
   }
+
+  QueryBuilder<Wish, Wish, QAfterFilterCondition> updatedAtIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'updatedAt',
+      ));
+    });
+  }
+
+  QueryBuilder<Wish, Wish, QAfterFilterCondition> updatedAtIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'updatedAt',
+      ));
+    });
+  }
+
+  QueryBuilder<Wish, Wish, QAfterFilterCondition> updatedAtEqualTo(
+      DateTime? value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'updatedAt',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Wish, Wish, QAfterFilterCondition> updatedAtGreaterThan(
+    DateTime? value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'updatedAt',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Wish, Wish, QAfterFilterCondition> updatedAtLessThan(
+    DateTime? value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'updatedAt',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Wish, Wish, QAfterFilterCondition> updatedAtBetween(
+    DateTime? lower,
+    DateTime? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'updatedAt',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
 }
 
 extension WishQueryObject on QueryBuilder<Wish, Wish, QFilterCondition> {}
@@ -638,6 +1034,18 @@ extension WishQueryObject on QueryBuilder<Wish, Wish, QFilterCondition> {}
 extension WishQueryLinks on QueryBuilder<Wish, Wish, QFilterCondition> {}
 
 extension WishQuerySortBy on QueryBuilder<Wish, Wish, QSortBy> {
+  QueryBuilder<Wish, Wish, QAfterSortBy> sortByCloudId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'cloudId', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Wish, Wish, QAfterSortBy> sortByCloudIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'cloudId', Sort.desc);
+    });
+  }
+
   QueryBuilder<Wish, Wish, QAfterSortBy> sortByCreatedAt() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'createdAt', Sort.asc);
@@ -686,6 +1094,18 @@ extension WishQuerySortBy on QueryBuilder<Wish, Wish, QSortBy> {
     });
   }
 
+  QueryBuilder<Wish, Wish, QAfterSortBy> sortByOwnerId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'ownerId', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Wish, Wish, QAfterSortBy> sortByOwnerIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'ownerId', Sort.desc);
+    });
+  }
+
   QueryBuilder<Wish, Wish, QAfterSortBy> sortByTitle() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'title', Sort.asc);
@@ -697,9 +1117,33 @@ extension WishQuerySortBy on QueryBuilder<Wish, Wish, QSortBy> {
       return query.addSortBy(r'title', Sort.desc);
     });
   }
+
+  QueryBuilder<Wish, Wish, QAfterSortBy> sortByUpdatedAt() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'updatedAt', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Wish, Wish, QAfterSortBy> sortByUpdatedAtDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'updatedAt', Sort.desc);
+    });
+  }
 }
 
 extension WishQuerySortThenBy on QueryBuilder<Wish, Wish, QSortThenBy> {
+  QueryBuilder<Wish, Wish, QAfterSortBy> thenByCloudId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'cloudId', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Wish, Wish, QAfterSortBy> thenByCloudIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'cloudId', Sort.desc);
+    });
+  }
+
   QueryBuilder<Wish, Wish, QAfterSortBy> thenByCreatedAt() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'createdAt', Sort.asc);
@@ -760,6 +1204,18 @@ extension WishQuerySortThenBy on QueryBuilder<Wish, Wish, QSortThenBy> {
     });
   }
 
+  QueryBuilder<Wish, Wish, QAfterSortBy> thenByOwnerId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'ownerId', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Wish, Wish, QAfterSortBy> thenByOwnerIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'ownerId', Sort.desc);
+    });
+  }
+
   QueryBuilder<Wish, Wish, QAfterSortBy> thenByTitle() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'title', Sort.asc);
@@ -771,9 +1227,28 @@ extension WishQuerySortThenBy on QueryBuilder<Wish, Wish, QSortThenBy> {
       return query.addSortBy(r'title', Sort.desc);
     });
   }
+
+  QueryBuilder<Wish, Wish, QAfterSortBy> thenByUpdatedAt() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'updatedAt', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Wish, Wish, QAfterSortBy> thenByUpdatedAtDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'updatedAt', Sort.desc);
+    });
+  }
 }
 
 extension WishQueryWhereDistinct on QueryBuilder<Wish, Wish, QDistinct> {
+  QueryBuilder<Wish, Wish, QDistinct> distinctByCloudId(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'cloudId', caseSensitive: caseSensitive);
+    });
+  }
+
   QueryBuilder<Wish, Wish, QDistinct> distinctByCreatedAt() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'createdAt');
@@ -799,10 +1274,23 @@ extension WishQueryWhereDistinct on QueryBuilder<Wish, Wish, QDistinct> {
     });
   }
 
+  QueryBuilder<Wish, Wish, QDistinct> distinctByOwnerId(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'ownerId', caseSensitive: caseSensitive);
+    });
+  }
+
   QueryBuilder<Wish, Wish, QDistinct> distinctByTitle(
       {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'title', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<Wish, Wish, QDistinct> distinctByUpdatedAt() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'updatedAt');
     });
   }
 }
@@ -811,6 +1299,12 @@ extension WishQueryProperty on QueryBuilder<Wish, Wish, QQueryProperty> {
   QueryBuilder<Wish, int, QQueryOperations> idProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'id');
+    });
+  }
+
+  QueryBuilder<Wish, String?, QQueryOperations> cloudIdProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'cloudId');
     });
   }
 
@@ -838,9 +1332,21 @@ extension WishQueryProperty on QueryBuilder<Wish, Wish, QQueryProperty> {
     });
   }
 
+  QueryBuilder<Wish, String?, QQueryOperations> ownerIdProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'ownerId');
+    });
+  }
+
   QueryBuilder<Wish, String, QQueryOperations> titleProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'title');
+    });
+  }
+
+  QueryBuilder<Wish, DateTime?, QQueryOperations> updatedAtProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'updatedAt');
     });
   }
 }

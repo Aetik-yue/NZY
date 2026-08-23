@@ -40,6 +40,7 @@ class DetailActions extends ConsumerWidget {
           total: total,
         );
       }
+
       final newCount = await ref
           .read(crawlRepositoryProvider)
           .updateNovel(novel.id, onProgress: onProgress);
@@ -129,7 +130,8 @@ class DetailActions extends ConsumerWidget {
               ),
             ),
             child: Text('目录',
-                style: AppTextStyles.body.copyWith(color: AppColors.accentRose)),
+                style:
+                    AppTextStyles.body.copyWith(color: AppColors.accentRose)),
           ),
         ),
         const SizedBox(height: 12),
@@ -192,7 +194,8 @@ class DetailActions extends ConsumerWidget {
               ),
             ),
             child: Text('删除小说',
-                style: AppTextStyles.body.copyWith(color: AppColors.accentRose)),
+                style:
+                    AppTextStyles.body.copyWith(color: AppColors.accentRose)),
           ),
         ),
       ],

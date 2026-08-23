@@ -100,14 +100,15 @@ mixin _ReaderProgress on ConsumerState<NovelReaderPage> {
   void _maybeRestore(ReaderSettings settings, int effectiveIndex) {
     if (_restored) return;
     if (_novel == null) return;
-    final restoreRatio = effectiveIndex == _novel!.lastChapterIndex
-        ? _novel!.lastPosition
-        : 0.0;
+    final restoreRatio =
+        effectiveIndex == _novel!.lastChapterIndex ? _novel!.lastPosition : 0.0;
     if (settings.pageMode == 1) {
       if (_pages.isNotEmpty && _pageController.hasClients) {
         final target = _jumpToEndOnRestore
             ? _pages.length - 1
-            : (restoreRatio * _pages.length).round().clamp(0, _pages.length - 1);
+            : (restoreRatio * _pages.length)
+                .round()
+                .clamp(0, _pages.length - 1);
         _pageController.jumpToPage(target);
         _jumpToEndOnRestore = false;
       }

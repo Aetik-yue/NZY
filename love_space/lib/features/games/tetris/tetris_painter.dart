@@ -33,10 +33,12 @@ class TetrisPainter extends CustomPainter {
       ..color = Colors.white.withValues(alpha: 0.05)
       ..strokeWidth = 1;
     for (var c = 1; c < kTetrisCols; c++) {
-      canvas.drawLine(Offset(c * cell, 0), Offset(c * cell, size.height), gridPaint);
+      canvas.drawLine(
+          Offset(c * cell, 0), Offset(c * cell, size.height), gridPaint);
     }
     for (var r = 1; r < kTetrisRows; r++) {
-      canvas.drawLine(Offset(0, r * cell), Offset(size.width, r * cell), gridPaint);
+      canvas.drawLine(
+          Offset(0, r * cell), Offset(size.width, r * cell), gridPaint);
     }
 
     // 已锁定格
@@ -70,7 +72,8 @@ class TetrisPainter extends CustomPainter {
     if (current != null) {
       for (final p in current!.absoluteCells()) {
         if (p.r < 0 || p.r >= kTetrisRows) continue;
-        _drawBlock(canvas, _rect(p.c, p.r, cell), current!.type.color, 1.0, false);
+        _drawBlock(
+            canvas, _rect(p.c, p.r, cell), current!.type.color, 1.0, false);
       }
     }
   }
@@ -79,7 +82,8 @@ class TetrisPainter extends CustomPainter {
       Rect.fromLTWH(c * cell, r * cell, cell, cell);
 
   /// 绘制单格：2-stop 渐变 + 圆角 + 内高光描边；[flash] 时叠加白色闪光
-  void _drawBlock(Canvas canvas, Rect rect, Color color, double alpha, bool flash) {
+  void _drawBlock(
+      Canvas canvas, Rect rect, Color color, double alpha, bool flash) {
     final rrect = RRect.fromRectAndRadius(
       rect.deflate(rect.width * 0.04),
       Radius.circular(rect.width * 0.16),
@@ -156,7 +160,10 @@ class TetrominoPainter extends CustomPainter {
           ..shader = LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [type!.color.withValues(alpha: 0.95), type!.color.withValues(alpha: 0.72)],
+            colors: [
+              type!.color.withValues(alpha: 0.95),
+              type!.color.withValues(alpha: 0.72)
+            ],
           ).createShader(rect),
       );
     }

@@ -104,7 +104,8 @@ class MemoCard extends StatelessWidget {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.delete_outline, color: AppColors.accentRose),
+              leading:
+                  const Icon(Icons.delete_outline, color: AppColors.accentRose),
               title: const Text('删除'),
               onTap: () {
                 Navigator.of(context).pop();
@@ -136,9 +137,7 @@ class _Leading extends StatelessWidget {
           onTap: onToggleDone,
           behavior: HitTestBehavior.opaque,
           child: Icon(
-            memo.done
-                ? Icons.check_circle
-                : Icons.radio_button_unchecked,
+            memo.done ? Icons.check_circle : Icons.radio_button_unchecked,
             size: 22,
             color: memo.done ? AppColors.accentRose : AppColors.textTertiary,
           ),
@@ -172,9 +171,8 @@ class _Header extends StatelessWidget {
           width: 20,
           height: 20,
           decoration: BoxDecoration(
-            color: memo.author == 1
-                ? AppColors.accentRose
-                : AppColors.accentPeach,
+            color:
+                memo.author == 1 ? AppColors.accentRose : AppColors.accentPeach,
             shape: BoxShape.circle,
           ),
           child: Center(
@@ -231,8 +229,7 @@ class _HighlightText extends StatelessWidget {
     // 完成时：正文与标签统一置灰（textTertiary）+ 删除线，作为已完成视觉降级
     final baseColor = done ? AppColors.textTertiary : AppColors.textPrimary;
     final tagColor = done ? AppColors.textTertiary : AppColors.accentRose;
-    final decoration =
-        done ? TextDecoration.lineThrough : TextDecoration.none;
+    final decoration = done ? TextDecoration.lineThrough : TextDecoration.none;
 
     for (final match in regex.allMatches(content)) {
       // 标签前的普通文本（继承父级 color/decoration）

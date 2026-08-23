@@ -18,12 +18,16 @@ class StopwatchPage extends StatefulWidget {
 class _StopwatchPageState extends State<StopwatchPage>
     with SingleTickerProviderStateMixin {
   late final Ticker _ticker;
+
   /// 累计已计时（跨暂停/继续）
   Duration _elapsed = Duration.zero;
+
   /// 上一帧 Ticker 回调的 elapsed，用于计算帧间 dt
   Duration _lastTick = Duration.zero;
+
   /// 是否正在计时
   bool _running = false;
+
   /// 计圈记录：每圈按下时的累计时长（index 0 = 第一圈）
   final List<Duration> _laps = [];
 
@@ -80,7 +84,8 @@ class _StopwatchPageState extends State<StopwatchPage>
   String _format(Duration d) {
     final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
     final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
-    final cs = (d.inMilliseconds ~/ 10).remainder(100).toString().padLeft(2, '0');
+    final cs =
+        (d.inMilliseconds ~/ 10).remainder(100).toString().padLeft(2, '0');
     return '$m:$s.$cs';
   }
 
@@ -156,7 +161,8 @@ class _StopwatchPageState extends State<StopwatchPage>
           const SizedBox(width: AppColors.spacingSm),
           Expanded(
             child: _primaryButton(
-              label: _running ? '暂停' : (_elapsed == Duration.zero ? '开始' : '继续'),
+              label:
+                  _running ? '暂停' : (_elapsed == Duration.zero ? '开始' : '继续'),
               icon: _running ? Icons.pause_rounded : Icons.play_arrow_rounded,
               onTap: _toggle,
             ),
@@ -202,8 +208,8 @@ class _StopwatchPageState extends State<StopwatchPage>
             Icon(icon, color: AppColors.textOnPink, size: 20),
             const SizedBox(width: AppColors.spacingXs),
             Text(label,
-                style: AppTextStyles.onPink.copyWith(
-                    fontSize: 16, fontWeight: FontWeight.w600)),
+                style: AppTextStyles.onPink
+                    .copyWith(fontSize: 16, fontWeight: FontWeight.w600)),
           ],
         ),
       ),
@@ -264,8 +270,8 @@ class _StopwatchPageState extends State<StopwatchPage>
         padding: EdgeInsets.zero,
         shrinkWrap: true,
         itemCount: _laps.length,
-        separatorBuilder: (_, __) => const Divider(
-            height: 1, indent: 16, color: AppColors.borderSoft),
+        separatorBuilder: (_, __) =>
+            const Divider(height: 1, indent: 16, color: AppColors.borderSoft),
         itemBuilder: (_, i) {
           // 最新在上：倒序展示
           final idx = _laps.length - i;

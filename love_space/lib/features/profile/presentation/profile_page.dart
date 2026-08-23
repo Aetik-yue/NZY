@@ -3,12 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_text_styles.dart';
 import '../../../data/providers/data_providers.dart';
+import '../../../data/sync/sync_providers.dart';
 import '../../../shared/widgets/pill_nav_bar.dart';
 import '../../memo/presentation/memo_page.dart';
 import '../../music/presentation/music_player_page.dart';
 import '../../music/providers/music_player_provider.dart';
 import 'all_features_page.dart';
 import 'settings_page.dart';
+import 'sync_pairing_page.dart';
 
 /// 我的页
 /// 还原设计稿：渐变头部 → 统计行 → 音乐卡 → 功能卡（小说/待办/设置）
@@ -26,6 +28,8 @@ class ProfilePage extends ConsumerWidget {
           _StatsRow(),
           SizedBox(height: 16),
           _MusicCard(),
+          SizedBox(height: 12),
+          _SyncEntry(),
           SizedBox(height: 12),
           _FunctionCards(),
           SizedBox(height: 12),
@@ -89,8 +93,8 @@ class _ProfileHeader extends ConsumerWidget {
                     const Positioned(
                       left: 45,
                       top: 21,
-                      child: Icon(Icons.favorite,
-                          color: Colors.white, size: 24),
+                      child:
+                          Icon(Icons.favorite, color: Colors.white, size: 24),
                     ),
                   ],
                 ),
@@ -204,62 +208,76 @@ class _MusicCard extends ConsumerWidget {
     final count = playerState.playlist.length;
     final current = playerState.currentSong;
     final sub = count == 0
-        ? '还没有音乐 · 点击播放'
-        : (current != null
-            ? '$count 首 · 正在播放「${current.title}」'
-            : '$count 首 · 点击播放');
+        ? '打开音乐库，开始播放'
+        : playerState.isLoading && current != null
+            ? '正在准备「${current.title}」'
+            : playerState.isPlaying && current != null
+                ? '正在播放「${current.title}」'
+                : current != null
+                    ? '$count 首 · 「${current.title}」'
+                    : '$count 首 · 点击播放';
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: AppColors.musicCardGradient,
-        borderRadius: BorderRadius.circular(AppColors.radiusCard),
-        boxShadow: const [
-          BoxShadow(
-            color: AppColors.shadowCard,
-            blurRadius: 16,
-            offset: Offset(0, 4),
-            spreadRadius: -4,
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              gradient: AppColors.pinkButtonGradient,
-              borderRadius: BorderRadius.circular(AppColors.radiusSm),
-            ),
-            child: const Icon(Icons.music_note,
-                color: AppColors.textOnPink, size: 24),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('我们的歌单', style: AppTextStyles.titleXs),
-                const SizedBox(height: 4),
-                Text(sub, style: AppTextStyles.label),
-              ],
-            ),
-          ),
-          GestureDetector(
-            onTap: () => MusicPlayerPage.show(context),
-            child: Container(
-              width: 40,
-              height: 40,
-              decoration: const BoxDecoration(
-                color: AppColors.bgCard,
-                shape: BoxShape.circle,
+    return Semantics(
+      button: true,
+      label: '打开回忆唱片',
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => MusicPlayerPage.show(context),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            gradient: AppColors.musicCardGradient,
+            borderRadius: BorderRadius.circular(AppColors.radiusCard),
+            boxShadow: const [
+              BoxShadow(
+                color: AppColors.shadowCard,
+                blurRadius: 16,
+                offset: Offset(0, 4),
+                spreadRadius: -4,
               ),
-              child: const Icon(Icons.play_arrow,
-                  color: AppColors.accentRose, size: 20),
-            ),
+            ],
           ),
-        ],
+          child: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  gradient: AppColors.pinkButtonGradient,
+                  borderRadius: BorderRadius.circular(AppColors.radiusSm),
+                ),
+                child: const Icon(Icons.photo_album_rounded,
+                    color: AppColors.textOnPink, size: 24),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('回忆唱片', style: AppTextStyles.titleXs),
+                    const SizedBox(height: 4),
+                    Text(
+                      sub,
+                      style: AppTextStyles.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                width: 44,
+                height: 44,
+                decoration: const BoxDecoration(
+                  color: AppColors.bgCard,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.play_arrow_rounded,
+                    color: AppColors.accentRose, size: 24),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -344,14 +362,90 @@ class _AllFeaturesEntry extends StatelessWidget {
         ),
         child: Row(
           children: [
-            const Icon(Icons.apps_rounded, color: AppColors.accentRose, size: 22),
+            const Icon(Icons.apps_rounded,
+                color: AppColors.accentRose, size: 22),
             const SizedBox(width: 12),
             Expanded(
               child: Text('全部功能', style: AppTextStyles.titleXs),
             ),
-            Text('更多双人小工具',
-                style: AppTextStyles.label),
+            Text('更多双人小工具', style: AppTextStyles.label),
             const SizedBox(width: 4),
+            const Icon(Icons.chevron_right_rounded,
+                size: 20, color: AppColors.textTertiary),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 双人同步入口卡（点击进入配对页）
+class _SyncEntry extends ConsumerWidget {
+  const _SyncEntry();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final status = ref.watch(syncStatusProvider).valueOrNull;
+    final isPaired = status?.isPaired ?? false;
+    final isConfigured = status?.isConfigured ?? false;
+
+    final String subtitle;
+    if (!isConfigured) {
+      subtitle = '未启用（需配置云环境）';
+    } else if (isPaired) {
+      subtitle = '已绑定房间 ${status?.roomCode ?? ''} · 数据自动同步中';
+    } else {
+      subtitle = '创建房间或输入情侣码，双端数据互通';
+    }
+
+    return GestureDetector(
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const SyncPairingPage()),
+      ),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: AppColors.bgCard,
+          borderRadius: BorderRadius.circular(AppColors.radiusCard),
+          boxShadow: const [
+            BoxShadow(
+              color: AppColors.shadowCard,
+              blurRadius: 16,
+              offset: Offset(0, 4),
+              spreadRadius: -4,
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color:
+                    isPaired ? AppColors.accentRose : AppColors.accentPinkSoft,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                isPaired ? Icons.favorite_rounded : Icons.sync_rounded,
+                color: isPaired ? Colors.white : AppColors.accentRose,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('双人同步', style: AppTextStyles.titleXs),
+                  const SizedBox(height: 2),
+                  Text(subtitle,
+                      style: AppTextStyles.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis),
+                ],
+              ),
+            ),
             const Icon(Icons.chevron_right_rounded,
                 size: 20, color: AppColors.textTertiary),
           ],

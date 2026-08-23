@@ -4,6 +4,7 @@ import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_text_styles.dart';
 import '../../../../data/models/memo.dart';
 import '../../../../data/providers/data_providers.dart';
+import '../../../../data/sync/sync_providers.dart';
 import '../../../../shared/widgets/app_snackbar.dart';
 import '../../../../shared/widgets/confirm_dialog.dart';
 import 'widgets/todo_fields.dart';
@@ -164,11 +165,19 @@ class _MemoEditPageState extends ConsumerState<MemoEditPage> {
       return;
     }
     try {
+      final syncEngine = ref.read(syncEngineProvider);
+      final cloudId = memo.cloudId;
       await repo.delete(memo.id);
+      if (cloudId != null) {
+        syncEngine.markDeleted(cloudId);
+      }
       if (!mounted) return;
       Navigator.of(context).pop();
       AppSnackbar.showUndo(context, '已删除', () async {
         try {
+          if (cloudId != null) {
+            syncEngine.restoreDeleted(cloudId);
+          }
           await repo.add(memo);
         } catch (e) {
           debugPrint('[MemoEditPage] 撤销删除失败: $e');
@@ -195,90 +204,86 @@ class _MemoEditPageState extends ConsumerState<MemoEditPage> {
       canPop: !_hasChanges,
       onPopInvokedWithResult: (didPop, _) => _handlePopInvoked(didPop),
       child: Scaffold(
-      backgroundColor: AppColors.bgPrimary,
-      appBar: AppBar(
         backgroundColor: AppColors.bgPrimary,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new,
-              size: 20, color: AppColors.textPrimary),
-          // 必须用 maybePop：强制 pop 会绕过 PopScope 的未保存拦截
-          onPressed: () => Navigator.of(context).maybePop(),
-        ),
-        title: Text(_isEditing ? '编辑待办' : '新建待办',
-            style: AppTextStyles.titleMedium),
-        centerTitle: true,
-        actions: [
-          if (_isEditing)
-            IconButton(
-              icon: const Icon(Icons.delete_outline,
-                  color: AppColors.accentRose),
-              tooltip: '删除',
-              onPressed: _deleteMemo,
-            ),
-          TextButton(
-            onPressed: _save,
-            child: Text(
-              '保存',
-              style: AppTextStyles.body.copyWith(
-                color: AppColors.accentRose,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
+        appBar: AppBar(
+          backgroundColor: AppColors.bgPrimary,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_ios_new,
+                size: 20, color: AppColors.textPrimary),
+            // 必须用 maybePop：强制 pop 会绕过 PopScope 的未保存拦截
+            onPressed: () => Navigator.of(context).maybePop(),
           ),
-        ],
-      ),
-      body: _loaded
-          ? SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // 作者选择器（仅新建时）
-                    if (!_isEditing) ...[
-                      AuthorSelector(
-                        value: _selectedAuthor,
-                        onChanged: (a) =>
-                            setState(() => _selectedAuthor = a),
-                      ),
-                      const SizedBox(height: 16),
-                    ],
-                    // 颜色选择
-                    ColorSelector(
-                      value: _selectedColor,
-                      onChanged: (c) =>
-                          setState(() => _selectedColor = c),
-                    ),
-                    const SizedBox(height: 16),
-                    // 截止日期选择
-                    DueDateField(
-                      value: _selectedDueDate,
-                      onChanged: (d) =>
-                          setState(() => _selectedDueDate = d),
-                    ),
-                    const SizedBox(height: 16),
-                    // 优先级选择
-                    PriorityField(
-                      value: _selectedPriority,
-                      onChanged: (p) =>
-                          setState(() => _selectedPriority = p),
-                    ),
-                    const SizedBox(height: 16),
-                    // 输入框
-                    ContentTextField(
-                      controller: _controller,
-                      autofocus: !_isEditing,
-                      onChanged: () => setState(() {}),
-                    ),
-                    const SizedBox(height: 8),
-                    Text('提示：使用 #标签名 添加标签，如 #旅行 #计划',
-                        style: AppTextStyles.label),
-                  ],
+          title: Text(_isEditing ? '编辑待办' : '新建待办',
+              style: AppTextStyles.titleMedium),
+          centerTitle: true,
+          actions: [
+            if (_isEditing)
+              IconButton(
+                icon: const Icon(Icons.delete_outline,
+                    color: AppColors.accentRose),
+                tooltip: '删除',
+                onPressed: _deleteMemo,
+              ),
+            TextButton(
+              onPressed: _save,
+              child: Text(
+                '保存',
+                style: AppTextStyles.body.copyWith(
+                  color: AppColors.accentRose,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
-            )
-          : const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+            ),
+          ],
+        ),
+        body: _loaded
+            ? SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // 作者选择器（仅新建时）
+                      if (!_isEditing) ...[
+                        AuthorSelector(
+                          value: _selectedAuthor,
+                          onChanged: (a) => setState(() => _selectedAuthor = a),
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+                      // 颜色选择
+                      ColorSelector(
+                        value: _selectedColor,
+                        onChanged: (c) => setState(() => _selectedColor = c),
+                      ),
+                      const SizedBox(height: 16),
+                      // 截止日期选择
+                      DueDateField(
+                        value: _selectedDueDate,
+                        onChanged: (d) => setState(() => _selectedDueDate = d),
+                      ),
+                      const SizedBox(height: 16),
+                      // 优先级选择
+                      PriorityField(
+                        value: _selectedPriority,
+                        onChanged: (p) => setState(() => _selectedPriority = p),
+                      ),
+                      const SizedBox(height: 16),
+                      // 输入框
+                      ContentTextField(
+                        controller: _controller,
+                        autofocus: !_isEditing,
+                        onChanged: () => setState(() {}),
+                      ),
+                      const SizedBox(height: 8),
+                      Text('提示：使用 #标签名 添加标签，如 #旅行 #计划',
+                          style: AppTextStyles.label),
+                    ],
+                  ),
+                ),
+              )
+            : const Center(child: CircularProgressIndicator(strokeWidth: 2)),
       ),
     );
   }

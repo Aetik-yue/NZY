@@ -4,6 +4,7 @@ import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_text_styles.dart';
 import '../../../data/models/timeline_event.dart';
 import '../../../data/providers/data_providers.dart';
+import '../../../data/sync/sync_providers.dart';
 import '../../../shared/widgets/app_snackbar.dart';
 import '../../../shared/widgets/confirm_dialog.dart';
 import 'widgets/add_timeline_sheet.dart';
@@ -100,8 +101,8 @@ class TimelineAllPage extends ConsumerWidget {
               onTap: () => Navigator.of(ctx).pop('edit'),
             ),
             ListTile(
-              leading: const Icon(Icons.delete_outline,
-                  color: AppColors.accentRose),
+              leading:
+                  const Icon(Icons.delete_outline, color: AppColors.accentRose),
               title: const Text('删除'),
               onTap: () => Navigator.of(ctx).pop('delete'),
             ),
@@ -130,10 +131,17 @@ class TimelineAllPage extends ConsumerWidget {
     );
     if (!confirmed || !context.mounted) return;
     try {
+      final cloudId = event.cloudId;
       await ref.read(timelineRepositoryProvider).delete(event.id);
+      if (cloudId != null) {
+        ref.read(syncEngineProvider).markDeleted(cloudId);
+      }
       if (!context.mounted) return;
       AppSnackbar.showUndo(context, '时光已删除', () async {
         try {
+          if (cloudId != null) {
+            ref.read(syncEngineProvider).restoreDeleted(cloudId);
+          }
           await ref.read(timelineRepositoryProvider).add(event);
         } catch (e) {
           debugPrint('[TimelineAllPage] 撤销删除失败: $e');

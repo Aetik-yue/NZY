@@ -378,8 +378,7 @@ class _TimelineSection extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
-                          color:
-                              AppColors.accentRose.withValues(alpha: 0.12),
+                          color: AppColors.accentRose.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Row(
@@ -506,7 +505,8 @@ class _PhotoGrid extends StatelessWidget {
                 width: width,
                 child: _PhotoThumb(
                   photo: photos[i],
-                  gradient: AppColors.coverGradients[photos[i].gradientIndex %
+                  gradient: AppColors
+                      .coverGradients[photos[i].gradientIndex %
                           AppColors.coverGradients.length]
                       .colors,
                   onTap: () => PhotoViewer.show(
@@ -550,32 +550,32 @@ class _PhotoThumb extends StatelessWidget {
           child: Stack(
             fit: StackFit.expand,
             children: [
-            // 兜底渐变背景
-            Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: gradient,
-                ),
-                boxShadow: const [
-                  BoxShadow(
-                    color: AppColors.shadowCard,
-                    blurRadius: 10,
-                    offset: Offset(0, 3),
-                    spreadRadius: -2,
+              // 兜底渐变背景
+              Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: gradient,
                   ),
-                ],
+                  boxShadow: const [
+                    BoxShadow(
+                      color: AppColors.shadowCard,
+                      blurRadius: 10,
+                      offset: Offset(0, 3),
+                      spreadRadius: -2,
+                    ),
+                  ],
+                ),
               ),
-            ),
-            // 真实照片（缩略图降采样解码，避免原图内存开销）
-            if (photo.filePath != null)
-              Image.file(
-                File(photo.filePath!),
-                fit: BoxFit.cover,
-                cacheWidth: 400,
-                errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-              ),
+              // 真实照片（缩略图降采样解码，避免原图内存开销）
+              if (photo.filePath != null)
+                Image.file(
+                  File(photo.filePath!),
+                  fit: BoxFit.cover,
+                  cacheWidth: 400,
+                  errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                ),
               // 日期文字
               Positioned(
                 left: 8,

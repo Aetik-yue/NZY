@@ -4,6 +4,7 @@ import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_text_styles.dart';
 import '../../../../data/models/timeline_event.dart';
 import '../../../../data/providers/data_providers.dart';
+import '../../../../data/sync/sync_providers.dart';
 import '../../../../shared/widgets/app_snackbar.dart';
 import '../../../../shared/widgets/confirm_dialog.dart';
 import 'add_timeline_sheet.dart';
@@ -92,8 +93,7 @@ class TimelineDetailSheet extends ConsumerWidget {
                       side: const BorderSide(color: AppColors.accentRose),
                       foregroundColor: AppColors.accentRose,
                       shape: RoundedRectangleBorder(
-                        borderRadius:
-                            BorderRadius.circular(AppColors.radiusMd),
+                        borderRadius: BorderRadius.circular(AppColors.radiusMd),
                       ),
                     ),
                   ),
@@ -107,8 +107,7 @@ class TimelineDetailSheet extends ConsumerWidget {
                     style: FilledButton.styleFrom(
                       backgroundColor: AppColors.accentRose,
                       shape: RoundedRectangleBorder(
-                        borderRadius:
-                            BorderRadius.circular(AppColors.radiusMd),
+                        borderRadius: BorderRadius.circular(AppColors.radiusMd),
                       ),
                     ),
                   ),
@@ -130,11 +129,19 @@ class TimelineDetailSheet extends ConsumerWidget {
     if (!confirmed || !context.mounted) return;
     try {
       final repo = ref.read(timelineRepositoryProvider);
+      final syncEngine = ref.read(syncEngineProvider);
+      final cloudId = event.cloudId;
       await repo.delete(event.id);
+      if (cloudId != null) {
+        syncEngine.markDeleted(cloudId);
+      }
       if (!context.mounted) return;
       Navigator.of(context).pop();
       AppSnackbar.showUndo(context, '时光已删除', () async {
         try {
+          if (cloudId != null) {
+            syncEngine.restoreDeleted(cloudId);
+          }
           await repo.add(event);
         } catch (e) {
           debugPrint('[TimelineDetailSheet] 撤销删除失败: $e');

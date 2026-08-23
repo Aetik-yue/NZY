@@ -15,21 +15,26 @@ class WishRepository {
       _isar.wishs.where().sortByCreatedAt().watch(fireImmediately: true);
 
   /// 新增愿望
-  Future<void> add(Wish wish) =>
-      _isar.writeTxn(() async => _isar.wishs.put(wish));
+  Future<void> add(Wish wish) => _isar.writeTxn(() async {
+        wish.updatedAt = DateTime.now();
+        await _isar.wishs.put(wish);
+      });
 
   /// 切换愿望完成状态
   Future<void> toggleDone(Id id) => _isar.writeTxn(() async {
         final w = await _isar.wishs.get(id);
         if (w != null) {
           w.done = !w.done;
+          w.updatedAt = DateTime.now();
           await _isar.wishs.put(w);
         }
       });
 
   /// 编辑愿望
-  Future<void> update(Wish wish) =>
-      _isar.writeTxn(() async => _isar.wishs.put(wish));
+  Future<void> update(Wish wish) => _isar.writeTxn(() async {
+        wish.updatedAt = DateTime.now();
+        await _isar.wishs.put(wish);
+      });
 
   /// 删除愿望
   Future<void> delete(Id id) =>

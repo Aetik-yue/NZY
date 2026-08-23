@@ -34,12 +34,16 @@ class AlbumRepository {
           .watch(fireImmediately: true);
 
   /// 编辑照片
-  Future<void> update(AlbumPhoto photo) =>
-      _isar.writeTxn(() async => _isar.albumPhotos.put(photo));
+  Future<void> update(AlbumPhoto photo) => _isar.writeTxn(() async {
+        photo.updatedAt = DateTime.now();
+        await _isar.albumPhotos.put(photo);
+      });
 
   /// 新增照片
-  Future<void> add(AlbumPhoto photo) =>
-      _isar.writeTxn(() async => _isar.albumPhotos.put(photo));
+  Future<void> add(AlbumPhoto photo) => _isar.writeTxn(() async {
+        photo.updatedAt = DateTime.now();
+        await _isar.albumPhotos.put(photo);
+      });
 
   /// 删除照片
   Future<void> delete(Id id) =>

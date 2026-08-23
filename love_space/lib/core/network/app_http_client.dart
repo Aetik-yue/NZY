@@ -50,6 +50,23 @@ class AppHttpClient {
     return _requestWithRetry(url, headers: headers);
   }
 
+  /// 执行一次 GET 请求，不做重试。
+  ///
+  /// 适用于搜索、分类探测等存在多个备用端点的场景：单个端点失败后应立即
+  /// 切换备用源，而不是在同一个失效端点上指数退避。正文和详情抓取仍应使用
+  /// [get] 保留重试能力。
+  Future<String> getOnce(
+    String url, {
+    Map<String, String>? headers,
+    Duration? timeoutOverride,
+  }) {
+    return _doRequest(
+      url,
+      headers: headers,
+      timeoutOverride: timeoutOverride,
+    );
+  }
+
   /// 执行 POST 请求（表单提交），返回解码后的字符串
   ///
   /// [body] 中的值会按 UTF-8 进行 URL 编码。
@@ -63,8 +80,31 @@ class AppHttpClient {
       'Content-Type': 'application/x-www-form-urlencoded',
       if (headers != null) ...headers,
     };
-    return _requestWithRetry(
-        url, body: body, headers: mergedHeaders, gbkBody: false);
+    return _requestWithRetry(url,
+        body: body, headers: mergedHeaders, gbkBody: false);
+  }
+
+  /// 执行一次 UTF-8 表单 POST，不做重试。
+  ///
+  /// 搜索端点本身就是可替换资源；失败时快速切源比反复请求同一端点更快，
+  /// 也能避免无效站点把整次跨源搜索拖到几十秒。
+  Future<String> postOnce(
+    String url, {
+    Map<String, String>? body,
+    Map<String, String>? headers,
+    Duration? timeoutOverride,
+  }) {
+    final mergedHeaders = <String, String>{
+      'Content-Type': 'application/x-www-form-urlencoded',
+      if (headers != null) ...headers,
+    };
+    return _doRequest(
+      url,
+      body: body,
+      headers: mergedHeaders,
+      gbkBody: false,
+      timeoutOverride: timeoutOverride,
+    );
   }
 
   /// 执行 POST 请求（表单值用 GBK 编码）
@@ -82,8 +122,8 @@ class AppHttpClient {
       'Content-Type': 'application/x-www-form-urlencoded',
       if (headers != null) ...headers,
     };
-    return _requestWithRetry(
-        url, body: body, headers: mergedHeaders, gbkBody: true);
+    return _requestWithRetry(url,
+        body: body, headers: mergedHeaders, gbkBody: true);
   }
 
   /// 带重试的请求
@@ -98,7 +138,8 @@ class AppHttpClient {
 
     while (attempt < maxRetries) {
       try {
-        final result = await _doRequest(url, body: body, headers: headers, gbkBody: gbkBody);
+        final result = await _doRequest(url,
+            body: body, headers: headers, gbkBody: gbkBody);
         return result;
       } on _NonRetryableException catch (e) {
         // 4xx 客户端错误：不可重试，立即失败
@@ -108,17 +149,20 @@ class AppHttpClient {
         debugPrint('[AppHttpClient] 超时 (${attempt + 1}/$maxRetries): $url');
       } on SocketException catch (e) {
         lastError = e;
-        debugPrint('[AppHttpClient] 网络异常 (${attempt + 1}/$maxRetries): $url — $e');
+        debugPrint(
+            '[AppHttpClient] 网络异常 (${attempt + 1}/$maxRetries): $url — $e');
       } on http.ClientException catch (e) {
         lastError = e;
-        debugPrint('[AppHttpClient] 客户端异常 (${attempt + 1}/$maxRetries): $url — $e');
+        debugPrint(
+            '[AppHttpClient] 客户端异常 (${attempt + 1}/$maxRetries): $url — $e');
       } catch (e) {
         // 不可恢复的编程错误（FormatException 等）：立即失败
         if (e is FormatException || e is ArgumentError) {
           throw Exception('请求失败: $url — $e');
         }
         lastError = e;
-        debugPrint('[AppHttpClient] 未知异常 (${attempt + 1}/$maxRetries): $url — $e');
+        debugPrint(
+            '[AppHttpClient] 未知异常 (${attempt + 1}/$maxRetries): $url — $e');
       }
 
       attempt++;
@@ -138,6 +182,7 @@ class AppHttpClient {
     Map<String, String>? body,
     Map<String, String>? headers,
     bool gbkBody = false,
+    Duration? timeoutOverride,
   }) async {
     // 请求间隔控制
     await _enforceMinInterval();
@@ -155,13 +200,14 @@ class AppHttpClient {
     final response = isPost
         ? await _client
             .post(uri, headers: requestHeaders, body: encodedBody)
-            .timeout(timeout)
+            .timeout(timeoutOverride ?? timeout)
         : await _client
             .get(uri, headers: requestHeaders)
-            .timeout(timeout);
+            .timeout(timeoutOverride ?? timeout);
 
     stopwatch.stop();
-    debugPrint('[AppHttpClient] ${response.statusCode} ${stopwatch.elapsedMilliseconds}ms $url');
+    debugPrint(
+        '[AppHttpClient] ${response.statusCode} ${stopwatch.elapsedMilliseconds}ms $url');
 
     if (response.statusCode >= 500) {
       // 5xx 服务器错误：可重试
@@ -191,7 +237,9 @@ class AppHttpClient {
       final parts = <String>[];
       body.forEach((key, value) {
         final gbkBytes = gbk.encode(value);
-        final encoded = gbkBytes.map((b) => '%${b.toRadixString(16).padLeft(2, '0').toUpperCase()}').join();
+        final encoded = gbkBytes
+            .map((b) => '%${b.toRadixString(16).padLeft(2, '0').toUpperCase()}')
+            .join();
         parts.add('$key=$encoded');
       });
       return parts.join('&');
@@ -288,8 +336,10 @@ class AppHttpClient {
   /// 按指定编码解码。返回解码结果，或该编码不适用时返回 null。
   String? _decodeByCharset(List<int> bytes, String charset) {
     final lower = charset.toLowerCase();
-    if (lower.contains('gbk') || lower.contains('gb2312') ||
-        lower.contains('gb-2312') || lower.contains('gb18030')) {
+    if (lower.contains('gbk') ||
+        lower.contains('gb2312') ||
+        lower.contains('gb-2312') ||
+        lower.contains('gb18030')) {
       try {
         return gbk.decode(bytes);
       } catch (e) {

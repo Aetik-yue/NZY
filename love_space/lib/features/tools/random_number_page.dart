@@ -25,6 +25,7 @@ class _RandomNumberPageState extends State<RandomNumberPage> {
 
   /// 当前结果（null 表示尚未生成）
   int? _result;
+
   /// 最近 5 次结果（最新在右）
   final List<int> _history = [];
 
@@ -141,7 +142,8 @@ class _RandomNumberPageState extends State<RandomNumberPage> {
         children: [
           Expanded(child: _buildField('最小值', _minCtrl)),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppColors.spacingSm),
+            padding:
+                const EdgeInsets.symmetric(horizontal: AppColors.spacingSm),
             child: Text('～',
                 style: AppTextStyles.titleMedium
                     .copyWith(color: AppColors.textTertiary)),
@@ -177,7 +179,8 @@ class _RandomNumberPageState extends State<RandomNumberPage> {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(AppColors.radiusSm),
-              borderSide: const BorderSide(color: AppColors.accentRose, width: 1.5),
+              borderSide:
+                  const BorderSide(color: AppColors.accentRose, width: 1.5),
             ),
           ),
         ),
@@ -206,8 +209,9 @@ class _RandomNumberPageState extends State<RandomNumberPage> {
           ],
         ),
         child: Text('生成随机数',
-            textAlign: TextAlign.center, style: AppTextStyles.onPink.copyWith(
-              fontSize: 16, fontWeight: FontWeight.w600)),
+            textAlign: TextAlign.center,
+            style: AppTextStyles.onPink
+                .copyWith(fontSize: 16, fontWeight: FontWeight.w600)),
       ),
     );
   }
@@ -224,8 +228,7 @@ class _RandomNumberPageState extends State<RandomNumberPage> {
           child: Row(
             children: [
               for (var i = 0; i < _history.length; i++) ...[
-                if (i > 0)
-                  const SizedBox(width: AppColors.spacingXs),
+                if (i > 0) const SizedBox(width: AppColors.spacingXs),
                 Container(
                   padding: const EdgeInsets.symmetric(
                       horizontal: AppColors.spacingSm, vertical: 4),

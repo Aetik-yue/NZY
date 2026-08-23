@@ -44,8 +44,7 @@ class ReaderTopBar extends StatelessWidget {
             ),
           ),
           IconButton(
-            icon: Icon(Icons.format_list_bulleted_rounded,
-                color: textColor),
+            icon: Icon(Icons.format_list_bulleted_rounded, color: textColor),
             onPressed: onOpenChapterList,
           ),
         ],
@@ -167,8 +166,7 @@ class ReaderBarButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final active = onTap != null;
-    final effectiveColor =
-        active ? color : color.withValues(alpha: 0.4);
+    final effectiveColor = active ? color : color.withValues(alpha: 0.4);
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,

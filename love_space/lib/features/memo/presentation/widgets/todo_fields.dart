@@ -33,9 +33,7 @@ class DueDateField extends StatelessWidget {
       trailing: Text(
         value == null ? '无' : _format(value!),
         style: AppTextStyles.body.copyWith(
-          color: value == null
-              ? AppColors.textTertiary
-              : AppColors.textPrimary,
+          color: value == null ? AppColors.textTertiary : AppColors.textPrimary,
         ),
       ),
       onTap: () => _pickDate(context),
@@ -120,9 +118,8 @@ class PriorityField extends StatelessWidget {
                         : AppColors.bgCard,
                     borderRadius: BorderRadius.circular(AppColors.radiusPill),
                     border: Border.all(
-                      color: value == p
-                          ? priorityColor(p)
-                          : AppColors.borderSoft,
+                      color:
+                          value == p ? priorityColor(p) : AppColors.borderSoft,
                     ),
                   ),
                   child: Row(
@@ -181,7 +178,9 @@ class DueDateLabel extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         Icon(
-          isOverdue ? Icons.error_outline_rounded : Icons.event_available_rounded,
+          isOverdue
+              ? Icons.error_outline_rounded
+              : Icons.event_available_rounded,
           size: 13,
           color: color,
         ),
@@ -208,8 +207,10 @@ class DueDateLabel extends StatelessWidget {
     if (diff == 1) return ('明天截止', AppColors.textSecondary);
     if (diff > 0 && diff < 7) {
       const weekdays = ['', '周一', '周二', '周三', '周四', '周五', '周六', '周日'];
-      return ('${weekdays[due0.weekday]} ${due0.month}/${due0.day} 截止',
-          AppColors.textSecondary);
+      return (
+        '${weekdays[due0.weekday]} ${due0.month}/${due0.day} 截止',
+        AppColors.textSecondary
+      );
     }
     return ('${due0.month}月${due0.day}日 截止', AppColors.textSecondary);
   }

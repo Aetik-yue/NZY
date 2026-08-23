@@ -81,6 +81,7 @@ class _ScriptedRandom implements Random {
     _i++;
     return v % max;
   }
+
   // 未用方法抛异常快速失败：当前 controller 仅消费 nextInt，若未来代码路径分支到
   // nextBool/nextDouble，硬编码常量会让测试在错误值下静默通过
   @override
@@ -200,8 +201,10 @@ void main() {
 
   test('播放完成自动切下一首', () async {
     final ctrl = container.read(musicPlayerProvider.notifier);
-    ctrl.setPlaylist([_song(1, dur: const Duration(milliseconds: 500)),
-                       _song(2, dur: const Duration(milliseconds: 500))]);
+    ctrl.setPlaylist([
+      _song(1, dur: const Duration(milliseconds: 500)),
+      _song(2, dur: const Duration(milliseconds: 500))
+    ]);
     backend.setDuration(const Duration(milliseconds: 500));
     await ctrl.selectSong(0);
     // 等待 Fake 的 500ms Timer 触发 completed
@@ -328,7 +331,8 @@ void main() {
     // 用户在 auto-advance 加载 song3 的窗口内点 song3：应合并（复用同一 Future），
     // 不重复 setUrl
     final clickC = ctrl.selectSong(2);
-    expect(backend.setUrlCalls.where((u) => u == 'file:///song3.mp3').length, 1);
+    expect(
+        backend.setUrlCalls.where((u) => u == 'file:///song3.mp3').length, 1);
 
     // 完成 song3 加载
     backend.setUrlCompleters[1].complete();
@@ -338,7 +342,8 @@ void main() {
     final state = container.read(musicPlayerProvider);
     expect(state.currentIndex, 2); // 用户点击的 song3 被播放，未被 auto-advance 抢走
     expect(backend.playedUrls, ['file:///song3.mp3']); // 只实际播放一次 song3
-    expect(backend.setUrlCalls.where((u) => u == 'file:///song3.mp3').length, 1);
+    expect(
+        backend.setUrlCalls.where((u) => u == 'file:///song3.mp3').length, 1);
   });
 
   test('setPlaylist 未选过歌时自动选中第一首（不播放）', () {
@@ -370,7 +375,8 @@ void main() {
     await ctrl.togglePlay(); // 暂停
     expect(container.read(musicPlayerProvider).isPlaying, false);
 
-    ctrl.setPlaylist([_song(1), _song(2), _song(3), _song(4)]); // 重注入：原曲仍在 index 2
+    ctrl.setPlaylist(
+        [_song(1), _song(2), _song(3), _song(4)]); // 重注入：原曲仍在 index 2
     await ctrl.togglePlay(); // 恢复播放
     final state = container.read(musicPlayerProvider);
     expect(state.currentIndex, 2);
@@ -490,9 +496,11 @@ void main() {
     await ctrl.next();
     expect(container.read(musicPlayerProvider).currentIndex, 2); // 第一个随机值 2
     await ctrl.next();
-    expect(container.read(musicPlayerProvider).currentIndex, 0); // 第二个随机值 0（!= 当前 2）
+    expect(container.read(musicPlayerProvider).currentIndex,
+        0); // 第二个随机值 0（!= 当前 2）
     await ctrl.next();
-    expect(container.read(musicPlayerProvider).currentIndex, 3); // 第三个随机值 3（!= 当前 0）
+    expect(container.read(musicPlayerProvider).currentIndex,
+        3); // 第三个随机值 3（!= 当前 0）
   });
 
   test('歌单缩短致 currentIndex 越界：夹紧到末位，currentSong 非 null', () async {
@@ -559,7 +567,8 @@ void main() {
     expect(state.currentIndex, 0); // 回到正在播放的 song1
     expect(state.isPlaying, true); // 仍在播放（未被重载打断）
     // song1 只 setUrl 过一次（首次加载），auto-advance 未重载当前曲
-    expect(backend.setUrlCalls.where((u) => u == 'file:///song1.mp3').length, 1);
+    expect(
+        backend.setUrlCalls.where((u) => u == 'file:///song1.mp3').length, 1);
     expect(backend.setUrlCalls,
         ['file:///song1.mp3', 'file:///song2.mp3', 'file:///song3.mp3']);
     // song1 的 play() 仅首次加载时调用一次，未被 auto-advance 重新触发（坏曲 setUrl

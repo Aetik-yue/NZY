@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -18,6 +19,19 @@ class _SearchAttempt {
   const _SearchAttempt(this.path, this.params);
 }
 
+/// 单个目录分页的抓取结果。
+class _TocPageResult {
+  const _TocPageResult({
+    required this.url,
+    this.html,
+    this.error,
+  });
+
+  final String url;
+  final String? html;
+  final Object? error;
+}
+
 /// 笔趣阁系列站点爬虫实现
 ///
 /// 支持符合以下 HTML 结构的笔趣阁镜像站：
@@ -29,12 +43,25 @@ class BiqugeCrawler implements BaseCrawler {
     required this.source,
     AppHttpClient? httpClient,
     ContentCleaner? contentCleaner,
+    this.enableSearchEngineFallback = true,
   })  : _httpClient = httpClient ?? AppHttpClient(),
         _contentCleaner = contentCleaner ?? ContentCleaner();
 
   final NovelSource source;
   final AppHttpClient _httpClient;
   final ContentCleaner _contentCleaner;
+
+  /// 是否在站内搜索失败后继续请求公共搜索引擎。
+  ///
+  /// 跨源协调器会先快速探测全部站内搜索，仅在全部无结果时选择一个源执行
+  /// 搜索引擎兜底，避免每个源都重复请求 Bing / 搜狗 / 360。
+  final bool enableSearchEngineFallback;
+
+  /// 搜索和分类都是“可切换源”的发现请求，单个端点不应占满正文抓取的 15 秒。
+  static const Duration _discoveryTimeout = Duration(seconds: 8);
+
+  /// 长篇小说目录常有数十页，每批并发 5 页可显著缩短加入书架等待时间。
+  static const int _tocFetchConcurrency = 5;
 
   @override
   String get sourceKey => source.key;
@@ -50,25 +77,18 @@ class BiqugeCrawler implements BaseCrawler {
     final kw = keyword.trim();
     if (kw.isEmpty) return [];
 
-    // 搜索使用 POST 表单提交。实测 biquge2.net / bqgbb.cc 等镜像站均为 UTF-8，
-    // 关键词用 GBK 编码反而致服务器无法识别（搜索失效），故统一用 UTF-8 post。
-    // postGbk 保留给未来真 GBK 站。不同镜像站参数名和端点不同，依次尝试。
-    final searchAttempts = <_SearchAttempt>[
-      _SearchAttempt('/search.php', {'searchkey': kw}), // bqgbb.cc 等
-      _SearchAttempt('/search.html', {'s': kw}), // biquge2.net 等
-      _SearchAttempt('/search.html', {'searchkey': kw}),
-      _SearchAttempt('/modules/article/search.php',
-          {'searchkey': kw, 'searchtype': 'novelname'}),
-      _SearchAttempt('/modules/article/search.php', {'searchkey': kw}),
-    ];
+    // 搜索使用 POST 表单提交。按源选择已知正确端点，避免每个源都盲试同一组
+    // 地址；未知的自定义源仍保留通用候选作为兼容路径。
+    final searchAttempts = _searchAttemptsForSource(kw);
 
     for (final attempt in searchAttempts) {
       try {
         final url = '$baseUrl${attempt.path}';
-        final body = await _httpClient.post(
+        final body = await _httpClient.postOnce(
           url,
           body: attempt.params,
           headers: {'Referer': '$baseUrl/'},
+          timeoutOverride: _discoveryTimeout,
         );
 
         // 检测搜索间隔限制提示
@@ -84,8 +104,48 @@ class BiqugeCrawler implements BaseCrawler {
       }
     }
 
-    // 站内搜索全部失败，回退到搜索引擎兜底
-    return _searchViaEngine(kw);
+    // 站内搜索全部失败。跨源搜索时由 Repository 统一选择一个源做兜底，
+    // 单独使用 crawler 时仍保持原有完整行为。
+    if (!enableSearchEngineFallback) return [];
+    return searchViaEngine(kw);
+  }
+
+  /// 返回当前源最可能成功的站内搜索端点。
+  ///
+  /// 已知源只探测 1 个地址；未知自定义源才使用完整通用候选。
+  List<_SearchAttempt> _searchAttemptsForSource(String keyword) {
+    switch (source.key) {
+      case 'bqgbb':
+        return [
+          _SearchAttempt('/search.php', {'searchkey': keyword}),
+        ];
+      case 'biquge':
+        return [
+          _SearchAttempt('/search.html', {'s': keyword}),
+        ];
+      case 'bqgecc':
+        return [
+          _SearchAttempt('/search.html', {'searchkey': keyword}),
+        ];
+      case 'biqumo':
+      case 'bxwxorg':
+        return [
+          _SearchAttempt('/modules/article/search.php', {
+            'searchkey': keyword,
+            'searchtype': 'novelname',
+          }),
+        ];
+      default:
+        return [
+          _SearchAttempt('/search.php', {'searchkey': keyword}),
+          _SearchAttempt('/search.html', {'s': keyword}),
+          _SearchAttempt('/search.html', {'searchkey': keyword}),
+          _SearchAttempt('/modules/article/search.php', {
+            'searchkey': keyword,
+            'searchtype': 'novelname',
+          }),
+        ];
+    }
   }
 
   /// 搜索引擎兜底：用多引擎 site: 搜索找书籍详情页 URL
@@ -93,11 +153,11 @@ class BiqugeCrawler implements BaseCrawler {
   /// 笔趣阁镜像站站内搜索普遍失效（404 / JS 渲染 / 搜索索引损坏），
   /// 通过搜索引擎检索 `site:<baseUrl> 书名` 是找到书籍 URL 的最后手段。
   ///
-  /// 逐个引擎尝试（Bing / Google / 搜狗 / 360 / DuckDuckGo），任一命中即返回：
-  /// - 国内网络下 Bing/Google 常被墙或返回机器人检测页，搜狗/360 是补充
-  /// - 结果链接常被包装成重定向 URL（bing.com/ck/a、google.com/url 等），
+  /// 并发尝试 Bing / 搜狗 / 360，在一个超时窗口内收集结果，任一命中即返回：
+  /// - 国内网络下各引擎可用性不同，因此保留三个互补入口
+  /// - 结果链接常被包装成重定向 URL（如 bing.com/ck/a），
   ///   需先解出真实地址再匹配书籍 URL 模式
-  Future<List<SearchResult>> _searchViaEngine(String keyword) async {
+  Future<List<SearchResult>> searchViaEngine(String keyword) async {
     final host = Uri.parse(baseUrl).host;
     // 转义 host 中的正则元字符（如 .）；注意不能用 raw string，否则 $hostPattern 不参与插值
     final hostPattern = RegExp.escape(host);
@@ -105,32 +165,50 @@ class BiqugeCrawler implements BaseCrawler {
     final bookRe = RegExp('https?://[^/]*$hostPattern/book/[0-9]+/?');
 
     final query = Uri.encodeQueryComponent('site:$host $keyword');
+    // 仅作为最后一级兜底，并发请求三个国内较常用入口；每个请求最多 8 秒。
+    // 旧实现逐个请求 5 个引擎，最坏耗时会线性叠加。
     final engines = <String, String>{
       'bing': 'https://www.bing.com/search?q=$query',
-      'google': 'https://www.google.com/search?q=$query',
       'sogou': 'https://www.sogou.com/web?query=$query',
       '360': 'https://www.so.com/s?q=$query',
-      'duckduckgo': 'https://html.duckduckgo.com/html/?q=$query',
     };
 
-    for (final entry in engines.entries) {
-      try {
-        final body = await _httpClient.get(entry.value, headers: {
-          'User-Agent': UserAgentRotator.random,
-          'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
-        });
+    final firstResult = Completer<List<SearchResult>>();
+    var remaining = engines.length;
 
-        final results = _parseEngineResults(body, bookRe);
-        if (results.isNotEmpty) {
-          debugPrint('[BiqugeCrawler] ${entry.key} 找到 ${results.length} 条');
+    for (final entry in engines.entries) {
+      unawaited(() async {
+        try {
+          final body = await _httpClient.getOnce(entry.value,
+              headers: {
+                'User-Agent': UserAgentRotator.random,
+                'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+              },
+              timeoutOverride: _discoveryTimeout);
+
+          final results = _parseEngineResults(body, bookRe);
+          if (results.isNotEmpty) {
+            debugPrint('[BiqugeCrawler] ${entry.key} 找到 ${results.length} 条');
+          }
           return results;
+        } catch (e) {
+          debugPrint('[BiqugeCrawler] 搜索引擎 ${entry.key} 失败: $e');
+          return <SearchResult>[];
         }
-      } catch (e) {
-        debugPrint('[BiqugeCrawler] 搜索引擎 ${entry.key} 失败: $e');
-      }
+      }()
+          .then((results) {
+        if (results.isNotEmpty && !firstResult.isCompleted) {
+          firstResult.complete(results);
+        }
+        remaining--;
+        if (remaining == 0 && !firstResult.isCompleted) {
+          firstResult.complete(<SearchResult>[]);
+        }
+      }));
     }
 
-    return [];
+    // 任一引擎先命中就立即返回；全部失败时最长仍只等待一个 8 秒窗口。
+    return firstResult.future;
   }
 
   /// 解析搜索引擎结果页，提取指向源站书籍页的链接
@@ -191,19 +269,14 @@ class BiqugeCrawler implements BaseCrawler {
   @override
   Future<List<CategoryBook>> browseCategory(int categoryId,
       {int page = 1}) async {
-    // 尝试多种分类页 URL 格式：
-    // - biquge2.net: /fenlei/lastupdate_{cat}_0_0_{page}.html
-    // - bqgbb.cc:    /fenlei/{cat}/{page}.html
-    final urlCandidates = [
-      '$baseUrl/fenlei/${categoryId}_$page/',
-      '$baseUrl/fenlei/${categoryId}_$page.html',
-      '$baseUrl/fenlei/$categoryId/$page.html',
-      '$baseUrl/fenlei/lastupdate_${categoryId}_0_0_$page.html',
-    ];
+    final urlCandidates = _categoryUrlsForSource(categoryId, page);
 
     for (final url in urlCandidates) {
       try {
-        final body = await _httpClient.get(url);
+        final body = await _httpClient.getOnce(
+          url,
+          timeoutOverride: _discoveryTimeout,
+        );
         final books = _parseCategoryPage(body);
         if (books.isNotEmpty) return books;
       } catch (e) {
@@ -212,6 +285,20 @@ class BiqugeCrawler implements BaseCrawler {
     }
 
     return [];
+  }
+
+  /// 按源排列分类页 URL，常用正确地址优先。
+  List<String> _categoryUrlsForSource(int categoryId, int page) {
+    final biquge = '$baseUrl/fenlei/lastupdate_${categoryId}_0_0_$page.html';
+    final bqgbb = '$baseUrl/fenlei/$categoryId/$page.html';
+    final compact = '$baseUrl/fenlei/${categoryId}_$page/';
+    final compactHtml = '$baseUrl/fenlei/${categoryId}_$page.html';
+
+    return switch (source.key) {
+      'biquge' => [biquge],
+      'bqgbb' => [bqgbb],
+      _ => [compact, compactHtml, bqgbb, biquge],
+    };
   }
 
   /// 解析分类页 HTML，提取书籍列表
@@ -326,12 +413,12 @@ class BiqugeCrawler implements BaseCrawler {
         .querySelectorAll('a[href]')
         .map((a) => a.attributes['href'] ?? '')
         .firstWhere(
-          (href) =>
-              RegExp(r'/book/\d+/(ml|index)_\d+\.html').hasMatch(href),
+          (href) => RegExp(r'/book/\d+/(ml|index)_\d+\.html').hasMatch(href),
           orElse: () => '',
         );
     // 判断目录页前缀（ml_ 或 index_）
-    final tocPrefix = RegExp(r'/(ml|index)_\d+\.html').firstMatch(tocLink)?.group(1) ?? 'ml';
+    final tocPrefix =
+        RegExp(r'/(ml|index)_\d+\.html').firstMatch(tocLink)?.group(1) ?? 'ml';
 
     // 提取 bookId 用于构造后续分页 URL（兼容 /book/ /read/ /chapter/ 路径）
     final bookIdMatch =
@@ -371,15 +458,39 @@ class BiqugeCrawler implements BaseCrawler {
       ));
     }
 
-    // 1. 抓取目录分页补充详情页未覆盖的章节（仅当详情页存在目录链接时）
-    //    不设固定页数上限：长篇小说（数百章）需要抓全，靠
-    //    「连续 2 页无新章节」终止；100 页仅是防病态站点的安全上限。
+    // 1. 抓取目录分页补充详情页未覆盖的章节（仅当详情页存在目录链接时）。
+    //    URL 页码是可预测的，因此按 5 页一批并发获取、按页码顺序解析；
+    //    相比逐页等待，长篇目录的墙钟时间约降为原来的 1/5。最后一批可能
+    //    多探测最多 4 页，但空页/404 会很快结束。100 页是病态站点安全上限。
     if (tocLink.isNotEmpty) {
-      for (var page = 1; page <= 100; page++) {
-        final tocUrl = '$baseUrl/book/$bookId/${tocPrefix}_$page.html';
-        try {
-          final html = await _httpClient.get(tocUrl);
-          final pageDoc = html_parser.parse(html);
+      var reachedEnd = false;
+      for (var batchStart = 1;
+          batchStart <= 100 && !reachedEnd;
+          batchStart += _tocFetchConcurrency) {
+        final pageNumbers = <int>[];
+        for (var offset = 0; offset < _tocFetchConcurrency; offset++) {
+          final page = batchStart + offset;
+          if (page > 100) break;
+          pageNumbers.add(page);
+        }
+
+        final batch = await Future.wait(
+          pageNumbers.map(
+            (page) => _fetchTocPage(bookId, tocPrefix, page),
+          ),
+        );
+
+        // 网络完成顺序不影响章节顺序；始终按 pageNumbers 的顺序解析。
+        for (final result in batch) {
+          if (result.error != null || result.html == null) {
+            debugPrint(
+              '[BiqugeCrawler] 目录页 ${result.url} 抓取失败: ${result.error}',
+            );
+            reachedEnd = true;
+            break;
+          }
+
+          final pageDoc = html_parser.parse(result.html!);
           final links = pageDoc.querySelectorAll('a[href]');
 
           var hasAnyChapterLink = false;
@@ -398,7 +509,7 @@ class BiqugeCrawler implements BaseCrawler {
             }
 
             // 用基础 chapterId 去重（135023 而非 135023_1）
-            final chapterUrl = _resolveUrl(href, tocUrl);
+            final chapterUrl = _resolveUrl(href, result.url);
             final sourceId = _extractChapterId(chapterUrl);
             if (seenIds.contains(sourceId)) continue;
             seenIds.add(sourceId);
@@ -412,16 +523,19 @@ class BiqugeCrawler implements BaseCrawler {
           }
           // 只有该页完全没有章节链接时才终止（说明已到目录末尾）
           // 如果该页有章节但全为重复，继续抓下一页（可能有新章节）
-          if (!hasAnyChapterLink) break;
+          if (!hasAnyChapterLink) {
+            reachedEnd = true;
+            break;
+          }
           // 连续 2 页无新章节时终止（避免无限抓取空页）
           if (!foundNewChapter) {
-            if (consecutiveEmptyTocPages++ >= 1) break;
+            if (consecutiveEmptyTocPages++ >= 1) {
+              reachedEnd = true;
+              break;
+            }
           } else {
             consecutiveEmptyTocPages = 0;
           }
-        } catch (e) {
-          debugPrint('[BiqugeCrawler] 目录页 $tocUrl 抓取失败: $e');
-          break;
         }
       }
     }
@@ -437,6 +551,22 @@ class BiqugeCrawler implements BaseCrawler {
     });
 
     return allChapters;
+  }
+
+  Future<_TocPageResult> _fetchTocPage(
+    String bookId,
+    String tocPrefix,
+    int page,
+  ) async {
+    final url = '$baseUrl/book/$bookId/${tocPrefix}_$page.html';
+    try {
+      return _TocPageResult(
+        url: url,
+        html: await _httpClient.get(url),
+      );
+    } catch (error) {
+      return _TocPageResult(url: url, error: error);
+    }
   }
 
   /// 从章节标题提取章号（"第123章..." → 123）
@@ -528,7 +658,9 @@ class BiqugeCrawler implements BaseCrawler {
     if (m != null) return (chapterId: m.group(1)!, page: 0);
     // 135023_3.html -> (135023, 3)
     m = RegExp(r'/(\d+)_(\d+)\.html$').firstMatch(url);
-    if (m != null) return (chapterId: m.group(1)!, page: int.parse(m.group(2)!));
+    if (m != null) {
+      return (chapterId: m.group(1)!, page: int.parse(m.group(2)!));
+    }
     return null;
   }
 
@@ -625,13 +757,12 @@ class BiqugeCrawler implements BaseCrawler {
     final kw = keyword.trim();
 
     // 按书名包含关键词排序：匹配的在前
-    final relevant = results
-        .where((r) => r.title.contains(kw))
-        .toList();
+    final relevant = results.where((r) => r.title.contains(kw)).toList();
     if (relevant.isNotEmpty) return relevant;
 
     // 宽松匹配：书名含关键词任一字（对长词有效）
-    final chars = kw.split('').toSet().where((c) => c.trim().isNotEmpty).toList();
+    final chars =
+        kw.split('').toSet().where((c) => c.trim().isNotEmpty).toList();
     if (chars.length >= 2) {
       final fuzzy = results.where((r) {
         final title = r.title;
@@ -674,8 +805,9 @@ class BiqugeCrawler implements BaseCrawler {
     }
     if (author.isEmpty) {
       // bqgbb.cc: 作者在 "作者：<a>" 或 ".details p i" 中
-      final authorLink = document.querySelector('.details p a[href*="/zuozhe/"]') ??
-          document.querySelector('.details p a');
+      final authorLink =
+          document.querySelector('.details p a[href*="/zuozhe/"]') ??
+              document.querySelector('.details p a');
       if (authorLink != null) {
         author = authorLink.text.trim();
       }
@@ -683,8 +815,7 @@ class BiqugeCrawler implements BaseCrawler {
     if (author.isEmpty) {
       // 从正文中提取 "作者：xxx"
       final bodyText = document.body?.text ?? '';
-      final authorMatch =
-          RegExp(r'作者[:：]\s*([^\s，。<]+)').firstMatch(bodyText);
+      final authorMatch = RegExp(r'作者[:：]\s*([^\s，。<]+)').firstMatch(bodyText);
       if (authorMatch != null) {
         author = authorMatch.group(1)!.trim();
       }
@@ -699,9 +830,7 @@ class BiqugeCrawler implements BaseCrawler {
     var intro = introEl?.text.trim() ?? '';
 
     // 若书名仍为空或误判为站点名，尝试从 og:title meta 提取
-    if (title.isEmpty ||
-        title == sourceName ||
-        title.contains('笔趣阁')) {
+    if (title.isEmpty || title == sourceName || title.contains('笔趣阁')) {
       final ogTitle = document
           .querySelector('meta[property="og:novel:book_name"]')
           ?.attributes['content'];

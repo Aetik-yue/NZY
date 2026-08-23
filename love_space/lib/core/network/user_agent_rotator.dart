@@ -42,7 +42,8 @@ class UserAgentRotator {
   ];
 
   /// 随机获取一个 User-Agent
-  static String get random => _desktopBrowsers[_random.nextInt(_desktopBrowsers.length)];
+  static String get random =>
+      _desktopBrowsers[_random.nextInt(_desktopBrowsers.length)];
 
   /// 获取 UA 列表总数
   static int get count => _desktopBrowsers.length;

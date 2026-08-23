@@ -111,12 +111,10 @@ class _PomodoroPageState extends ConsumerState<PomodoroPage>
               PomodoroControls(
                 status: s.status,
                 onToggle: _toggle,
-                onAbort: () =>
-                    ref.read(pomodoroTimerProvider.notifier).abort(),
+                onAbort: () => ref.read(pomodoroTimerProvider.notifier).abort(),
               ),
               const Spacer(),
-              PomodoroTodaySummary(
-                  minutes: today.minutes, count: today.count),
+              PomodoroTodaySummary(minutes: today.minutes, count: today.count),
             ],
           ),
         ),

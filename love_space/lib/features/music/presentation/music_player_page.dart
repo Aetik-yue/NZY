@@ -3,22 +3,28 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_text_styles.dart';
+import '../../../data/models/album_photo.dart';
+import '../../../data/providers/data_providers.dart';
 import '../models/music_song.dart';
 import '../providers/music_library_provider.dart';
 import '../providers/music_player_provider.dart';
+import 'widgets/memory_photo_carousel.dart';
+import 'widgets/music_player_states.dart';
 import 'widgets/music_player_widgets.dart';
 
-/// 全屏音乐播放页（网易云风格）
+/// 全屏音乐播放页。
 ///
-/// 通过 [show] 以全屏 BottomSheet 弹出，渐变背景 + 旋转封面 + 进度/控制/列表。
+/// 奶油粉背景中的“回忆唱片”：播放时轮播 App 内相册照片，照片不可用时回退到
+/// 歌曲封面；进度与播放控制保持音乐播放器的主视觉层级。
 class MusicPlayerPage extends ConsumerStatefulWidget {
   const MusicPlayerPage({super.key});
 
-  /// 以全屏 BottomSheet 弹出播放页
+  /// 以全屏 BottomSheet 弹出播放页。
   static Future<void> show(BuildContext context) {
     return showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      enableDrag: false,
       backgroundColor: Colors.transparent,
       builder: (_) => const MusicPlayerPage(),
     );
@@ -29,53 +35,39 @@ class MusicPlayerPage extends ConsumerStatefulWidget {
 }
 
 class _MusicPlayerPageState extends ConsumerState<MusicPlayerPage>
-    with TickerProviderStateMixin {
-  late final AnimationController _rotateCtrl;
-  late final AnimationController _slideCtrl; // 下滑位移（0=原位，1=移出屏外）
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _slideCtrl;
   late final ProviderSubscription<AsyncValue<List<MusicSong>>> _librarySub;
 
   @override
   void initState() {
     super.initState();
-    _rotateCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 20),
-    )..repeat();
     _slideCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 250),
     );
-    // 页面打开才监听扫描结果：权限/扫描仅在真正打开播放页时触发。
-    // MiniPlayerBar 与 profile 卡只 watch musicPlayerProvider，启动与切 tab 不弹权限框。
-    // fireImmediately: true —— musicLibraryProvider 是非 autoDispose FutureProvider，
-    // 扫描结果缓存终生；若首次打开时扫描未完成就收起 sheet，重开时 provider 已是
-    // AsyncData 不再重发通知，故需立即回调缓存值，配合去重注入歌单，避免播放器成死角。
+    // 只有真正打开音乐页才触发系统音频权限和扫描，避免冷启动弹权限框。
     _librarySub = ref.listenManual<AsyncValue<List<MusicSong>>>(
       musicLibraryProvider,
       (_, next) {
         final songs = next.valueOrNull;
         if (songs == null || songs.isEmpty) return;
         final controller = ref.read(musicPlayerProvider.notifier);
-        if (_sameSongs(ref.read(musicPlayerProvider).playlist, songs)) {
-          return; // 去重：当前歌单已是这批，跳过注入
-        }
+        if (_sameSongs(ref.read(musicPlayerProvider).playlist, songs)) return;
         controller.setPlaylist(songs);
       },
       fireImmediately: true,
     );
-    // 打开播放页时恢复迷你条显示（用户可能滑动关闭过，重新打开应恢复）
     ref.read(musicPlayerProvider.notifier).showPlayer();
   }
 
   @override
   void dispose() {
     _librarySub.close();
-    _rotateCtrl.dispose();
     _slideCtrl.dispose();
     super.dispose();
   }
 
-  /// 歌单是否与当前注入的相同（按长度 + id 比对，避免重复注入）
   bool _sameSongs(List<MusicSong> a, List<MusicSong> b) {
     if (a.length != b.length) return false;
     for (var i = 0; i < a.length; i++) {
@@ -84,126 +76,219 @@ class _MusicPlayerPageState extends ConsumerState<MusicPlayerPage>
     return true;
   }
 
+  void _onVerticalDragUpdate(DragUpdateDetails details) {
+    _slideCtrl.value = (_slideCtrl.value +
+            details.delta.dy / MediaQuery.sizeOf(context).height)
+        .clamp(0.0, 1.0);
+  }
+
+  void _onVerticalDragEnd(DragEndDetails details) {
+    final velocity = details.primaryVelocity ?? 0;
+    if (_slideCtrl.value > 0.25 || velocity > 800) {
+      _slideCtrl.animateTo(1).then((_) {
+        if (context.mounted) Navigator.of(context).pop();
+      });
+      return;
+    }
+    _slideCtrl.animateBack(0, curve: Curves.easeOut);
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(musicPlayerProvider);
     final library = ref.watch(musicLibraryProvider);
+    // 这里只消费 App 内 Isar 相册数据，不调用 image_picker 或系统相册接口。
+    final albumPhotos =
+        ref.watch(allPhotosTypedProvider).valueOrNull ?? const <AlbumPhoto>[];
 
-    // 旋转动画跟随播放状态
-    if (state.isPlaying) {
-      if (!_rotateCtrl.isAnimating) _rotateCtrl.repeat();
-    } else {
-      _rotateCtrl.stop();
-    }
-
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: AppColors.headerGradient,
-        ),
-        child: SafeArea(
-          child: library.when(
-            loading: () => const Center(
-                child: CircularProgressIndicator(strokeWidth: 2)),
-            error: (e, _) => e is MusicPermissionDeniedException
-                ? MusicPermissionState(
-                    onRetry: () => ref.refresh(musicLibraryProvider))
-                : Center(child: Text('加载失败', style: AppTextStyles.body)),
-            data: (songs) => songs.isEmpty
-                ? MusicEmptyState(
-                    onRetry: () => ref.refresh(musicLibraryProvider))
-                : _playerContent(state),
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onVerticalDragUpdate: _onVerticalDragUpdate,
+      onVerticalDragEnd: _onVerticalDragEnd,
+      child: SlideTransition(
+        position: Tween<Offset>(
+          begin: Offset.zero,
+          end: const Offset(0, 1.08),
+        ).animate(_slideCtrl),
+        child: Scaffold(
+          backgroundColor: AppColors.bgPrimary,
+          body: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: RadialGradient(
+                center: Alignment.topRight,
+                radius: 1.15,
+                colors: [
+                  AppColors.accentPinkSoft.withValues(alpha: 0.72),
+                  AppColors.bgPrimary,
+                  AppColors.bgCream,
+                ],
+                stops: const [0, 0.48, 1],
+              ),
+            ),
+            child: SafeArea(
+              child: library.when(
+                loading: () => _stateContent(
+                  const CircularProgressIndicator(strokeWidth: 2),
+                ),
+                error: (error, _) => _stateContent(
+                  error is MusicPermissionDeniedException
+                      ? MusicPermissionState(
+                          onRetry: () => ref.refresh(musicLibraryProvider),
+                        )
+                      : MusicLoadErrorState(
+                          onRetry: () => ref.refresh(musicLibraryProvider),
+                        ),
+                ),
+                data: (songs) => songs.isEmpty
+                    ? _stateContent(
+                        MusicEmptyState(
+                          onRetry: () => ref.refresh(musicLibraryProvider),
+                        ),
+                      )
+                    : _playerContent(state, albumPhotos),
+              ),
+            ),
           ),
         ),
       ),
     );
   }
 
-  /// 播放器主体内容：收起条 + 歌名 + 旋转封面 + 进度 + 控制（含列表入口）
-  Widget _playerContent(MusicPlayerState state) {
+  Widget _stateContent(Widget child) {
+    return Column(
+      children: [
+        _PlayerTopBar(
+          title: '回忆唱片',
+          onClose: () => Navigator.of(context).pop(),
+        ),
+        Expanded(child: Center(child: child)),
+      ],
+    );
+  }
+
+  Widget _playerContent(
+    MusicPlayerState state,
+    List<AlbumPhoto> albumPhotos,
+  ) {
     final song = state.currentSong;
-    return GestureDetector(
-      // 下滑手势：跟随手指向下位移，松手超阈值收起、否则回弹
-      onVerticalDragUpdate: (details) {
-        // 双向跟手：上下都跟随，clamp 到 [0,1] 防止越界
-        _slideCtrl.value =
-            (_slideCtrl.value +
-                    details.delta.dy / MediaQuery.of(context).size.height)
-                .clamp(0.0, 1.0);
-      },
-      onVerticalDragEnd: (details) {
-        final velocity = details.primaryVelocity ?? 0;
-        if (_slideCtrl.value > 0.25 || velocity > 800) {
-          // 先滑出屏幕再收起，观感更顺
-          _slideCtrl.animateTo(1).then((_) {
-            if (context.mounted) Navigator.of(context).pop();
-          });
-        } else {
-          _slideCtrl.animateBack(0, curve: Curves.easeOut);
-        }
-      },
-      child: SlideTransition(
-        position: Tween<Offset>(
-          begin: Offset.zero,
-          end: const Offset(0, 1.2),
-        ).animate(_slideCtrl), // 线性跟手，回弹由 animateBack 的 curve 提供
-        child: Column(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxHeight < 680;
+        final sectionGap = compact ? AppColors.spacingSm : AppColors.spacingLg;
+        return Column(
           children: [
-            // 顶部收起条
-            GestureDetector(
-              onTap: () => Navigator.of(context).pop(),
-              child: Container(
-                width: 40,
-                height: 4,
-                margin: const EdgeInsets.only(top: 12),
-                decoration: BoxDecoration(
-                  color: AppColors.textOnPink.withValues(alpha: 0.5),
-                  borderRadius: BorderRadius.circular(AppColors.radiusXs),
-                ),
-              ),
+            _PlayerTopBar(
+              title: state.isLoading
+                  ? '正在准备'
+                  : state.isPlaying
+                      ? '正在播放'
+                      : '回忆唱片',
+              onClose: () => Navigator.of(context).pop(),
             ),
-            const SizedBox(height: 16),
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 300),
-              child: Text(song?.title ?? '',
-                  key: ValueKey<int?>(song?.id),
-                  style: AppTextStyles.titleLarge
-                      .copyWith(color: AppColors.textOnPink),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis),
-            ),
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 300),
-              child: Text(song?.artist ?? '',
-                  key: ValueKey<int?>(song?.id),
-                  style: AppTextStyles.caption
-                      .copyWith(color: AppColors.textOnPink)),
-            ),
-            const SizedBox(height: 24),
-            // 大封面（旋转）
+            SizedBox(
+                height: compact ? AppColors.spacing2xs : AppColors.spacingXs),
             Expanded(
               child: Center(
-                child: RotationTransition(
-                  turns: _rotateCtrl,
-                  child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 300),
-                    child: MusicBigCover(
-                      key: ValueKey<int?>(song?.id),
-                      song: song,
+                child: Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: compact
+                        ? AppColors.spacing2xl
+                        : AppColors.spacing2xl + AppColors.spacingXs,
+                  ),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(
+                      maxWidth: 360,
+                      maxHeight: 360,
+                    ),
+                    child: AspectRatio(
+                      aspectRatio: 1,
+                      child: MemoryPhotoCarousel(
+                        photos: albumPhotos,
+                        song: song,
+                        isPlaying: state.isPlaying,
+                      ),
                     ),
                   ),
                 ),
               ),
             ),
-            // 进度条
+            SizedBox(height: sectionGap),
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 300),
+              child: Padding(
+                key: ValueKey<int?>(song?.id),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppColors.spacingXl,
+                ),
+                child: Column(
+                  children: [
+                    Text(
+                      song?.title ?? '',
+                      style: AppTextStyles.titleLarge,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: AppColors.spacing2xs),
+                    Text(
+                      song?.artist ?? '',
+                      style: AppTextStyles.bodySmall,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            SizedBox(
+                height: compact ? AppColors.spacingXs : AppColors.spacingSm),
             MusicProgressRow(state: state),
-            const SizedBox(height: 8),
-            // 控制区（含播放模式 / 列表入口）
+            SizedBox(
+                height: compact ? AppColors.spacingXs : AppColors.spacingMd),
             MusicControls(state: state),
-            const SizedBox(height: 8),
+            SizedBox(
+                height: compact ? AppColors.spacingXs : AppColors.spacingMd),
           ],
-        ),
+        );
+      },
+    );
+  }
+}
+
+class _PlayerTopBar extends StatelessWidget {
+  const _PlayerTopBar({required this.title, required this.onClose});
+
+  final String title;
+  final VoidCallback onClose;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 56,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Padding(
+              padding: const EdgeInsets.only(left: AppColors.spacingXs),
+              child: IconButton(
+                tooltip: '收起播放器',
+                onPressed: onClose,
+                icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 30),
+                color: AppColors.textPrimary,
+              ),
+            ),
+          ),
+          Text(
+            title,
+            style: AppTextStyles.bodySmall.copyWith(
+              color: AppColors.textPrimary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
       ),
     );
   }

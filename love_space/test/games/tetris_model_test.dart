@@ -29,30 +29,54 @@ void main() {
     });
     test('T 旋转 4 态坐标深比较（修复 #13：校验具体坐标而非引用互异）', () {
       expect(cellsOf(TetrominoType.T, 0), [
-        (r: 0, c: 1), (r: 1, c: 0), (r: 1, c: 1), (r: 1, c: 2),
+        (r: 0, c: 1),
+        (r: 1, c: 0),
+        (r: 1, c: 1),
+        (r: 1, c: 2),
       ]);
       expect(cellsOf(TetrominoType.T, 1), [
-        (r: 1, c: 2), (r: 0, c: 1), (r: 1, c: 1), (r: 2, c: 1),
+        (r: 1, c: 2),
+        (r: 0, c: 1),
+        (r: 1, c: 1),
+        (r: 2, c: 1),
       ]);
       expect(cellsOf(TetrominoType.T, 2), [
-        (r: 2, c: 1), (r: 1, c: 2), (r: 1, c: 1), (r: 1, c: 0),
+        (r: 2, c: 1),
+        (r: 1, c: 2),
+        (r: 1, c: 1),
+        (r: 1, c: 0),
       ]);
       expect(cellsOf(TetrominoType.T, 3), [
-        (r: 1, c: 0), (r: 2, c: 1), (r: 1, c: 1), (r: 0, c: 1),
+        (r: 1, c: 0),
+        (r: 2, c: 1),
+        (r: 1, c: 1),
+        (r: 0, c: 1),
       ]);
     });
     test('I 旋转 4 态坐标深比较（修复 #13）', () {
       expect(cellsOf(TetrominoType.I, 0), [
-        (r: 1, c: 0), (r: 1, c: 1), (r: 1, c: 2), (r: 1, c: 3),
+        (r: 1, c: 0),
+        (r: 1, c: 1),
+        (r: 1, c: 2),
+        (r: 1, c: 3),
       ]);
       expect(cellsOf(TetrominoType.I, 1), [
-        (r: 0, c: 2), (r: 1, c: 2), (r: 2, c: 2), (r: 3, c: 2),
+        (r: 0, c: 2),
+        (r: 1, c: 2),
+        (r: 2, c: 2),
+        (r: 3, c: 2),
       ]);
       expect(cellsOf(TetrominoType.I, 2), [
-        (r: 2, c: 3), (r: 2, c: 2), (r: 2, c: 1), (r: 2, c: 0),
+        (r: 2, c: 3),
+        (r: 2, c: 2),
+        (r: 2, c: 1),
+        (r: 2, c: 0),
       ]);
       expect(cellsOf(TetrominoType.I, 3), [
-        (r: 3, c: 1), (r: 2, c: 1), (r: 1, c: 1), (r: 0, c: 1),
+        (r: 3, c: 1),
+        (r: 2, c: 1),
+        (r: 1, c: 1),
+        (r: 0, c: 1),
       ]);
     });
     test('O 任意旋转态相同', () {
@@ -63,21 +87,26 @@ void main() {
   group('isValidPosition', () {
     test('空盘 spawn 合法', () {
       final board = emptyBoard();
-      expect(isValidPosition(board, const Piece(type: TetrominoType.T, col: 3)), isTrue);
+      expect(isValidPosition(board, const Piece(type: TetrominoType.T, col: 3)),
+          isTrue);
     });
     test('越左边界非法', () {
       final board = emptyBoard();
-      expect(isValidPosition(board, const Piece(type: TetrominoType.T, col: -1)), isFalse);
+      expect(
+          isValidPosition(board, const Piece(type: TetrominoType.T, col: -1)),
+          isFalse);
     });
     test('撞已占格非法', () {
       final board = emptyBoard();
       board[0][4] = TetrominoType.I;
-      expect(isValidPosition(board, const Piece(type: TetrominoType.T, col: 3)), isFalse);
+      expect(isValidPosition(board, const Piece(type: TetrominoType.T, col: 3)),
+          isFalse);
     });
     test('底行外非法', () {
       final board = emptyBoard();
       expect(
-        isValidPosition(board, const Piece(type: TetrominoType.I, row: 19, col: 0)),
+        isValidPosition(
+            board, const Piece(type: TetrominoType.I, row: 19, col: 0)),
         isFalse,
       );
     });
@@ -194,10 +223,13 @@ void main() {
       final board = emptyBoard();
       // T spawn 在 col=3 时顶部格为 (0,4)；占据该格即 spawn 位被占
       board[0][4] = TetrominoType.I;
-      expect(isBlockOut(board, const Piece(type: TetrominoType.T, col: 3)), isTrue);
+      expect(isBlockOut(board, const Piece(type: TetrominoType.T, col: 3)),
+          isTrue);
     });
     test('空盘 spawn 不结束', () {
-      expect(isBlockOut(emptyBoard(), const Piece(type: TetrominoType.T, col: 3)), isFalse);
+      expect(
+          isBlockOut(emptyBoard(), const Piece(type: TetrominoType.T, col: 3)),
+          isFalse);
     });
   });
 }

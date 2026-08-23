@@ -13,7 +13,8 @@ void main() {
     const brickW = 0.125, brickH = 0.04, top = 0.1;
     test('球从下方击中砖块底部 -> 返回该砖 + bounceY', () {
       final bricks = [Brick(row: 0, col: 0, kind: BrickKind.rose)];
-      final ball = Ball(x: 0.06, y: top + brickH + 0.005, vx: 0, vy: -0.02, r: 0.015);
+      final ball =
+          Ball(x: 0.06, y: top + brickH + 0.005, vx: 0, vy: -0.02, r: 0.015);
       final hit = collideBrick(ball, bricks, brickW, brickH, top);
       expect(hit, isNotNull);
       expect(hit!.brick, same(bricks[0]));
@@ -28,15 +29,19 @@ void main() {
 
     test('球从侧面击中 -> bounceX', () {
       final bricks = [Brick(row: 0, col: 0, kind: BrickKind.rose)];
-      final ball = Ball(x: -0.01, y: top + brickH / 2, vx: 0.02, vy: 0, r: 0.015);
+      final ball =
+          Ball(x: -0.01, y: top + brickH / 2, vx: 0.02, vy: 0, r: 0.015);
       final hit = collideBrick(ball, bricks, brickW, brickH, top);
       expect(hit, isNotNull);
       expect(hit!.bounceX, isTrue);
     });
 
     test('已 dead 的砖块不命中', () {
-      final bricks = [Brick(row: 0, col: 0, kind: BrickKind.rose)..alive = false];
-      final ball = Ball(x: 0.06, y: top + brickH + 0.005, vx: 0, vy: -0.02, r: 0.015);
+      final bricks = [
+        Brick(row: 0, col: 0, kind: BrickKind.rose)..alive = false
+      ];
+      final ball =
+          Ball(x: 0.06, y: top + brickH + 0.005, vx: 0, vy: -0.02, r: 0.015);
       expect(collideBrick(ball, bricks, brickW, brickH, top), isNull);
     });
 
@@ -63,18 +68,46 @@ void main() {
     });
   });
 
+  group('collidePaddle', () {
+    final paddle = Paddle(x: 0.4, y: 0.92, width: 0.2);
+    test('球从上方正面击中挡板 -> bounceY', () {
+      final ball = Ball(x: 0.5, y: 0.915, vx: 0, vy: 0.02, r: 0.015);
+      final hit = collidePaddle(ball, paddle);
+      expect(hit, isNotNull);
+      expect(hit!.bounceY, isTrue);
+    });
+
+    test('球从侧面击中挡板 -> bounceX', () {
+      final ball = Ball(x: 0.39, y: 0.932, vx: 0.02, vy: 0, r: 0.015);
+      final hit = collidePaddle(ball, paddle);
+      expect(hit, isNotNull);
+      expect(hit!.bounceX, isTrue);
+    });
+
+    test('球未接触挡板 -> 返回 null', () {
+      final ball = Ball(x: 0.5, y: 0.3, vx: 0, vy: 0.02, r: 0.015);
+      expect(collidePaddle(ball, paddle), isNull);
+    });
+
+    test('球在挡板边界外（水平范围外）-> 不命中', () {
+      final ball = Ball(x: 0.1, y: 0.93, vx: 0, vy: 0.02, r: 0.015);
+      expect(collidePaddle(ball, paddle), isNull);
+    });
+  });
+
   group('levelCleared', () {
-    test('全部 alive=false -> true', () {
+    test('全部砖块被清除时返回 true', () {
       final bricks = [
         Brick(row: 0, col: 0, kind: BrickKind.rose)..alive = false,
-        Brick(row: 0, col: 1, kind: BrickKind.rose)..alive = false,
+        Brick(row: 0, col: 1, kind: BrickKind.peach)..alive = false,
       ];
       expect(levelCleared(bricks), isTrue);
     });
-    test('仍有 alive -> false', () {
+
+    test('仍有砖块存活时返回 false', () {
       final bricks = [
         Brick(row: 0, col: 0, kind: BrickKind.rose)..alive = false,
-        Brick(row: 0, col: 1, kind: BrickKind.rose),
+        Brick(row: 0, col: 1, kind: BrickKind.peach),
       ];
       expect(levelCleared(bricks), isFalse);
     });

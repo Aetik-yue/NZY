@@ -12,7 +12,8 @@ Future<bool> showConfirmDeleteDialog(
   final result = await showDialog<bool>(
     context: context,
     builder: (ctx) => AlertDialog(
-      icon: const Icon(Icons.warning_amber_rounded, color: AppColors.accentRose, size: 32),
+      icon: const Icon(Icons.warning_amber_rounded,
+          color: AppColors.accentRose, size: 32),
       title: Text(title ?? '确认删除'),
       content: Text(content ?? '确定要删除这条记录吗？此操作无法撤销。'),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),

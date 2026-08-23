@@ -56,8 +56,7 @@ class _MemoSearchBarState extends ConsumerState<MemoSearchBar> {
                 isDense: true,
               ),
               style: AppTextStyles.body,
-              onChanged: (v) =>
-                  ref.read(memoSearchProvider.notifier).state = v,
+              onChanged: (v) => ref.read(memoSearchProvider.notifier).state = v,
             ),
           ),
           if (query.isNotEmpty)

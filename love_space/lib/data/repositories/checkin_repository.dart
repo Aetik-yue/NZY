@@ -17,20 +17,17 @@ class CheckinRepository {
   /// 今天是否已打卡
   Future<bool> hasCheckedInToday() async {
     final today = DateUtilsX.today();
-    final count = await _isar.checkIns
-        .where()
-        .dateEqualTo(today)
-        .count();
+    final count = await _isar.checkIns.where().dateEqualTo(today).count();
     return count > 0;
   }
 
   /// 今日打卡（幂等：已打卡则不重复插入）
-  Future<void> checkInToday({String? note}) =>
-      _isar.writeTxn(() async {
+  Future<void> checkInToday({String? note}) => _isar.writeTxn(() async {
         if (await hasCheckedInToday()) return;
         await _isar.checkIns.put(CheckIn()
           ..date = DateUtilsX.today()
-          ..note = note);
+          ..note = note
+          ..updatedAt = DateTime.now());
       });
 
   /// 删除打卡（用于撤销）

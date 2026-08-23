@@ -178,8 +178,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 const SizedBox(height: 8),
                 // 隐私开关
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 14, vertical: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                   decoration: BoxDecoration(
                     color: AppColors.bgCard,
                     borderRadius: BorderRadius.circular(AppColors.radiusSm),
@@ -188,8 +188,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   child: SwitchListTile(
                     contentPadding: EdgeInsets.zero,
                     title: Text('隐藏在一起天数', style: AppTextStyles.body),
-                    subtitle: Text('在首页和「我的」页不显示相伴天数',
-                        style: AppTextStyles.caption),
+                    subtitle:
+                        Text('在首页和「我的」页不显示相伴天数', style: AppTextStyles.caption),
                     value: _hideDays,
                     activeThumbColor: AppColors.accentRose,
                     activeTrackColor: AppColors.accentPinkSoft,

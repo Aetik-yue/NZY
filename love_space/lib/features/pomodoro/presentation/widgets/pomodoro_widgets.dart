@@ -111,8 +111,8 @@ class PomodoroPhaseCard extends StatelessWidget {
         children: [
           Text(
             phaseText,
-            style: AppTextStyles.titleMedium
-                .copyWith(color: AppColors.textOnPink),
+            style:
+                AppTextStyles.titleMedium.copyWith(color: AppColors.textOnPink),
           ),
           const SizedBox(height: 12),
           Text('$m:$ss', style: AppTextStyles.heroNumber),
@@ -287,8 +287,7 @@ class PomodoroTodaySummary extends StatelessWidget {
           const Icon(Icons.local_fire_department_rounded,
               size: 18, color: AppColors.accentRose),
           const SizedBox(width: 8),
-          Text('今日专注 $minutes 分钟 · $count 次',
-              style: AppTextStyles.bodySmall),
+          Text('今日专注 $minutes 分钟 · $count 次', style: AppTextStyles.bodySmall),
         ],
       ),
     );

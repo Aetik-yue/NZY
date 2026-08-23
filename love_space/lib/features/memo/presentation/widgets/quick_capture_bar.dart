@@ -78,7 +78,8 @@ class _QuickCaptureBarState extends ConsumerState<QuickCaptureBar> {
               width: 32,
               height: 32,
               decoration: BoxDecoration(
-                color: _author == 1 ? AppColors.accentRose : AppColors.accentPeach,
+                color:
+                    _author == 1 ? AppColors.accentRose : AppColors.accentPeach,
                 shape: BoxShape.circle,
               ),
               child: Center(

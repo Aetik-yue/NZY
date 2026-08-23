@@ -15,6 +15,7 @@ import '../repositories/crawl_config_repository.dart';
 import '../repositories/crawl_log_repository.dart';
 import '../repositories/crawl_repository.dart';
 import '../repositories/memo_repository.dart';
+import '../repositories/secret_message_repository.dart';
 import '../repositories/pomodoro_settings_repository.dart';
 import '../repositories/focus_session_repository.dart';
 import '../../core/utils/greeting.dart';
@@ -36,6 +37,7 @@ import '../models/novel_source.dart';
 import '../models/crawl_config.dart';
 import '../models/crawl_log.dart';
 import '../models/memo.dart';
+import '../models/secret_message.dart';
 import '../models/pomodoro_settings.dart';
 import '../models/focus_session.dart';
 
@@ -46,52 +48,51 @@ import '../models/focus_session.dart';
 /// 当前激活的底部 Tab（驱动 MainShell 的 IndexedStack 切换）
 final currentTabProvider = StateProvider<NavTab>((ref) => NavTab.home);
 
-final wishRepositoryProvider = Provider((ref) =>
-    WishRepository(ref.watch(isarProvider)));
+final wishRepositoryProvider =
+    Provider((ref) => WishRepository(ref.watch(isarProvider)));
 
-final timelineRepositoryProvider = Provider((ref) =>
-    TimelineRepository(ref.watch(isarProvider)));
+final timelineRepositoryProvider =
+    Provider((ref) => TimelineRepository(ref.watch(isarProvider)));
 
-final albumRepositoryProvider = Provider((ref) =>
-    AlbumRepository(ref.watch(isarProvider)));
+final albumRepositoryProvider =
+    Provider((ref) => AlbumRepository(ref.watch(isarProvider)));
 
-final checkinRepositoryProvider = Provider((ref) =>
-    CheckinRepository(ref.watch(isarProvider)));
+final checkinRepositoryProvider =
+    Provider((ref) => CheckinRepository(ref.watch(isarProvider)));
 
-final settingsRepositoryProvider = Provider((ref) =>
-    SettingsRepository(ref.watch(isarProvider)));
+final settingsRepositoryProvider =
+    Provider((ref) => SettingsRepository(ref.watch(isarProvider)));
 
-final anniversaryRepositoryProvider = Provider((ref) =>
-    AnniversaryRepository(ref.watch(isarProvider)));
+final anniversaryRepositoryProvider =
+    Provider((ref) => AnniversaryRepository(ref.watch(isarProvider)));
 
 // ═══════════════════════════════════════════════════════════════
 // Data stream providers（监听数据库变化）
 // ═══════════════════════════════════════════════════════════════
 
 /// 所有愿望
-final wishesProvider = StreamProvider<List<Wish>>((ref) =>
-    ref.watch(wishRepositoryProvider).watchAll());
+final wishesProvider = StreamProvider<List<Wish>>(
+    (ref) => ref.watch(wishRepositoryProvider).watchAll());
 
 /// 所有时间轴事件
-final timelineEventsProvider = StreamProvider<List<TimelineEvent>>((ref) =>
-    ref.watch(timelineRepositoryProvider).watchAll());
-
+final timelineEventsProvider = StreamProvider<List<TimelineEvent>>(
+    (ref) => ref.watch(timelineRepositoryProvider).watchAll());
 
 /// 应用设置
-final appSettingsProvider = StreamProvider<AppSettings?>((ref) =>
-    ref.watch(settingsRepositoryProvider).watch());
+final appSettingsProvider = StreamProvider<AppSettings?>(
+    (ref) => ref.watch(settingsRepositoryProvider).watch());
 
 /// 所有打卡记录
-final checkinsProvider = StreamProvider<List<CheckIn>>((ref) =>
-    ref.watch(checkinRepositoryProvider).watchAll());
+final checkinsProvider = StreamProvider<List<CheckIn>>(
+    (ref) => ref.watch(checkinRepositoryProvider).watchAll());
 
 // ═══════════════════════════════════════════════════════════════
 // 纪念日模块 providers（多节点管理 + 首页倒数）
 // ═══════════════════════════════════════════════════════════════
 
 /// 所有纪念日（实时流，按日期升序）
-final anniversariesProvider = StreamProvider<List<Anniversary>>((ref) =>
-    ref.watch(anniversaryRepositoryProvider).watchAll());
+final anniversariesProvider = StreamProvider<List<Anniversary>>(
+    (ref) => ref.watch(anniversaryRepositoryProvider).watchAll());
 
 /// 距今天最近的下一个纪念日（含今天当天），无数据返回 null
 final nextAnniversaryProvider = Provider<Anniversary?>((ref) {
@@ -137,8 +138,8 @@ final daysTogetherProvider = Provider<int>((ref) {
 });
 
 /// 相册照片总数
-final photoCountProvider = Provider<int>((ref) =>
-    ref.watch(allPhotosTypedProvider).valueOrNull?.length ?? 0);
+final photoCountProvider = Provider<int>(
+    (ref) => ref.watch(allPhotosTypedProvider).valueOrNull?.length ?? 0);
 
 /// 愿望统计
 class WishStats {
@@ -183,8 +184,8 @@ final filteredAlbumPhotosProvider = StreamProvider<List<AlbumPhoto>>((ref) {
 // ═══════════════════════════════════════════════════════════════
 
 /// 所有照片（强类型，供时间轴分组使用）
-final allPhotosTypedProvider = StreamProvider<List<AlbumPhoto>>((ref) =>
-    ref.watch(albumRepositoryProvider).watchAll());
+final allPhotosTypedProvider = StreamProvider<List<AlbumPhoto>>(
+    (ref) => ref.watch(albumRepositoryProvider).watchAll());
 
 /// 照片按年月分组
 class PhotoGroup {
@@ -229,11 +230,13 @@ final groupedAlbumPhotosProvider =
       final key = p.date.year * 100 + p.date.month;
       map.putIfAbsent(key, () => []).add(p);
     }
-    return map.entries.map((e) => PhotoGroup(
-      year: e.key ~/ 100,
-      month: e.key % 100,
-      photos: e.value,
-    )).toList();
+    return map.entries
+        .map((e) => PhotoGroup(
+              year: e.key ~/ 100,
+              month: e.key % 100,
+              photos: e.value,
+            ))
+        .toList();
   });
 });
 
@@ -242,45 +245,45 @@ final groupedAlbumPhotosProvider =
 // ═══════════════════════════════════════════════════════════════
 
 /// 小说书架数据仓库
-final novelRepositoryProvider = Provider((ref) =>
-    NovelRepository(ref.watch(isarProvider)));
+final novelRepositoryProvider =
+    Provider((ref) => NovelRepository(ref.watch(isarProvider)));
 
 /// 小说章节数据仓库
-final novelChapterRepositoryProvider = Provider((ref) =>
-    NovelChapterRepository(ref.watch(isarProvider)));
+final novelChapterRepositoryProvider =
+    Provider((ref) => NovelChapterRepository(ref.watch(isarProvider)));
 
 /// 阅读设置数据仓库（单例行）
-final readerSettingsRepositoryProvider = Provider((ref) =>
-    ReaderSettingsRepository(ref.watch(isarProvider)));
+final readerSettingsRepositoryProvider =
+    Provider((ref) => ReaderSettingsRepository(ref.watch(isarProvider)));
 
 /// 所有书架小说
-final novelsProvider = StreamProvider<List<Novel>>((ref) =>
-    ref.watch(novelRepositoryProvider).watchAll());
+final novelsProvider = StreamProvider<List<Novel>>(
+    (ref) => ref.watch(novelRepositoryProvider).watchAll());
 
 /// 某本小说的章节列表（按小说 id 过滤）
-final chaptersProvider =
-    StreamProvider.family<List<NovelChapter>, int>((ref, novelId) =>
+final chaptersProvider = StreamProvider.family<List<NovelChapter>, int>(
+    (ref, novelId) =>
         ref.watch(novelChapterRepositoryProvider).watchByNovel(novelId));
 
 /// 阅读器设置
-final readerSettingsProvider = StreamProvider<ReaderSettings?>((ref) =>
-    ref.watch(readerSettingsRepositoryProvider).watch());
+final readerSettingsProvider = StreamProvider<ReaderSettings?>(
+    (ref) => ref.watch(readerSettingsRepositoryProvider).watch());
 
 // ═══════════════════════════════════════════════════════════════
 // 小说爬虫模块 providers（源 / 配置 / 日志 / 协调器）
 // ═══════════════════════════════════════════════════════════════
 
 /// 小说爬取源数据仓库
-final novelSourceRepositoryProvider = Provider((ref) =>
-    NovelSourceRepository(ref.watch(isarProvider)));
+final novelSourceRepositoryProvider =
+    Provider((ref) => NovelSourceRepository(ref.watch(isarProvider)));
 
 /// 全局爬取配置数据仓库
-final crawlConfigRepositoryProvider = Provider((ref) =>
-    CrawlConfigRepository(ref.watch(isarProvider)));
+final crawlConfigRepositoryProvider =
+    Provider((ref) => CrawlConfigRepository(ref.watch(isarProvider)));
 
 /// 爬取日志数据仓库
-final crawlLogRepositoryProvider = Provider((ref) =>
-    CrawlLogRepository(ref.watch(isarProvider)));
+final crawlLogRepositoryProvider =
+    Provider((ref) => CrawlLogRepository(ref.watch(isarProvider)));
 
 /// 爬取协调器（依赖其他 4 个 repository）
 final crawlRepositoryProvider = Provider<CrawlRepository>((ref) {
@@ -297,20 +300,21 @@ final crawlRepositoryProvider = Provider<CrawlRepository>((ref) {
 });
 
 /// 所有爬取源
-final novelSourcesProvider = StreamProvider<List<NovelSource>>((ref) =>
-    ref.watch(novelSourceRepositoryProvider).watchAll());
+final novelSourcesProvider = StreamProvider<List<NovelSource>>(
+    (ref) => ref.watch(novelSourceRepositoryProvider).watchAll());
 
 /// 全局爬取配置
-final crawlConfigProvider = FutureProvider<CrawlConfig>((ref) =>
-    ref.watch(crawlConfigRepositoryProvider).getOrCreate());
+final crawlConfigProvider = FutureProvider<CrawlConfig>(
+    (ref) => ref.watch(crawlConfigRepositoryProvider).getOrCreate());
 
 /// 某小说的爬取日志（按小说 id 过滤）
-final crawlLogsProvider =
-    StreamProvider.family<List<CrawlLog>, int>((ref, novelId) =>
+final crawlLogsProvider = StreamProvider.family<List<CrawlLog>, int>(
+    (ref, novelId) =>
         ref.watch(crawlLogRepositoryProvider).watchByNovel(novelId));
 
 /// 当前爬取状态（UI 展示进度用）
-final crawlStatusProvider = StateProvider<CrawlStatus>((ref) => CrawlStatus.idle);
+final crawlStatusProvider =
+    StateProvider<CrawlStatus>((ref) => CrawlStatus.idle);
 
 /// 爬取状态（不可变数据类，驱动 UI 进度展示）
 class CrawlStatus {
@@ -351,12 +355,12 @@ class CrawlStatus {
 // ═══════════════════════════════════════════════════════════════
 
 /// 待办数据仓库
-final memoRepositoryProvider = Provider((ref) =>
-    MemoRepository(ref.watch(isarProvider)));
+final memoRepositoryProvider =
+    Provider((ref) => MemoRepository(ref.watch(isarProvider)));
 
 /// 所有待办（实时流，按创建时间降序）
-final memosProvider = StreamProvider<List<Memo>>((ref) =>
-    ref.watch(memoRepositoryProvider).watchAll());
+final memosProvider = StreamProvider<List<Memo>>(
+    (ref) => ref.watch(memoRepositoryProvider).watchAll());
 
 /// 搜索关键词
 final memoSearchProvider = StateProvider<String>((ref) => '');
@@ -453,8 +457,8 @@ final memoStatsProvider = Provider<MemoStats>((ref) {
 });
 
 /// 待办总数
-final memoCountProvider = Provider<int>((ref) =>
-    ref.watch(memosProvider).valueOrNull?.length ?? 0);
+final memoCountProvider =
+    Provider<int>((ref) => ref.watch(memosProvider).valueOrNull?.length ?? 0);
 
 /// 所有可用标签（去重排序）
 final allTagsProvider = Provider<List<String>>((ref) {
@@ -467,24 +471,42 @@ final allTagsProvider = Provider<List<String>>((ref) {
 });
 
 // ═══════════════════════════════════════════════════════════════
+// 悄悄话模块 providers（留言列表 / 未读数）
+// ═══════════════════════════════════════════════════════════════
+
+/// 悄悄话数据仓库
+final secretMessageRepositoryProvider =
+    Provider((ref) => SecretMessageRepository(ref.watch(isarProvider)));
+
+/// 所有悄悄话（实时流，按时间倒序）
+final secretMessagesProvider = StreamProvider<List<SecretMessage>>(
+    (ref) => ref.watch(secretMessageRepositoryProvider).watchAll());
+
+/// 未读悄悄话数量（本机未读且对方发来的）
+final unreadSecretCountProvider = Provider<int>((ref) {
+  final messages = ref.watch(secretMessagesProvider).valueOrNull ?? [];
+  return messages.where((m) => !m.read).length;
+});
+
+// ═══════════════════════════════════════════════════════════════
 // 番茄钟模块 providers（设置 / 记录 / 今日统计 / 连续天数）
 // ═══════════════════════════════════════════════════════════════
 
 /// 番茄钟设置数据仓库（单例，id 固定 0）
-final pomodoroSettingsRepositoryProvider = Provider((ref) =>
-    PomodoroSettingsRepository(ref.watch(isarProvider)));
+final pomodoroSettingsRepositoryProvider =
+    Provider((ref) => PomodoroSettingsRepository(ref.watch(isarProvider)));
 
 /// 番茄钟设置（实时流，行不存在时仓库以默认值兜底）
-final pomodoroSettingsProvider = StreamProvider<PomodoroSettings>((ref) =>
-    ref.watch(pomodoroSettingsRepositoryProvider).watch());
+final pomodoroSettingsProvider = StreamProvider<PomodoroSettings>(
+    (ref) => ref.watch(pomodoroSettingsRepositoryProvider).watch());
 
 /// 专注记录数据仓库
-final focusSessionRepositoryProvider = Provider((ref) =>
-    FocusSessionRepository(ref.watch(isarProvider)));
+final focusSessionRepositoryProvider =
+    Provider((ref) => FocusSessionRepository(ref.watch(isarProvider)));
 
 /// 所有专注记录（实时流，按开始时间降序）
-final focusSessionsProvider = StreamProvider<List<FocusSession>>((ref) =>
-    ref.watch(focusSessionRepositoryProvider).watchAll());
+final focusSessionsProvider = StreamProvider<List<FocusSession>>(
+    (ref) => ref.watch(focusSessionRepositoryProvider).watchAll());
 
 /// 今日专注统计（时长分钟 + 次数）
 ///
@@ -511,4 +533,3 @@ final focusStreakProvider = Provider<int>((ref) {
       .toList();
   return computeStreak(dates);
 });
-

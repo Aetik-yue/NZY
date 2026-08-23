@@ -4,6 +4,8 @@
 // 旧实现因依赖链接文案而漏跟，导致只抓第1页、章节字数被截断。
 // 这里用 FakeHttpClient 注入多页 HTML，断言按 URL 模式正确拼接全章内容、
 // 不误入下一章（不同 chapterId）、不因回链死循环。
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:love_space/core/network/app_http_client.dart';
 import 'package:love_space/data/crawler/biquge_crawler.dart';
@@ -19,6 +21,9 @@ class _FakeHttpClient extends AppHttpClient {
   /// 按顺序记录所有被请求过的 URL（用于断言跟随路径）
   final List<String> requestedUrls = [];
 
+  /// 记录站内搜索 POST（URL + 表单参数）
+  final List<({String url, Map<String, String> body})> requestedPosts = [];
+
   @override
   Future<String> get(String url, {Map<String, String>? headers}) async {
     requestedUrls.add(url);
@@ -28,6 +33,51 @@ class _FakeHttpClient extends AppHttpClient {
     }
     return body;
   }
+
+  @override
+  Future<String> getOnce(
+    String url, {
+    Map<String, String>? headers,
+    Duration? timeoutOverride,
+  }) {
+    return get(url, headers: headers);
+  }
+
+  @override
+  Future<String> postOnce(
+    String url, {
+    Map<String, String>? body,
+    Map<String, String>? headers,
+    Duration? timeoutOverride,
+  }) async {
+    requestedPosts.add((url: url, body: body ?? const {}));
+    final response = _responses[url];
+    if (response == null) {
+      throw Exception('FakeHttpClient: 未配置响应 $url');
+    }
+    return response;
+  }
+}
+
+/// Bing 立即命中，其他两个引擎保持挂起，用于验证“首个成功即返回”。
+class _EngineRaceHttpClient extends AppHttpClient {
+  final Completer<String> slowResponses = Completer<String>();
+  int requestCount = 0;
+
+  @override
+  Future<String> getOnce(
+    String url, {
+    Map<String, String>? headers,
+    Duration? timeoutOverride,
+  }) {
+    requestCount++;
+    if (url.contains('bing.com')) {
+      return Future.value('''
+<a href="https://www.bqgbb.cc/book/123/">斗破苍穹</a>
+''');
+    }
+    return slowResponses.future;
+  }
 }
 
 /// 构造 bqgbb 源
@@ -36,6 +86,20 @@ NovelSource _bqgbbSource() => NovelSource()
   ..name = '笔趣阁'
   ..baseUrl = 'https://www.bqgbb.cc'
   ..selectors = '{}';
+
+NovelSource _source(String key, String baseUrl) => NovelSource()
+  ..key = key
+  ..name = key
+  ..baseUrl = baseUrl
+  ..selectors = '{}';
+
+String _searchResultHtml() => '''
+<html><body>
+<table class="grid">
+  <tr><td><a href="/book/123/">斗破苍穹</a></td><td>天蚕土豆</td></tr>
+</table>
+</body></html>
+''';
 
 /// 构造一页章节 HTML
 ///
@@ -62,6 +126,138 @@ String _chapterPageHtml({
 }
 
 void main() {
+  group('BiqugeCrawler 发现请求快速路径', () {
+    test('bqgbb 搜索只请求该源已知端点一次', () async {
+      final http = _FakeHttpClient({
+        'https://www.bqgbb.cc/search.php': _searchResultHtml(),
+      });
+      final crawler = BiqugeCrawler(
+        source: _bqgbbSource(),
+        httpClient: http,
+        enableSearchEngineFallback: false,
+      );
+
+      final results = await crawler.search('斗破苍穹');
+
+      expect(results, hasLength(1));
+      expect(results.single.title, '斗破苍穹');
+      expect(http.requestedPosts, hasLength(1));
+      expect(http.requestedPosts.single.url, 'https://www.bqgbb.cc/search.php');
+      expect(http.requestedPosts.single.body, {'searchkey': '斗破苍穹'});
+      expect(http.requestedUrls, isEmpty);
+    });
+
+    test('biquge 搜索使用 /search.html 的 s 参数且不再盲试其他参数', () async {
+      final http = _FakeHttpClient({
+        'https://www.biquge2.net/search.html': _searchResultHtml(),
+      });
+      final crawler = BiqugeCrawler(
+        source: _source('biquge', 'https://www.biquge2.net'),
+        httpClient: http,
+        enableSearchEngineFallback: false,
+      );
+
+      final results = await crawler.search('斗破苍穹');
+
+      expect(results, hasLength(1));
+      expect(http.requestedPosts, hasLength(1));
+      expect(http.requestedPosts.single.body, {'s': '斗破苍穹'});
+    });
+
+    test('跨源模式下站内搜索失败不会由每个源重复访问搜索引擎', () async {
+      final http = _FakeHttpClient({});
+      final crawler = BiqugeCrawler(
+        source: _source('bqgecc', 'https://www.bqge.cc'),
+        httpClient: http,
+        enableSearchEngineFallback: false,
+      );
+
+      final results = await crawler.search('不存在的小说');
+
+      expect(results, isEmpty);
+      expect(http.requestedPosts, hasLength(1));
+      expect(http.requestedUrls, isEmpty);
+    });
+
+    test('搜索引擎兜底在首个引擎命中后立即返回，不等待其他慢引擎', () async {
+      final http = _EngineRaceHttpClient();
+      final crawler = BiqugeCrawler(
+        source: _bqgbbSource(),
+        httpClient: http,
+      );
+
+      final results = await crawler.searchViaEngine('斗破苍穹');
+
+      expect(results, hasLength(1));
+      expect(results.single.url, 'https://www.bqgbb.cc/book/123/');
+      expect(http.requestCount, 3);
+
+      // 释放仍在后台等待的两个测试 Future，避免把异步任务遗留到下一用例。
+      http.slowResponses.complete('<html></html>');
+      await Future<void>.delayed(Duration.zero);
+    });
+
+    test('biquge 分类浏览直接命中已知 URL，不再轮询四种路径', () async {
+      const categoryUrl =
+          'https://www.biquge2.net/fenlei/lastupdate_1_0_0_1.html';
+      final http = _FakeHttpClient({
+        categoryUrl: '''
+<div class="item">
+  <a href="/book/88/" title="测试小说">测试小说</a>
+  <dd>测试简介</dd>
+  <div class="btm">测试作者 <em>100万字</em><em>今天</em></div>
+</div>
+''',
+      });
+      final crawler = BiqugeCrawler(
+        source: _source('biquge', 'https://www.biquge2.net'),
+        httpClient: http,
+      );
+
+      final books = await crawler.browseCategory(1);
+
+      expect(books, hasLength(1));
+      expect(books.single.title, '测试小说');
+      expect(http.requestedUrls, [categoryUrl]);
+    });
+
+    test('长篇目录按批请求并保持章节页顺序', () async {
+      const detailUrl = 'https://www.biquge2.net/book/123/';
+      final http = _FakeHttpClient({
+        detailUrl: '''
+<div id="info"><h1>测试长篇</h1><p>作者：测试作者</p></div>
+<a href="/book/123/ml_1.html">完整目录</a>
+''',
+        'https://www.biquge2.net/book/123/ml_1.html':
+            '<a href="/book/123/11.html">第1章 开始</a>',
+        'https://www.biquge2.net/book/123/ml_2.html':
+            '<a href="/book/123/12.html">第2章 继续</a>',
+        'https://www.biquge2.net/book/123/ml_3.html': '<html></html>',
+        'https://www.biquge2.net/book/123/ml_4.html': '<html></html>',
+        'https://www.biquge2.net/book/123/ml_5.html': '<html></html>',
+      });
+      final crawler = BiqugeCrawler(
+        source: _source('biquge', 'https://www.biquge2.net'),
+        httpClient: http,
+      );
+
+      final detail = await crawler.fetchBookDetail(detailUrl);
+
+      expect(detail.chapters.map((chapter) => chapter.title), [
+        '第1章 开始',
+        '第2章 继续',
+      ]);
+      expect(http.requestedUrls, [
+        detailUrl,
+        'https://www.biquge2.net/book/123/ml_1.html',
+        'https://www.biquge2.net/book/123/ml_2.html',
+        'https://www.biquge2.net/book/123/ml_3.html',
+        'https://www.biquge2.net/book/123/ml_4.html',
+        'https://www.biquge2.net/book/123/ml_5.html',
+      ]);
+    });
+  });
+
   group('BiqugeCrawler.fetchChapterContent 分页跟随', () {
     test('bqgbb 同章分页按钮文案标为"下一章"时仍正确跟随并拼接全章', () async {
       final http = _FakeHttpClient({
@@ -209,15 +405,11 @@ void main() {
       // 不会重复抓取任何一页
       expect(http.requestedUrls.length, 2);
       expect(
-        http.requestedUrls
-            .where((u) => u.endsWith('/200.html'))
-            .length,
+        http.requestedUrls.where((u) => u.endsWith('/200.html')).length,
         1,
       );
       expect(
-        http.requestedUrls
-            .where((u) => u.endsWith('/200_1.html'))
-            .length,
+        http.requestedUrls.where((u) => u.endsWith('/200_1.html')).length,
         1,
       );
     });

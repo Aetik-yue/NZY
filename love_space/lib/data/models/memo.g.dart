@@ -22,44 +22,54 @@ const MemoSchema = CollectionSchema(
       name: r'author',
       type: IsarType.long,
     ),
-    r'colorValue': PropertySchema(
+    r'cloudId': PropertySchema(
       id: 1,
+      name: r'cloudId',
+      type: IsarType.string,
+    ),
+    r'colorValue': PropertySchema(
+      id: 2,
       name: r'colorValue',
       type: IsarType.long,
     ),
     r'content': PropertySchema(
-      id: 2,
+      id: 3,
       name: r'content',
       type: IsarType.string,
     ),
     r'createdAt': PropertySchema(
-      id: 3,
+      id: 4,
       name: r'createdAt',
       type: IsarType.dateTime,
     ),
     r'done': PropertySchema(
-      id: 4,
+      id: 5,
       name: r'done',
       type: IsarType.bool,
     ),
     r'dueDate': PropertySchema(
-      id: 5,
+      id: 6,
       name: r'dueDate',
       type: IsarType.dateTime,
     ),
     r'isPinned': PropertySchema(
-      id: 6,
+      id: 7,
       name: r'isPinned',
       type: IsarType.bool,
     ),
+    r'ownerId': PropertySchema(
+      id: 8,
+      name: r'ownerId',
+      type: IsarType.string,
+    ),
     r'priority': PropertySchema(
-      id: 7,
+      id: 9,
       name: r'priority',
       type: IsarType.string,
       enumMap: _MemopriorityEnumValueMap,
     ),
     r'updatedAt': PropertySchema(
-      id: 8,
+      id: 10,
       name: r'updatedAt',
       type: IsarType.dateTime,
     )
@@ -84,7 +94,19 @@ int _memoEstimateSize(
   Map<Type, List<int>> allOffsets,
 ) {
   var bytesCount = offsets.last;
+  {
+    final value = object.cloudId;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
   bytesCount += 3 + object.content.length * 3;
+  {
+    final value = object.ownerId;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
   bytesCount += 3 + object.priority.name.length * 3;
   return bytesCount;
 }
@@ -96,14 +118,16 @@ void _memoSerialize(
   Map<Type, List<int>> allOffsets,
 ) {
   writer.writeLong(offsets[0], object.author);
-  writer.writeLong(offsets[1], object.colorValue);
-  writer.writeString(offsets[2], object.content);
-  writer.writeDateTime(offsets[3], object.createdAt);
-  writer.writeBool(offsets[4], object.done);
-  writer.writeDateTime(offsets[5], object.dueDate);
-  writer.writeBool(offsets[6], object.isPinned);
-  writer.writeString(offsets[7], object.priority.name);
-  writer.writeDateTime(offsets[8], object.updatedAt);
+  writer.writeString(offsets[1], object.cloudId);
+  writer.writeLong(offsets[2], object.colorValue);
+  writer.writeString(offsets[3], object.content);
+  writer.writeDateTime(offsets[4], object.createdAt);
+  writer.writeBool(offsets[5], object.done);
+  writer.writeDateTime(offsets[6], object.dueDate);
+  writer.writeBool(offsets[7], object.isPinned);
+  writer.writeString(offsets[8], object.ownerId);
+  writer.writeString(offsets[9], object.priority.name);
+  writer.writeDateTime(offsets[10], object.updatedAt);
 }
 
 Memo _memoDeserialize(
@@ -114,17 +138,19 @@ Memo _memoDeserialize(
 ) {
   final object = Memo();
   object.author = reader.readLong(offsets[0]);
-  object.colorValue = reader.readLong(offsets[1]);
-  object.content = reader.readString(offsets[2]);
-  object.createdAt = reader.readDateTime(offsets[3]);
-  object.done = reader.readBool(offsets[4]);
-  object.dueDate = reader.readDateTimeOrNull(offsets[5]);
+  object.cloudId = reader.readStringOrNull(offsets[1]);
+  object.colorValue = reader.readLong(offsets[2]);
+  object.content = reader.readString(offsets[3]);
+  object.createdAt = reader.readDateTime(offsets[4]);
+  object.done = reader.readBool(offsets[5]);
+  object.dueDate = reader.readDateTimeOrNull(offsets[6]);
   object.id = id;
-  object.isPinned = reader.readBool(offsets[6]);
+  object.isPinned = reader.readBool(offsets[7]);
+  object.ownerId = reader.readStringOrNull(offsets[8]);
   object.priority =
-      _MemopriorityValueEnumMap[reader.readStringOrNull(offsets[7])] ??
+      _MemopriorityValueEnumMap[reader.readStringOrNull(offsets[9])] ??
           TodoPriority.none;
-  object.updatedAt = reader.readDateTimeOrNull(offsets[8]);
+  object.updatedAt = reader.readDateTimeOrNull(offsets[10]);
   return object;
 }
 
@@ -138,21 +164,25 @@ P _memoDeserializeProp<P>(
     case 0:
       return (reader.readLong(offset)) as P;
     case 1:
-      return (reader.readLong(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 2:
-      return (reader.readString(offset)) as P;
+      return (reader.readLong(offset)) as P;
     case 3:
-      return (reader.readDateTime(offset)) as P;
+      return (reader.readString(offset)) as P;
     case 4:
-      return (reader.readBool(offset)) as P;
+      return (reader.readDateTime(offset)) as P;
     case 5:
-      return (reader.readDateTimeOrNull(offset)) as P;
-    case 6:
       return (reader.readBool(offset)) as P;
+    case 6:
+      return (reader.readDateTimeOrNull(offset)) as P;
     case 7:
+      return (reader.readBool(offset)) as P;
+    case 8:
+      return (reader.readStringOrNull(offset)) as P;
+    case 9:
       return (_MemopriorityValueEnumMap[reader.readStringOrNull(offset)] ??
           TodoPriority.none) as P;
-    case 8:
+    case 10:
       return (reader.readDateTimeOrNull(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -308,6 +338,150 @@ extension MemoQueryFilter on QueryBuilder<Memo, Memo, QFilterCondition> {
         includeLower: includeLower,
         upper: upper,
         includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<Memo, Memo, QAfterFilterCondition> cloudIdIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'cloudId',
+      ));
+    });
+  }
+
+  QueryBuilder<Memo, Memo, QAfterFilterCondition> cloudIdIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'cloudId',
+      ));
+    });
+  }
+
+  QueryBuilder<Memo, Memo, QAfterFilterCondition> cloudIdEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'cloudId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Memo, Memo, QAfterFilterCondition> cloudIdGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'cloudId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Memo, Memo, QAfterFilterCondition> cloudIdLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'cloudId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Memo, Memo, QAfterFilterCondition> cloudIdBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'cloudId',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Memo, Memo, QAfterFilterCondition> cloudIdStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'cloudId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Memo, Memo, QAfterFilterCondition> cloudIdEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'cloudId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Memo, Memo, QAfterFilterCondition> cloudIdContains(String value,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'cloudId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Memo, Memo, QAfterFilterCondition> cloudIdMatches(String pattern,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'cloudId',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Memo, Memo, QAfterFilterCondition> cloudIdIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'cloudId',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<Memo, Memo, QAfterFilterCondition> cloudIdIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'cloudId',
+        value: '',
       ));
     });
   }
@@ -684,6 +858,150 @@ extension MemoQueryFilter on QueryBuilder<Memo, Memo, QFilterCondition> {
     });
   }
 
+  QueryBuilder<Memo, Memo, QAfterFilterCondition> ownerIdIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'ownerId',
+      ));
+    });
+  }
+
+  QueryBuilder<Memo, Memo, QAfterFilterCondition> ownerIdIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'ownerId',
+      ));
+    });
+  }
+
+  QueryBuilder<Memo, Memo, QAfterFilterCondition> ownerIdEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'ownerId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Memo, Memo, QAfterFilterCondition> ownerIdGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'ownerId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Memo, Memo, QAfterFilterCondition> ownerIdLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'ownerId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Memo, Memo, QAfterFilterCondition> ownerIdBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'ownerId',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Memo, Memo, QAfterFilterCondition> ownerIdStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'ownerId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Memo, Memo, QAfterFilterCondition> ownerIdEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'ownerId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Memo, Memo, QAfterFilterCondition> ownerIdContains(String value,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'ownerId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Memo, Memo, QAfterFilterCondition> ownerIdMatches(String pattern,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'ownerId',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Memo, Memo, QAfterFilterCondition> ownerIdIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'ownerId',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<Memo, Memo, QAfterFilterCondition> ownerIdIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'ownerId',
+        value: '',
+      ));
+    });
+  }
+
   QueryBuilder<Memo, Memo, QAfterFilterCondition> priorityEqualTo(
     TodoPriority value, {
     bool caseSensitive = true,
@@ -900,6 +1218,18 @@ extension MemoQuerySortBy on QueryBuilder<Memo, Memo, QSortBy> {
     });
   }
 
+  QueryBuilder<Memo, Memo, QAfterSortBy> sortByCloudId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'cloudId', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Memo, Memo, QAfterSortBy> sortByCloudIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'cloudId', Sort.desc);
+    });
+  }
+
   QueryBuilder<Memo, Memo, QAfterSortBy> sortByColorValue() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'colorValue', Sort.asc);
@@ -972,6 +1302,18 @@ extension MemoQuerySortBy on QueryBuilder<Memo, Memo, QSortBy> {
     });
   }
 
+  QueryBuilder<Memo, Memo, QAfterSortBy> sortByOwnerId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'ownerId', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Memo, Memo, QAfterSortBy> sortByOwnerIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'ownerId', Sort.desc);
+    });
+  }
+
   QueryBuilder<Memo, Memo, QAfterSortBy> sortByPriority() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'priority', Sort.asc);
@@ -1007,6 +1349,18 @@ extension MemoQuerySortThenBy on QueryBuilder<Memo, Memo, QSortThenBy> {
   QueryBuilder<Memo, Memo, QAfterSortBy> thenByAuthorDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'author', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Memo, Memo, QAfterSortBy> thenByCloudId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'cloudId', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Memo, Memo, QAfterSortBy> thenByCloudIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'cloudId', Sort.desc);
     });
   }
 
@@ -1094,6 +1448,18 @@ extension MemoQuerySortThenBy on QueryBuilder<Memo, Memo, QSortThenBy> {
     });
   }
 
+  QueryBuilder<Memo, Memo, QAfterSortBy> thenByOwnerId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'ownerId', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Memo, Memo, QAfterSortBy> thenByOwnerIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'ownerId', Sort.desc);
+    });
+  }
+
   QueryBuilder<Memo, Memo, QAfterSortBy> thenByPriority() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'priority', Sort.asc);
@@ -1123,6 +1489,13 @@ extension MemoQueryWhereDistinct on QueryBuilder<Memo, Memo, QDistinct> {
   QueryBuilder<Memo, Memo, QDistinct> distinctByAuthor() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'author');
+    });
+  }
+
+  QueryBuilder<Memo, Memo, QDistinct> distinctByCloudId(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'cloudId', caseSensitive: caseSensitive);
     });
   }
 
@@ -1163,6 +1536,13 @@ extension MemoQueryWhereDistinct on QueryBuilder<Memo, Memo, QDistinct> {
     });
   }
 
+  QueryBuilder<Memo, Memo, QDistinct> distinctByOwnerId(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'ownerId', caseSensitive: caseSensitive);
+    });
+  }
+
   QueryBuilder<Memo, Memo, QDistinct> distinctByPriority(
       {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
@@ -1187,6 +1567,12 @@ extension MemoQueryProperty on QueryBuilder<Memo, Memo, QQueryProperty> {
   QueryBuilder<Memo, int, QQueryOperations> authorProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'author');
+    });
+  }
+
+  QueryBuilder<Memo, String?, QQueryOperations> cloudIdProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'cloudId');
     });
   }
 
@@ -1223,6 +1609,12 @@ extension MemoQueryProperty on QueryBuilder<Memo, Memo, QQueryProperty> {
   QueryBuilder<Memo, bool, QQueryOperations> isPinnedProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'isPinned');
+    });
+  }
+
+  QueryBuilder<Memo, String?, QQueryOperations> ownerIdProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'ownerId');
     });
   }
 

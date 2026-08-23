@@ -5,6 +5,8 @@
 // 注意：Isar 原生库在 flutter test 环境（如 Windows 未注册 Flutter 插件）
 // 可能无法加载，此时用例会跳过而非失败；在可加载原生库的环境（配置正确的
 // CI 或桌面构建）中测试会真实执行。
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:isar/isar.dart';
 
@@ -32,7 +34,7 @@ import 'package:love_space/data/repositories/novel_repository.dart';
 import 'package:love_space/data/repositories/novel_chapter_repository.dart';
 
 /// 打开一个全新的内存 Isar 实例
-Future<Isar> _openTestIsar() {
+Future<Isar> _openTestIsar(String directory) {
   return Isar.open(
     [
       WishSchema,
@@ -49,18 +51,26 @@ Future<Isar> _openTestIsar() {
       CrawlLogSchema,
       MemoSchema,
     ],
-    directory: '',
+    directory: directory,
+    name: 'repositories_test',
   );
 }
 
 void main() {
   late Isar isar;
+  late Directory testDirectory;
   var isarOpened = false;
+
+  setUpAll(() async {
+    await Isar.initializeIsarCore(download: true);
+    testDirectory =
+        await Directory.systemTemp.createTemp('love_space_repositories_');
+  });
 
   setUp(() async {
     isarOpened = false;
     try {
-      isar = await _openTestIsar();
+      isar = await _openTestIsar(testDirectory.path);
       isarOpened = true;
     } catch (_) {
       // 原生库不可用：保持未打开状态，由各用例跳过
@@ -68,7 +78,13 @@ void main() {
   });
 
   tearDown(() async {
-    if (isarOpened) await isar.close();
+    if (isarOpened) await isar.close(deleteFromDisk: true);
+  });
+
+  tearDownAll(() async {
+    if (await testDirectory.exists()) {
+      await testDirectory.delete(recursive: true);
+    }
   });
 
   group('WishRepository', () {
@@ -204,6 +220,26 @@ void main() {
       expect(a.id, b.id);
       expect(a.prefetchChapters, CrawlConfigRepository.defaultPrefetchChapters);
     });
+
+    test('将旧版默认预取 5 章迁移为只预取首章', () async {
+      if (!isarOpened) {
+        markTestSkipped('Isar 原生库不可用，跳过数据层测试');
+        return;
+      }
+      final legacy = CrawlConfig()
+        ..requestIntervalMs = CrawlConfigRepository.defaultIntervalMs
+        ..maxRetries = CrawlConfigRepository.defaultMaxRetries
+        ..timeoutMs = CrawlConfigRepository.defaultTimeoutMs
+        ..rotateUserAgent = CrawlConfigRepository.defaultRotateUserAgent
+        ..adKeywords = []
+        ..prefetchChapters = 5;
+      await isar.writeTxn(() => isar.crawlConfigs.put(legacy));
+
+      final migrated = await CrawlConfigRepository(isar).getOrCreate();
+
+      expect(migrated.prefetchChapters, 1);
+      expect((await isar.crawlConfigs.get(legacy.id))!.prefetchChapters, 1);
+    });
   });
 
   group('ReaderSettingsRepository', () {
@@ -265,7 +301,8 @@ void main() {
       await chapterRepo.updateContent(novel.id, 0, '新抓取的正文');
       final ch0 = await chapterRepo.getByNovelAndIndex(novel.id, 0);
       expect(ch0!.content, '新抓取的正文');
-      expect((await chapterRepo.getByNovelAndIndex(novel.id, 1))!.content, '正文');
+      expect(
+          (await chapterRepo.getByNovelAndIndex(novel.id, 1))!.content, '正文');
     });
   });
 

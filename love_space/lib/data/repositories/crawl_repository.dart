@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import '../../app/theme/app_colors.dart';
@@ -41,6 +43,24 @@ class CrawlRepository {
   /// 批与批之间由 minInterval 保持间隔，兼顾速度与防封。
   static const int _chapterFetchConcurrency = 5;
 
+  /// 源优先级：前两项是当前实测响应稳定的主搜索源，其余仅作降级。
+  static const List<String> _sourcePriority = [
+    'bqgbb',
+    'biquge',
+    'bqgecc',
+    'bxwxorg',
+    'biqumo',
+  ];
+
+  /// 同一关键词/分类短时间重复打开时直接复用结果，避免返回页面后再次爬站。
+  static const Duration _positiveCacheTtl = Duration(minutes: 5);
+  static const Duration _negativeCacheTtl = Duration(seconds: 30);
+
+  final Map<String, ({DateTime expiresAt, List<SearchResult> value})>
+      _searchCache = {};
+  final Map<String, ({DateTime expiresAt, List<CategoryBook> value})>
+      _categoryCache = {};
+
   /// 复用的 HTTP 客户端（避免每次操作新建连接后不释放）
   ///
   /// 配置未变化时复用同一实例；配置变化时关闭旧实例并重建。
@@ -72,6 +92,8 @@ class CrawlRepository {
   void dispose() {
     _httpClient?.close();
     _httpClient = null;
+    _searchCache.clear();
+    _categoryCache.clear();
   }
 
   /// 取消令牌（UI 取消时设为 true）
@@ -108,8 +130,9 @@ class CrawlRepository {
     final results = List<R?>.filled(items.length, null);
     for (var start = 0; start < items.length; start += concurrency) {
       _checkCancelled();
-      final end =
-          start + concurrency > items.length ? items.length : start + concurrency;
+      final end = start + concurrency > items.length
+          ? items.length
+          : start + concurrency;
       final batch = <Future<void>>[];
       for (var i = start; i < end; i++) {
         final index = i;
@@ -120,35 +143,103 @@ class CrawlRepository {
     return results.cast<R>();
   }
 
-  /// 搜索小说（跨所有启用的源）
+  /// 搜索小说（主源优先，备用源按需启用）
   ///
-  /// 各源搜索并发执行：任一源失败/空结果不影响其他源，慢源（如引擎兜底）
-  /// 不阻塞快源返回。各源共享同一 [AppHttpClient]，minInterval 仍提供
-  /// 整站礼貌限速（并发请求以小窗口并行，批与批之间保持间隔）。
+  /// 旧实现同时启动所有源，并让每个源各自执行搜索引擎兜底；最终
+  /// `Future.wait` 仍会等待最慢源。现在分为三级：
+  /// 1. 两个主源并发站内搜索；有结果立即返回；
+  /// 2. 主源无结果才并发探测备用源；
+  /// 3. 全部站内搜索为空时，只选择一个主源做搜索引擎兜底。
   Future<List<SearchResult>> search(String keyword) async {
-    final sources = await sourceRepository.getEnabled();
+    final normalized = keyword.trim();
+    if (normalized.isEmpty) return [];
+
+    final cacheKey = normalized.toLowerCase();
+    final cached = _searchCache[cacheKey];
+    if (cached != null && DateTime.now().isBefore(cached.expiresAt)) {
+      return cached.value;
+    }
+
+    final sources = _orderSources(await sourceRepository.getEnabled());
     if (sources.isEmpty) return [];
 
     final config = await configRepository.getOrCreate();
+    final primarySources = sources.take(2).toList();
+    final fallbackSources = sources.skip(primarySources.length).toList();
 
-    final futures = sources.map((source) async {
-      try {
-        final crawler = _createCrawler(source, config);
-        return await crawler.search(keyword);
-      } catch (e) {
-        debugPrint('[CrawlRepository] 搜索失败 (${source.name}): $e');
-        return <SearchResult>[];
-      }
-    }).toList();
-
-    final results = <SearchResult>[];
-    for (final batch in await Future.wait(futures)) {
-      results.addAll(batch);
+    List<SearchResult> results = await _searchSources(
+      primarySources,
+      config,
+      normalized,
+    );
+    if (results.isEmpty && fallbackSources.isNotEmpty) {
+      results = await _searchSources(
+        fallbackSources,
+        config,
+        normalized,
+      );
     }
-    return results;
+    if (results.isEmpty) {
+      // 所有站内搜索失败后只执行一次公共搜索引擎兜底。
+      final crawler = _createCrawler(
+        sources.first,
+        config,
+        enableSearchEngineFallback: false,
+      );
+      if (crawler is BiqugeCrawler) {
+        results = await crawler.searchViaEngine(normalized);
+      }
+    }
+
+    final deduped = List<SearchResult>.unmodifiable(
+      _dedupeSearchResults(results),
+    );
+    _searchCache[cacheKey] = (
+      expiresAt: DateTime.now().add(
+        deduped.isEmpty ? _negativeCacheTtl : _positiveCacheTtl,
+      ),
+      value: deduped,
+    );
+    return deduped;
   }
 
-  /// 按分类浏览小说（跨所有启用的源）
+  Future<List<SearchResult>> _searchSources(
+    List<NovelSource> sources,
+    CrawlConfig config,
+    String keyword,
+  ) async {
+    if (sources.isEmpty) return [];
+
+    final firstResult = Completer<List<SearchResult>>();
+    var remaining = sources.length;
+    for (final source in sources) {
+      unawaited(() async {
+        try {
+          final crawler = _createCrawler(
+            source,
+            config,
+            enableSearchEngineFallback: false,
+          );
+          return await crawler.search(keyword);
+        } catch (e) {
+          debugPrint('[CrawlRepository] 搜索失败 (${source.name}): $e');
+          return <SearchResult>[];
+        }
+      }()
+          .then((results) {
+        if (results.isNotEmpty && !firstResult.isCompleted) {
+          firstResult.complete(results);
+        }
+        remaining--;
+        if (remaining == 0 && !firstResult.isCompleted) {
+          firstResult.complete(<SearchResult>[]);
+        }
+      }));
+    }
+    return firstResult.future;
+  }
+
+  /// 按分类浏览小说（主源优先，备用源按需启用）
   ///
   /// [categoryId] 为分类 ID（1=玄幻 2=修真 3=都市 4=历史 5=网游 6=科幻 7=恐怖 8=其他），
   /// [page] 为页码（从 1 开始）。
@@ -156,23 +247,81 @@ class CrawlRepository {
   /// 搜索不可靠时，分类浏览是找书的可靠替代方案。
   Future<List<CategoryBook>> browseCategory(int categoryId,
       {int page = 1}) async {
-    final sources = await sourceRepository.getEnabled();
+    final cacheKey = '$categoryId:$page';
+    final cached = _categoryCache[cacheKey];
+    if (cached != null && DateTime.now().isBefore(cached.expiresAt)) {
+      return cached.value;
+    }
+
+    final sources = _orderSources(await sourceRepository.getEnabled());
     if (sources.isEmpty) return [];
 
     final config = await configRepository.getOrCreate();
-    final results = <CategoryBook>[];
+    final primarySources = sources.take(2).toList();
+    final fallbackSources = sources.skip(primarySources.length).toList();
 
-    for (final source in sources) {
-      try {
-        final crawler = _createCrawler(source, config);
-        final books = await crawler.browseCategory(categoryId, page: page);
-        results.addAll(books);
-      } catch (e) {
-        debugPrint('[CrawlRepository] 分类浏览失败 (${source.name}): $e');
-      }
+    List<CategoryBook> results = await _browseSources(
+      primarySources,
+      config,
+      categoryId,
+      page,
+    );
+    if (results.isEmpty && fallbackSources.isNotEmpty) {
+      results = await _browseSources(
+        fallbackSources,
+        config,
+        categoryId,
+        page,
+      );
     }
 
-    return results;
+    final deduped = List<CategoryBook>.unmodifiable(
+      _dedupeCategoryBooks(results),
+    );
+    _categoryCache[cacheKey] = (
+      expiresAt: DateTime.now().add(
+        deduped.isEmpty ? _negativeCacheTtl : _positiveCacheTtl,
+      ),
+      value: deduped,
+    );
+    return deduped;
+  }
+
+  Future<List<CategoryBook>> _browseSources(
+    List<NovelSource> sources,
+    CrawlConfig config,
+    int categoryId,
+    int page,
+  ) async {
+    if (sources.isEmpty) return [];
+
+    final firstResult = Completer<List<CategoryBook>>();
+    var remaining = sources.length;
+    for (final source in sources) {
+      unawaited(() async {
+        try {
+          final crawler = _createCrawler(
+            source,
+            config,
+            enableSearchEngineFallback: false,
+          );
+          return await crawler.browseCategory(categoryId, page: page);
+        } catch (e) {
+          debugPrint('[CrawlRepository] 分类浏览失败 (${source.name}): $e');
+          return <CategoryBook>[];
+        }
+      }()
+          .then((results) {
+        if (results.isNotEmpty && !firstResult.isCompleted) {
+          firstResult.complete(results);
+        }
+        remaining--;
+        if (remaining == 0 && !firstResult.isCompleted) {
+          firstResult.complete(<CategoryBook>[]);
+        }
+      }));
+    }
+    return firstResult.future;
   }
 
   /// 从源站添加小说到书架
@@ -231,8 +380,7 @@ class CrawlRepository {
       await novelRepository.add(novel);
 
       // 4. 写入章节列表 + 预取正文（前 N 章有界并发抓取）
-      final prefetch =
-          prefetchChapters ?? config.prefetchChapters;
+      final prefetch = prefetchChapters ?? config.prefetchChapters;
       final chaptersToFetch =
           detail.chapters.length < prefetch ? detail.chapters.length : prefetch;
 
@@ -343,8 +491,7 @@ class CrawlRepository {
       final detail = await crawler.fetchBookDetail(novel.sourceUrl!);
 
       // 获取已有章节的 sourceChapterId 集合（用于去重）
-      final existingChapters =
-          await novelChapterRepository.getByNovel(novelId);
+      final existingChapters = await novelChapterRepository.getByNovel(novelId);
       final existingIds = existingChapters
           .map((c) => c.sourceChapterId)
           .whereType<String>()
@@ -535,8 +682,64 @@ class CrawlRepository {
     }
   }
 
+  /// 按已知可用性排序；未知自定义源保持原始相对顺序并排在已知源之后。
+  List<NovelSource> _orderSources(List<NovelSource> sources) {
+    final priorities = <String, int>{
+      for (var i = 0; i < _sourcePriority.length; i++) _sourcePriority[i]: i,
+    };
+    final originalOrder = <String, int>{
+      for (var i = 0; i < sources.length; i++) sources[i].key: i,
+    };
+    final ordered = List<NovelSource>.from(sources);
+    ordered.sort((a, b) {
+      final pa = priorities[a.key] ?? _sourcePriority.length;
+      final pb = priorities[b.key] ?? _sourcePriority.length;
+      final priorityComparison = pa.compareTo(pb);
+      if (priorityComparison != 0) return priorityComparison;
+      return originalOrder[a.key]!.compareTo(originalOrder[b.key]!);
+    });
+    return ordered;
+  }
+
+  /// 跨镜像去重：标准化后的书名和作者均相同时，只保留优先源结果。
+  List<SearchResult> _dedupeSearchResults(List<SearchResult> results) {
+    final seen = <String>{};
+    final deduped = <SearchResult>[];
+    for (final result in results) {
+      final key = _bookIdentity(result.title, result.author);
+      if (!seen.add(key)) continue;
+      deduped.add(result);
+    }
+    return deduped;
+  }
+
+  List<CategoryBook> _dedupeCategoryBooks(List<CategoryBook> books) {
+    final seen = <String>{};
+    final deduped = <CategoryBook>[];
+    for (final book in books) {
+      final key = _bookIdentity(book.title, book.author);
+      if (!seen.add(key)) continue;
+      deduped.add(book);
+    }
+    return deduped;
+  }
+
+  String _bookIdentity(String title, String author) {
+    final normalizedTitle =
+        title.replaceAll(RegExp(r'[《》\s]'), '').toLowerCase();
+    final normalizedAuthor = author
+        .replaceAll(RegExp(r'^(作者|著者)\s*[:：]?\s*'), '')
+        .replaceAll(RegExp(r'\s'), '')
+        .toLowerCase();
+    return '$normalizedTitle|$normalizedAuthor';
+  }
+
   /// 创建爬虫实例
-  BaseCrawler _createCrawler(NovelSource source, CrawlConfig config) {
+  BaseCrawler _createCrawler(
+    NovelSource source,
+    CrawlConfig config, {
+    bool enableSearchEngineFallback = true,
+  }) {
     final httpClient = _getHttpClient(config);
     final contentCleaner = ContentCleaner(adPhrases: config.adKeywords);
 
@@ -545,6 +748,7 @@ class CrawlRepository {
       source: source,
       httpClient: httpClient,
       contentCleaner: contentCleaner,
+      enableSearchEngineFallback: enableSearchEngineFallback,
     );
   }
 

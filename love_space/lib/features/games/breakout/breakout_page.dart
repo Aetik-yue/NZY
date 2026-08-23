@@ -56,7 +56,7 @@ class _BreakoutPageState extends State<BreakoutPage>
     _levelIndex = idx;
     final level = kBreakoutLevels[idx];
     _bricks = buildBricks(level);
-    _paddle = Paddle(x: 0.4, width: 0.2);
+    _paddle = Paddle(x: 0.4, y: 0.92, width: 0.2);
     _ball = Ball(
       x: 0.5,
       y: 0.85,
@@ -68,8 +68,7 @@ class _BreakoutPageState extends State<BreakoutPage>
   }
 
   void _start() {
-    if (_status == BreakoutStatus.ready ||
-        _status == BreakoutStatus.paused) {
+    if (_status == BreakoutStatus.ready || _status == BreakoutStatus.paused) {
       setState(() => _status = BreakoutStatus.playing);
       // 归零 dt 基准，避免暂停期间累积的时间在恢复瞬间造成大跳
       _lastTick = Duration.zero;
@@ -124,19 +123,17 @@ class _BreakoutPageState extends State<BreakoutPage>
       return;
     }
 
-    // 挡板碰撞（y=0.92 与 Painter 一致）
-    const paddleTop = 0.92;
-    if (ball.vy > 0 &&
-        ball.y + ball.r >= paddleTop &&
-        ball.y + ball.r <= paddleTop + 0.04 &&
-        ball.x >= _paddle.x &&
-        ball.x <= _paddle.x + _paddle.width) {
-      ball.y = paddleTop - ball.r;
+    // 挡板碰撞：圆-矩形最近点检测（支持挡板垂直移动，见 _paddleHit）
+    final paddleHit = _paddleHit(ball);
+    if (paddleHit != null) {
+      ball.y = _paddle.y - ball.r;
       final hitPos = (ball.x - _paddle.x) / _paddle.width - 0.5;
       final speed = level.ballSpeed;
       // 速度定义不变（不乘 dt），仅作为方向/大小基准
       ball.vx = hitPos * speed * 1.6;
       ball.vy = -speed;
+      // 侧面命中（bounceX 主导）：水平取反；正面命中：vy 保持击球公式（向上）
+      if (paddleHit.bounceX) ball.vx = -ball.vx;
     }
 
     // 砖块碰撞：传 aspectRatio 使碰撞圆与视觉正圆（半径 r*w 像素）一致
@@ -153,6 +150,7 @@ class _BreakoutPageState extends State<BreakoutPage>
       _score += hit.brick.kind.score;
       if (hit.bounceY) ball.vy = -ball.vy;
       if (hit.bounceX) ball.vx = -ball.vx;
+      // 只有清除全部砖块才通关；单次击中只计分并继续游戏。
       if (levelCleared(_bricks)) {
         _ticker.stop();
         if (_levelIndex + 1 >= kBreakoutLevels.length) {
@@ -165,6 +163,15 @@ class _BreakoutPageState extends State<BreakoutPage>
     }
 
     setState(() {});
+  }
+
+  /// 挡板碰撞：圆-矩形最近点检测（同 collideBrick 的写法）
+  ///
+  /// 仅在下落（vy>0）时判定，避免挡板移入上升球路时被反复触发；
+  /// 返回 `(bounceX, bounceY)` 记录，null 表示未命中。
+  ({bool bounceX, bool bounceY})? _paddleHit(Ball ball) {
+    if (ball.vy <= 0) return null;
+    return collidePaddle(ball, _paddle, aspectRatio: _aspectRatio);
   }
 
   void _loseLife() {
@@ -181,7 +188,7 @@ class _BreakoutPageState extends State<BreakoutPage>
         vy: -level.ballSpeed,
         r: 0.018,
       );
-      _paddle = Paddle(x: 0.4, width: 0.2);
+      _paddle = Paddle(x: 0.4, y: 0.92, width: 0.2);
       setState(() => _status = BreakoutStatus.ready);
     }
   }
@@ -198,10 +205,13 @@ class _BreakoutPageState extends State<BreakoutPage>
     setState(() {});
   }
 
-  void _onPanUpdate(DragUpdateDetails d, double width) {
+  void _onPanUpdate(DragUpdateDetails d, double width, double height) {
     setState(() {
       _paddle.x =
           (_paddle.x + d.delta.dx / width).clamp(0.0, 1.0 - _paddle.width);
+      // 逻辑 y 与像素同比例（height 为场地像素高），clamp 保证挡板不越界
+      _paddle.y =
+          (_paddle.y + d.delta.dy / height).clamp(0.05, 1.0 - kPaddleHeight);
     });
   }
 
@@ -252,8 +262,8 @@ class _BreakoutPageState extends State<BreakoutPage>
                     _aspectRatio = constraints.maxHeight / constraints.maxWidth;
                     return GestureDetector(
                       behavior: HitTestBehavior.opaque,
-                      onPanUpdate: (d) =>
-                          _onPanUpdate(d, constraints.maxWidth),
+                      onPanUpdate: (d) => _onPanUpdate(
+                          d, constraints.maxWidth, constraints.maxHeight),
                       onTap: () {
                         if (_status == BreakoutStatus.playing) {
                           _pause();
@@ -265,8 +275,8 @@ class _BreakoutPageState extends State<BreakoutPage>
                       child: Stack(
                         children: [
                           CustomPaint(
-                            size: Size(constraints.maxWidth,
-                                constraints.maxHeight),
+                            size: Size(
+                                constraints.maxWidth, constraints.maxHeight),
                             painter: BreakoutPainter(
                               bricks: _bricks,
                               ball: _ball,

@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -143,12 +143,12 @@ class _NovelReaderPageState extends ConsumerState<NovelReaderPage>
         return settingsAsync.when(
           data: (settings) => (settings == null)
               ? const Scaffold(
-                  body: Center(child: CircularProgressIndicator(strokeWidth: 2)))
+                  body:
+                      Center(child: CircularProgressIndicator(strokeWidth: 2)))
               : _buildReader(context, settings, sorted, effectiveIndex),
           loading: () => const Scaffold(
               body: Center(child: CircularProgressIndicator(strokeWidth: 2))),
-          error: (_, __) =>
-              const Scaffold(body: Center(child: Text('设置加载失败'))),
+          error: (_, __) => const Scaffold(body: Center(child: Text('设置加载失败'))),
         );
       },
       loading: () => const Scaffold(
@@ -203,7 +203,8 @@ class _NovelReaderPageState extends ConsumerState<NovelReaderPage>
             isLastChapter: effectiveIndex >= chapters.length - 1,
             controller: _pageController,
             onPageChanged: _onPageChanged,
-            onChapterEnd: () => _handleNextChapterPage(chapters, effectiveIndex),
+            onChapterEnd: () =>
+                _handleNextChapterPage(chapters, effectiveIndex),
             onChapterEndRetry: _autoAdvanceFailed
                 ? () => _handleNextChapterPage(chapters, effectiveIndex)
                 : null,
@@ -262,10 +263,10 @@ class _NovelReaderPageState extends ConsumerState<NovelReaderPage>
                     ? null
                     : () => _goToChapter(effectiveIndex - 1, chapters),
                 onSettings: () => ReaderSettingsSheet.show(context),
-                onNext: (chapters.isEmpty ||
-                        effectiveIndex >= chapters.length - 1)
-                    ? null
-                    : () => _goToChapter(effectiveIndex + 1, chapters),
+                onNext:
+                    (chapters.isEmpty || effectiveIndex >= chapters.length - 1)
+                        ? null
+                        : () => _goToChapter(effectiveIndex + 1, chapters),
                 onSeekChapter: (i) => _goToChapter(i, chapters),
               ),
             ),

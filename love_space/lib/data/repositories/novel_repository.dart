@@ -19,10 +19,8 @@ class NovelRepository {
   Future<Novel?> getById(Id id) => _isar.novels.get(id);
 
   /// 按源站详情页 URL 查询（添加小说时去重）
-  Future<Novel?> findBySourceUrl(String sourceUrl) => _isar.novels
-      .filter()
-      .sourceUrlEqualTo(sourceUrl)
-      .findFirst();
+  Future<Novel?> findBySourceUrl(String sourceUrl) =>
+      _isar.novels.filter().sourceUrlEqualTo(sourceUrl).findFirst();
 
   /// 新增小说
   Future<void> add(Novel novel) =>
@@ -57,8 +55,7 @@ class NovelRepository {
   /// 永久禁用）；addNovel 中途被杀也可能残留 0 章节的半成品。此方法：
   /// - crawling → success（恢复正常可更新）
   /// - 非内置且无实际章节的小说删除（半成品残骸）
-  Future<void> recoverInterruptedCrawls() =>
-      _isar.writeTxn(() async {
+  Future<void> recoverInterruptedCrawls() => _isar.writeTxn(() async {
         final all = await _isar.novels.where().findAll();
         for (final novel in all) {
           final chapterCount = await _isar.novelChapters

@@ -82,3 +82,12 @@ local.properties
 # Release APK（体积大，构建产物不入库；仅保留更新日志等文本）
 # ============================================================
 version/**/*.apk
+
+# Serverless 依赖与部署包（源码和 package-lock 入库，安装产物不入库）
+serverless/node_modules/
+serverless/*.zip
+
+# Isar native test runtime / temporary databases
+love_space/isar.dll
+love_space/*.isar
+love_space/*.isar-lck

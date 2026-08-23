@@ -322,8 +322,8 @@ class MusicPlayerController extends Notifier<MusicPlayerState> {
   /// 循环切换播放模式（顺序 -> 随机 -> 单曲 -> 顺序）
   void togglePlayMode() {
     state = state.copyWith(
-      playMode: PlayMode
-          .values[(state.playMode.index + 1) % PlayMode.values.length],
+      playMode:
+          PlayMode.values[(state.playMode.index + 1) % PlayMode.values.length],
     );
   }
 
@@ -387,8 +387,7 @@ class MusicPlayerController extends Notifier<MusicPlayerState> {
   /// 一首播完自动切下一首；单曲循环模式重播当前；失败已被 selectSong 内部兜底
   Future<void> _onTrackCompleted() async {
     try {
-      if (state.playMode == PlayMode.repeatOne &&
-          state.currentIndex >= 0) {
+      if (state.playMode == PlayMode.repeatOne && state.currentIndex >= 0) {
         // 单曲循环：seek 回开头并继续播放；seek 失败（文件被删等）回退切下一首
         try {
           await _backend.seek(Duration.zero);

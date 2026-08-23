@@ -33,6 +33,7 @@ TetrisBoard emptyBoard() => List.generate(20, (_) => List.filled(10, null));
 
 /// 列数
 const kTetrisCols = 10;
+
 /// 行数（可见）
 const kTetrisRows = 20;
 
@@ -76,33 +77,129 @@ List<Cell> cellsOf(TetrominoType type, int rotation) {
 // 由标准 SRS 表（y-up）转换：dr = -y。JLSTZ 与 I 各 8 组。
 
 const kKicksJlStz = <(int, int), List<({int dc, int dr})>>{
-  (0, 1): [(dc: 0, dr: 0), (dc: -1, dr: 0), (dc: -1, dr: -1), (dc: 0, dr: 2), (dc: -1, dr: 2)],
-  (1, 0): [(dc: 0, dr: 0), (dc: 1, dr: 0), (dc: 1, dr: 1), (dc: 0, dr: -2), (dc: 1, dr: -2)],
-  (1, 2): [(dc: 0, dr: 0), (dc: 1, dr: 0), (dc: 1, dr: 1), (dc: 0, dr: -2), (dc: 1, dr: -2)],
-  (2, 1): [(dc: 0, dr: 0), (dc: -1, dr: 0), (dc: -1, dr: -1), (dc: 0, dr: 2), (dc: -1, dr: 2)],
-  (2, 3): [(dc: 0, dr: 0), (dc: 1, dr: 0), (dc: 1, dr: -1), (dc: 0, dr: 2), (dc: 1, dr: 2)],
-  (3, 2): [(dc: 0, dr: 0), (dc: -1, dr: 0), (dc: -1, dr: 1), (dc: 0, dr: -2), (dc: -1, dr: -2)],
-  (3, 0): [(dc: 0, dr: 0), (dc: -1, dr: 0), (dc: -1, dr: 1), (dc: 0, dr: -2), (dc: -1, dr: -2)],
-  (0, 3): [(dc: 0, dr: 0), (dc: 1, dr: 0), (dc: 1, dr: -1), (dc: 0, dr: 2), (dc: 1, dr: 2)],
+  (0, 1): [
+    (dc: 0, dr: 0),
+    (dc: -1, dr: 0),
+    (dc: -1, dr: -1),
+    (dc: 0, dr: 2),
+    (dc: -1, dr: 2)
+  ],
+  (1, 0): [
+    (dc: 0, dr: 0),
+    (dc: 1, dr: 0),
+    (dc: 1, dr: 1),
+    (dc: 0, dr: -2),
+    (dc: 1, dr: -2)
+  ],
+  (1, 2): [
+    (dc: 0, dr: 0),
+    (dc: 1, dr: 0),
+    (dc: 1, dr: 1),
+    (dc: 0, dr: -2),
+    (dc: 1, dr: -2)
+  ],
+  (2, 1): [
+    (dc: 0, dr: 0),
+    (dc: -1, dr: 0),
+    (dc: -1, dr: -1),
+    (dc: 0, dr: 2),
+    (dc: -1, dr: 2)
+  ],
+  (2, 3): [
+    (dc: 0, dr: 0),
+    (dc: 1, dr: 0),
+    (dc: 1, dr: -1),
+    (dc: 0, dr: 2),
+    (dc: 1, dr: 2)
+  ],
+  (3, 2): [
+    (dc: 0, dr: 0),
+    (dc: -1, dr: 0),
+    (dc: -1, dr: 1),
+    (dc: 0, dr: -2),
+    (dc: -1, dr: -2)
+  ],
+  (3, 0): [
+    (dc: 0, dr: 0),
+    (dc: -1, dr: 0),
+    (dc: -1, dr: 1),
+    (dc: 0, dr: -2),
+    (dc: -1, dr: -2)
+  ],
+  (0, 3): [
+    (dc: 0, dr: 0),
+    (dc: 1, dr: 0),
+    (dc: 1, dr: -1),
+    (dc: 0, dr: 2),
+    (dc: 1, dr: 2)
+  ],
 };
 
 const kKicksI = <(int, int), List<({int dc, int dr})>>{
-  (0, 1): [(dc: 0, dr: 0), (dc: -2, dr: 0), (dc: 1, dr: 0), (dc: -2, dr: 1), (dc: 1, dr: -2)],
-  (1, 0): [(dc: 0, dr: 0), (dc: 2, dr: 0), (dc: -1, dr: 0), (dc: 2, dr: -1), (dc: -1, dr: 2)],
-  (1, 2): [(dc: 0, dr: 0), (dc: -1, dr: 0), (dc: 2, dr: 0), (dc: -1, dr: -2), (dc: 2, dr: 1)],
-  (2, 1): [(dc: 0, dr: 0), (dc: 1, dr: 0), (dc: -2, dr: 0), (dc: 1, dr: 2), (dc: -2, dr: -1)],
-  (2, 3): [(dc: 0, dr: 0), (dc: 2, dr: 0), (dc: -1, dr: 0), (dc: 2, dr: -1), (dc: -1, dr: 2)],
-  (3, 2): [(dc: 0, dr: 0), (dc: -2, dr: 0), (dc: 1, dr: 0), (dc: -2, dr: 1), (dc: 1, dr: -2)],
-  (3, 0): [(dc: 0, dr: 0), (dc: 1, dr: 0), (dc: -2, dr: 0), (dc: 1, dr: 2), (dc: -2, dr: -1)],
-  (0, 3): [(dc: 0, dr: 0), (dc: -1, dr: 0), (dc: 2, dr: 0), (dc: -1, dr: -2), (dc: 2, dr: 1)],
+  (0, 1): [
+    (dc: 0, dr: 0),
+    (dc: -2, dr: 0),
+    (dc: 1, dr: 0),
+    (dc: -2, dr: 1),
+    (dc: 1, dr: -2)
+  ],
+  (1, 0): [
+    (dc: 0, dr: 0),
+    (dc: 2, dr: 0),
+    (dc: -1, dr: 0),
+    (dc: 2, dr: -1),
+    (dc: -1, dr: 2)
+  ],
+  (1, 2): [
+    (dc: 0, dr: 0),
+    (dc: -1, dr: 0),
+    (dc: 2, dr: 0),
+    (dc: -1, dr: -2),
+    (dc: 2, dr: 1)
+  ],
+  (2, 1): [
+    (dc: 0, dr: 0),
+    (dc: 1, dr: 0),
+    (dc: -2, dr: 0),
+    (dc: 1, dr: 2),
+    (dc: -2, dr: -1)
+  ],
+  (2, 3): [
+    (dc: 0, dr: 0),
+    (dc: 2, dr: 0),
+    (dc: -1, dr: 0),
+    (dc: 2, dr: -1),
+    (dc: -1, dr: 2)
+  ],
+  (3, 2): [
+    (dc: 0, dr: 0),
+    (dc: -2, dr: 0),
+    (dc: 1, dr: 0),
+    (dc: -2, dr: 1),
+    (dc: 1, dr: -2)
+  ],
+  (3, 0): [
+    (dc: 0, dr: 0),
+    (dc: 1, dr: 0),
+    (dc: -2, dr: 0),
+    (dc: 1, dr: 2),
+    (dc: -2, dr: -1)
+  ],
+  (0, 3): [
+    (dc: 0, dr: 0),
+    (dc: -1, dr: 0),
+    (dc: 2, dr: 0),
+    (dc: -1, dr: -2),
+    (dc: 2, dr: 1)
+  ],
 };
 
 /// 当前方块
 class Piece {
   final TetrominoType type;
   final int rotation; // 0..3
-  final int row;      // origin 行（box 左上）
-  final int col;      // origin 列
+  final int row; // origin 行（box 左上）
+  final int col; // origin 列
 
   const Piece({
     required this.type,
@@ -179,7 +276,8 @@ int clearLines(TetrisBoard board) {
 }
 
 /// Block out 检测（spawn 位被占 -> 游戏结束）
-bool isBlockOut(TetrisBoard board, Piece piece) => !isValidPosition(board, piece);
+bool isBlockOut(TetrisBoard board, Piece piece) =>
+    !isValidPosition(board, piece);
 
 /// Ghost origin 行（方块最大合法下落行）
 int ghostRow(TetrisBoard board, Piece? piece) {
@@ -220,5 +318,5 @@ Duration gravityInterval(int level) {
 ///
 /// SRS 居中：I（4 宽 box）col=3 占 cols 3-6；O（2 宽 box）col=4 占 cols 4-5；
 /// 其余 3 宽 box col=3 占 cols 3-5。原 `I ? 3 : 3` 是空操作三元，O 实际偏左 1 格。
-Piece spawnPiece(TetrominoType type) =>
-    Piece(type: type, rotation: 0, row: 0, col: type == TetrominoType.O ? 4 : 3);
+Piece spawnPiece(TetrominoType type) => Piece(
+    type: type, rotation: 0, row: 0, col: type == TetrominoType.O ? 4 : 3);

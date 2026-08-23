@@ -101,9 +101,8 @@ class ChapterListSheet extends ConsumerWidget {
                             color: isCurrent
                                 ? AppColors.accentRose
                                 : AppColors.textPrimary,
-                            fontWeight: isCurrent
-                                ? FontWeight.w700
-                                : FontWeight.w400,
+                            fontWeight:
+                                isCurrent ? FontWeight.w700 : FontWeight.w400,
                           ),
                         ),
                         tileColor: isCurrent

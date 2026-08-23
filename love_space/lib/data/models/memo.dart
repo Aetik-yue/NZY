@@ -32,12 +32,18 @@ class Memo {
   DateTime? updatedAt;
 
   /// 完成状态（待办场景使用，默认 false）
-  late bool done;
+  bool done = false;
 
   /// 截止日期（可选，待办场景使用；null = 无截止）
   DateTime? dueDate;
 
   /// 优先级（待办场景使用，默认 none）
   @Enumerated(EnumType.name)
-  late TodoPriority priority;
+  TodoPriority priority = TodoPriority.none;
+
+  /// 云端文档 ID（双人同步；null = 未同步）
+  String? cloudId;
+
+  /// 创建者标识（云端用户 ID；本机创建为 null，上传时补充）
+  String? ownerId;
 }

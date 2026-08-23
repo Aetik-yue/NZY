@@ -32,8 +32,7 @@ class PomodoroSettingsSheet extends ConsumerStatefulWidget {
       _PomodoroSettingsSheetState();
 }
 
-class _PomodoroSettingsSheetState
-    extends ConsumerState<PomodoroSettingsSheet> {
+class _PomodoroSettingsSheetState extends ConsumerState<PomodoroSettingsSheet> {
   // 表单当前值（settings 未加载时以默认值兜底）
   int _focusMin = 25;
   int _shortBreakMin = 5;
@@ -197,8 +196,7 @@ class _PomodoroSettingsSheetState
                     backgroundColor: AppColors.accentRose,
                     disabledBackgroundColor: AppColors.accentPinkSoft,
                     shape: RoundedRectangleBorder(
-                      borderRadius:
-                          BorderRadius.circular(AppColors.radiusSm),
+                      borderRadius: BorderRadius.circular(AppColors.radiusSm),
                     ),
                   ),
                   child: _saving
@@ -249,8 +247,7 @@ class _StepperField extends StatelessWidget {
       child: Row(
         children: [
           Expanded(
-            child:
-                Text('$label（$min-$max $unit）', style: AppTextStyles.body),
+            child: Text('$label（$min-$max $unit）', style: AppTextStyles.body),
           ),
           _stepButton(
             Icons.remove_rounded,
@@ -260,8 +257,8 @@ class _StepperField extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: Text('$value $unit',
-                style: AppTextStyles.body
-                    .copyWith(fontWeight: FontWeight.w600)),
+                style:
+                    AppTextStyles.body.copyWith(fontWeight: FontWeight.w600)),
           ),
           _stepButton(
             Icons.add_rounded,

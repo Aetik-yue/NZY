@@ -23,8 +23,7 @@ const int _coverBatchSize = 8;
 /// 其它任何平台异常捕获后返回空列表并记录日志，让 UI 走带「重新扫描」按钮的空态，
 /// 而非卡死在无重试入口的 error 死胡同。纯 Dart 的 MusicSong 映射段在 try 外，
 /// 若映射层有编程错误应正常抛出，避免被静默吞成空库掩盖。
-final musicLibraryProvider =
-    FutureProvider<List<MusicSong>>((ref) async {
+final musicLibraryProvider = FutureProvider<List<MusicSong>>((ref) async {
   final audioQuery = OnAudioQuery();
 
   // 平台调用段（权限 / querySongs / 封面拉取），整体兜底

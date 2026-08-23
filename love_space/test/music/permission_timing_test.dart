@@ -3,7 +3,6 @@
 //
 // 通过读计数 spy override musicLibraryProvider：provider 每执行一次扫描则计数 +1。
 // 若启动或 profile 音乐卡误 watch musicLibraryProvider，计数会提前 > 0，测试失败。
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -67,8 +66,8 @@ List<Override> _appOverrides(void Function() onLibraryScan) => [
           ..partner1Name = '小桃'
           ..partner2Name = '阿树'
           ..togetherSince = DateUtilsX.today().subtract(
-                const Duration(days: 365),
-              )),
+            const Duration(days: 365),
+          )),
       ),
       // 书架小说
       novelsProvider.overrideWith((ref) => Stream.value([])),
@@ -128,8 +127,8 @@ void main() {
     expect(libraryCalls, 0, reason: '打开「我的」tab 不应触发音乐扫描/权限');
 
     // 3. 打开播放页：initState 的 listenManual 触发扫描 + 注入歌单
-    // profile 音乐卡右侧播放按钮 -> MusicPlayerPage.show
-    await tester.tap(find.byIcon(Icons.play_arrow));
+    // profile「回忆唱片」整卡可点击 -> MusicPlayerPage.show
+    await tester.tap(find.text('回忆唱片'));
     await tester.pump(); // 构建 BottomSheet，initState 执行 -> provider 执行
     await tester.pump(const Duration(milliseconds: 400)); // sheet 动画 + 微任务
     await tester.pump(const Duration(milliseconds: 100)); // 额外缓冲

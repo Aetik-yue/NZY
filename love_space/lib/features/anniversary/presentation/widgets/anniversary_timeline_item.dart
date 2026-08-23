@@ -35,15 +35,19 @@ class AnniversaryTimelineItem extends StatelessWidget {
 
   /// 左轨道宽度（圆点与竖线在其上居中）
   static const double _trackWidth = 44;
+
   /// 轨道与右侧内容的间距
   static const double _spacer = 12;
+
   /// 圆点直径
   static const double _dotSize = 16;
+
   /// 竖线宽度
   static const double _lineWidth = 2;
 
   /// 节点淡入区间起点：i/n * 0.7
   double get _fadeStart => (index / total) * 0.7;
+
   /// 节点淡入区间终点：(i+1)/n * 0.7 + 0.3（末节点恰为 1.0）
   double get _fadeEnd => ((index + 1) / total) * 0.7 + 0.3;
 
@@ -57,7 +61,8 @@ class AnniversaryTimelineItem extends StatelessWidget {
       children: [
         // 右侧内容（左偏移 = 轨道宽 + 间距 = 56）
         Padding(
-          padding: const EdgeInsets.only(left: _trackWidth + _spacer, bottom: 24),
+          padding:
+              const EdgeInsets.only(left: _trackWidth + _spacer, bottom: 24),
           child: Opacity(
             opacity: opacity,
             child: Transform.translate(

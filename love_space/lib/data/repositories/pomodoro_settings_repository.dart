@@ -28,10 +28,9 @@ class PomodoroSettingsRepository {
   }
 
   /// 监听单例设置变化（实时流，行不存在时以默认值兜底）
-  Stream<PomodoroSettings> watch() =>
-      _isar.pomodoroSettings
-          .watchObject(0, fireImmediately: true)
-          .map((s) => s ?? _defaults());
+  Stream<PomodoroSettings> watch() => _isar.pomodoroSettings
+      .watchObject(0, fireImmediately: true)
+      .map((s) => s ?? _defaults());
 
   /// 保存设置（强制 id=0，保证幂等写入单例行）
   Future<void> save(PomodoroSettings settings) async {

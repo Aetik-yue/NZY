@@ -13,8 +13,7 @@ class TetrisPage extends StatefulWidget {
   State<TetrisPage> createState() => _TetrisPageState();
 }
 
-class _TetrisPageState extends State<TetrisPage>
-    with TickerProviderStateMixin {
+class _TetrisPageState extends State<TetrisPage> with TickerProviderStateMixin {
   late final Ticker _ticker;
   Duration _lastTick = Duration.zero;
 
@@ -122,7 +121,8 @@ class _TetrisPageState extends State<TetrisPage>
       }
     }
     // lock delay：复算贴地状态用最新 _current（修复 #7）
-    _onGround = !isValidPosition(_board, _current!.copyWith(row: _current!.row + 1));
+    _onGround =
+        !isValidPosition(_board, _current!.copyWith(row: _current!.row + 1));
     if (_onGround) {
       _lockAccumMs += dt * 16.6667;
       if (_lockAccumMs >= 500) {
@@ -318,7 +318,12 @@ class _TetrisPageState extends State<TetrisPage>
       status: _status,
       onHorizontalDrag: _onHorizontalDrag,
       onVerticalDrag: _onVerticalDrag,
+      onLeft: () => _move(-1),
+      onRight: () => _move(1),
       onRotate: () => _rotate(1),
+      onSoftDrop: _softDrop,
+      onHardDrop: _hardDrop,
+      enabled: _status == TetrisStatus.playing,
       onStart: _start,
       onPause: _pause,
       onRestart: () {
@@ -326,7 +331,6 @@ class _TetrisPageState extends State<TetrisPage>
         _start(); // 修复 #12：重开即开始，无需二次点击
       },
       onHoldSwap: _holdSwap,
-      onHardDrop: _hardDrop,
       onPop: () => _ticker.stop(),
     );
   }

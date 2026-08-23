@@ -59,8 +59,7 @@ class PomodoroTimerState {
         status: status ?? this.status,
         endTime: endTime,
         remainingSec: remainingSec ?? this.remainingSec,
-        completedFocusCount:
-            completedFocusCount ?? this.completedFocusCount,
+        completedFocusCount: completedFocusCount ?? this.completedFocusCount,
         currentTag: currentTag ?? this.currentTag,
       );
 }
@@ -151,12 +150,10 @@ class PomodoroTimerController extends Notifier<PomodoroTimerState> {
   /// break 阶段放弃不写记录。状态回到 idle，endTime 清空。
   Future<void> abort() async {
     _timer?.cancel();
-    if (state.phase == FocusPhase.focus &&
-        state.status != TimerStatus.idle) {
+    if (state.phase == FocusPhase.focus && state.status != TimerStatus.idle) {
       // 从时钟计算实际剩余（tick 可能尚未触发），保证 actualMin 准确
-      final remaining =
-          state.endTime?.difference(_currentTime).inSeconds ??
-              state.remainingSec;
+      final remaining = state.endTime?.difference(_currentTime).inSeconds ??
+          state.remainingSec;
       state = state.copyWith(
         remainingSec: remaining > 0 ? remaining : 0,
       );
@@ -187,9 +184,8 @@ class PomodoroTimerController extends Notifier<PomodoroTimerState> {
       final newCount = state.completedFocusCount + 1;
       final interval = settings?.longBreakInterval ?? 4;
       final isLongBreak = newCount % interval == 0;
-      final nextPhase = isLongBreak
-          ? FocusPhase.longBreak
-          : FocusPhase.shortBreak;
+      final nextPhase =
+          isLongBreak ? FocusPhase.longBreak : FocusPhase.shortBreak;
       final breakMin = isLongBreak
           ? (settings?.longBreakMin ?? 15)
           : (settings?.shortBreakMin ?? 5);
@@ -266,8 +262,7 @@ class PomodoroTimerController extends Notifier<PomodoroTimerState> {
   /// - 已超时（remaining<=0）：触发阶段完成
   /// - 未超时：更新 remainingSec 展示值
   Future<void> onAppResumed() async {
-    if (state.status == TimerStatus.running &&
-        state.endTime != null) {
+    if (state.status == TimerStatus.running && state.endTime != null) {
       final remaining = state.endTime!.difference(_currentTime).inSeconds;
       if (remaining <= 0) {
         await _onPhaseComplete();

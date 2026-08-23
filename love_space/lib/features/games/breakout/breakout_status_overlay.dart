@@ -64,8 +64,8 @@ class BreakoutStatusOverlay extends StatelessWidget {
                     break;
                 }
               },
-              style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.accentRose),
+              style:
+                  FilledButton.styleFrom(backgroundColor: AppColors.accentRose),
               child: Text(action,
                   style: AppTextStyles.body.copyWith(color: Colors.white)),
             ),

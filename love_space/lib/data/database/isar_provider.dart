@@ -13,6 +13,7 @@ import '../models/novel_source.dart';
 import '../models/crawl_config.dart';
 import '../models/crawl_log.dart';
 import '../models/memo.dart';
+import '../models/secret_message.dart';
 import '../models/pomodoro_settings.dart';
 import '../models/focus_session.dart';
 
@@ -39,6 +40,7 @@ const isarSchemas = [
   CrawlConfigSchema,
   CrawlLogSchema,
   MemoSchema,
+  SecretMessageSchema,
   PomodoroSettingsSchema,
   FocusSessionSchema,
 ];

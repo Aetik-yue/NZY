@@ -231,11 +231,9 @@ void main() {
         await ctrl.onAppResumed();
         final state = container.read(pomodoroTimerProvider);
         if (i < 4) {
-          expect(state.phase, FocusPhase.shortBreak,
-              reason: '第 $i 次应为短休');
+          expect(state.phase, FocusPhase.shortBreak, reason: '第 $i 次应为短休');
         } else {
-          expect(state.phase, FocusPhase.longBreak,
-              reason: '第 $i 次应为长休');
+          expect(state.phase, FocusPhase.longBreak, reason: '第 $i 次应为长休');
         }
       }
     });

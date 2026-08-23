@@ -9,6 +9,7 @@ import '../../games/tetris/tetris_page.dart';
 import '../../home/presentation/checkin_history_page.dart';
 import '../../home/presentation/timeline_all_page.dart';
 import '../../memo/presentation/memo_page.dart';
+import '../../secrets/presentation/secrets_page.dart';
 import '../../tools/random_number_page.dart';
 import '../../tools/stopwatch_page.dart';
 import 'settings_page.dart';
@@ -60,6 +61,15 @@ class AllFeaturesPage extends ConsumerWidget {
             color: AppColors.accentPeach,
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const TimelineAllPage()),
+            ),
+          ),
+          _FeatureEntry(
+            icon: Icons.forum_rounded,
+            title: '悄悄话',
+            subtitle: '只属于你们的私密留言',
+            color: AppColors.accentMauve,
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const SecretsPage()),
             ),
           ),
         ],
@@ -224,8 +234,7 @@ class _FeatureTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final isPlaceholder = entry.onTap == null;
     return ListTile(
-      onTap: entry.onTap ??
-          () => AppSnackbar.show(context, '即将上线 ✨'),
+      onTap: entry.onTap ?? () => AppSnackbar.show(context, '即将上线 ✨'),
       leading: Container(
         width: 40,
         height: 40,
@@ -242,8 +251,8 @@ class _FeatureTile extends StatelessWidget {
       subtitle: Text(entry.subtitle, style: AppTextStyles.label),
       trailing: isPlaceholder
           ? Text('即将上线',
-              style: AppTextStyles.label
-                  .copyWith(color: AppColors.textTertiary))
+              style:
+                  AppTextStyles.label.copyWith(color: AppColors.textTertiary))
           : const Icon(Icons.chevron_right_rounded,
               size: 20, color: AppColors.textTertiary),
     );

@@ -27,7 +27,11 @@ class Brick {
   final int col;
   final BrickKind kind;
   bool alive;
-  Brick({required this.row, required this.col, required this.kind, this.alive = true});
+  Brick(
+      {required this.row,
+      required this.col,
+      required this.kind,
+      this.alive = true});
 }
 
 /// 球（逻辑坐标 0..1，r 为半径）
@@ -35,14 +39,20 @@ class Ball {
   double x, y;
   double vx, vy;
   final double r;
-  Ball({required this.x, required this.y, required this.vx, required this.vy, required this.r});
+  Ball(
+      {required this.x,
+      required this.y,
+      required this.vx,
+      required this.vy,
+      required this.r});
 }
 
-/// 挡板（x 为左边缘，width 为宽）
+/// 挡板（x/y 为左上角逻辑坐标，width 为宽，高固定 [kPaddleHeight]）
 class Paddle {
   double x;
+  double y;
   final double width;
-  Paddle({required this.x, required this.width});
+  Paddle({required this.x, required this.y, required this.width});
 }
 
 /// 游戏状态
@@ -82,10 +92,15 @@ const kBreakoutLevels = <Level>[
 
 /// 关卡砖块顶部偏移（逻辑 y）
 const kBrickTop = 0.12;
+
 /// 砖块高度（逻辑）
 const kBrickHeight = 0.035;
+
 /// 砖块列间距系数（gap = brickH * 0.08）
 const kBrickGapRatio = 0.08;
+
+/// 挡板高度（逻辑）
+const kPaddleHeight = 0.025;
 
 /// 把关卡布局转为 Brick 列表
 List<Brick> buildBricks(Level level) {
@@ -153,5 +168,36 @@ BrickHit? collideBrick(
   return null;
 }
 
+/// 检测球与挡板碰撞（纯函数）
+///
+/// 圆-矩形最近点检测（同 [collideBrick]）：取球心到挡板矩形的最远接触点，
+/// `dx² + (dy*aspectRatio)² ≤ r²` 即命中；反弹方向由球心相对挡板中心的
+/// 方向（|relX|>|relY| -> bounceX，否则 bounceY）判断，规则与 [collideBrick] 一致。
+///
+/// [aspectRatio] 语义同 [collideBrick]：高屏下 y 距离按 h/w 缩放，使碰撞圆
+/// 与视觉正圆（半径 `r*w` 像素）一致。默认 1.0（正方形场地）。
+/// 返回 `(bounceX, bounceY)` 记录，null 表示未命中。
+({bool bounceX, bool bounceY})? collidePaddle(
+  Ball ball,
+  Paddle paddle, {
+  double aspectRatio = 1.0,
+}) {
+  final nearestX = ball.x.clamp(paddle.x, paddle.x + paddle.width);
+  final nearestY = ball.y.clamp(paddle.y, paddle.y + kPaddleHeight);
+  final dx = ball.x - nearestX;
+  // y 距离按高宽比缩放，使碰撞圆与视觉正圆（半径 r*w 像素）一致
+  final dy = (ball.y - nearestY) * aspectRatio;
+  if (dx * dx + dy * dy > ball.r * ball.r) return null;
+  final cx = paddle.x + paddle.width / 2;
+  final cy = paddle.y + kPaddleHeight / 2;
+  final relX = (ball.x - cx) / (paddle.width / 2);
+  // 反弹方向判断同样按像素空间缩放 y，保持与碰撞一致
+  final relY = (ball.y - cy) / (kPaddleHeight / 2) * aspectRatio;
+  if (relX.abs() > relY.abs()) {
+    return (bounceX: true, bounceY: false);
+  }
+  return (bounceX: false, bounceY: true);
+}
+
 /// 关卡是否清除（所有砖块 alive=false）
-bool levelCleared(List<Brick> bricks) => bricks.every((b) => !b.alive);
+bool levelCleared(List<Brick> bricks) => bricks.every((brick) => !brick.alive);

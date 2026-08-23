@@ -1,26 +1,14 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_text_styles.dart';
 import '../../../../data/models/wish.dart';
 import '../../../../data/providers/data_providers.dart';
 import '../../../../shared/widgets/app_snackbar.dart';
+import 'wish_icons.dart';
 
-/// 预定义图标列表
-const _presetIcons = [
-  Icons.flight_rounded,
-  Icons.cake_rounded,
-  Icons.pets_rounded,
-  Icons.star_rounded,
-  Icons.favorite_rounded,
-  Icons.home_rounded,
-  Icons.wb_sunny_rounded,
-  Icons.music_note_rounded,
-  Icons.menu_book_rounded,
-  Icons.photo_camera_rounded,
-  Icons.directions_bike_rounded,
-  Icons.celebration_rounded,
-];
+/// 预定义图标列表（与 wish_icons 共享常量）
+const _presetIcons = kPresetWishIcons;
 
 /// 添加/编辑愿望的底部弹出表单
 ///
@@ -35,7 +23,8 @@ class AddWishSheet extends ConsumerStatefulWidget {
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(AppColors.radiusCard)),
+        borderRadius:
+            BorderRadius.vertical(top: Radius.circular(AppColors.radiusCard)),
       ),
       builder: (_) => AddWishSheet(initial: initial),
     );

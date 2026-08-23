@@ -88,19 +88,17 @@ class _StatsRow extends StatelessWidget {
     return Row(
       children: [
         Expanded(
-            child: _StatCard(
-                '今日时长', '$todayMinutes 分', Icons.timer_outlined)),
+            child: _StatCard('今日时长', '$todayMinutes 分', Icons.timer_outlined)),
         const SizedBox(width: 8),
         Expanded(
-            child: _StatCard(
-                '今日次数', '$todayCount 次', Icons.check_circle_outline)),
+            child:
+                _StatCard('今日次数', '$todayCount 次', Icons.check_circle_outline)),
         const SizedBox(width: 8),
         Expanded(
-            child: _StatCard(
-                '累计专注', '$totalMinutes 分', Icons.local_fire_department_outlined)),
+            child: _StatCard('累计专注', '$totalMinutes 分',
+                Icons.local_fire_department_outlined)),
         const SizedBox(width: 8),
-        Expanded(
-            child: _StatCard('连续天数', '$streak 天', Icons.bolt_outlined)),
+        Expanded(child: _StatCard('连续天数', '$streak 天', Icons.bolt_outlined)),
       ],
     );
   }
@@ -195,8 +193,7 @@ class _SessionTile extends StatelessWidget {
           Text(
             '${session.actualMin} min',
             style: AppTextStyles.bodySmall.copyWith(
-              color:
-                  completed ? AppColors.textPrimary : AppColors.textTertiary,
+              color: completed ? AppColors.textPrimary : AppColors.textTertiary,
             ),
           ),
         ],

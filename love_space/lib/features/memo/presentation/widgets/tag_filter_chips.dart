@@ -28,7 +28,8 @@ class TagFilterChips extends ConsumerWidget {
             return _Chip(
               label: '全部',
               isSelected: selected == null,
-              onTap: () => ref.read(memoTagFilterProvider.notifier).state = null,
+              onTap: () =>
+                  ref.read(memoTagFilterProvider.notifier).state = null,
             );
           }
           final tag = tags[index - 1];
@@ -65,9 +66,7 @@ class _Chip extends StatelessWidget {
         decoration: BoxDecoration(
           color: isSelected ? AppColors.accentRose : AppColors.bgCard,
           borderRadius: BorderRadius.circular(AppColors.radiusPill),
-          border: isSelected
-              ? null
-              : Border.all(color: AppColors.borderSoft),
+          border: isSelected ? null : Border.all(color: AppColors.borderSoft),
         ),
         child: Text(
           label,

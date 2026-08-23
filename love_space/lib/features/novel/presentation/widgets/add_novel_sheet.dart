@@ -165,17 +165,17 @@ class _AddNovelSheetState extends ConsumerState<AddNovelSheet> {
 
     try {
       await ref.read(crawlRepositoryProvider).addNovel(
-            url,
-            onProgress: (message, current, total) {
-              if (!mounted) return;
-              ref.read(crawlStatusProvider.notifier).state = CrawlStatus(
-                state: 'fetching',
-                message: message,
-                current: current,
-                total: total,
-              );
-            },
+        url,
+        onProgress: (message, current, total) {
+          if (!mounted) return;
+          ref.read(crawlStatusProvider.notifier).state = CrawlStatus(
+            state: 'fetching',
+            message: message,
+            current: current,
+            total: total,
           );
+        },
+      );
 
       if (!mounted) return;
       ref.read(crawlStatusProvider.notifier).state = const CrawlStatus(
@@ -422,8 +422,7 @@ class _AddNovelSheetState extends ConsumerState<AddNovelSheet> {
                           _browseCategory();
                         },
                         child: Container(
-                          padding:
-                              const EdgeInsets.symmetric(horizontal: 14),
+                          padding: const EdgeInsets.symmetric(horizontal: 14),
                           alignment: Alignment.center,
                           decoration: BoxDecoration(
                             color: isActive
@@ -441,9 +440,8 @@ class _AddNovelSheetState extends ConsumerState<AddNovelSheet> {
                               color: isActive
                                   ? Colors.white
                                   : AppColors.textSecondary,
-                              fontWeight: isActive
-                                  ? FontWeight.w600
-                                  : FontWeight.w400,
+                              fontWeight:
+                                  isActive ? FontWeight.w600 : FontWeight.w400,
                             ),
                           ),
                         ),
@@ -502,16 +500,14 @@ class _AddNovelSheetState extends ConsumerState<AddNovelSheet> {
             children: [
               Icon(icon,
                   size: 16,
-                  color: isActive
-                      ? AppColors.accentRose
-                      : AppColors.textTertiary),
+                  color:
+                      isActive ? AppColors.accentRose : AppColors.textTertiary),
               const SizedBox(width: 4),
               Text(
                 label,
                 style: AppTextStyles.caption.copyWith(
-                  color: isActive
-                      ? AppColors.accentRose
-                      : AppColors.textTertiary,
+                  color:
+                      isActive ? AppColors.accentRose : AppColors.textTertiary,
                   fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
                 ),
               ),
@@ -526,7 +522,8 @@ class _AddNovelSheetState extends ConsumerState<AddNovelSheet> {
   Widget _buildCategoryContent() {
     if (_isBrowsing && _categoryBooks.isEmpty) {
       return const Center(
-        child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.accentRose),
+        child: CircularProgressIndicator(
+            strokeWidth: 2, color: AppColors.accentRose),
       );
     }
 
@@ -626,8 +623,7 @@ class _AddNovelSheetState extends ConsumerState<AddNovelSheet> {
               const SizedBox(height: 12),
               Text('输入关键词搜索小说', style: AppTextStyles.caption),
               const SizedBox(height: 4),
-              Text('数据来源：笔趣阁系列站点',
-                  style: AppTextStyles.label),
+              Text('数据来源：笔趣阁系列站点', style: AppTextStyles.label),
             ],
           ),
         ),

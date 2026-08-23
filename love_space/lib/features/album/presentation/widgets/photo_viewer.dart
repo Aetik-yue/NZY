@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../data/models/album_photo.dart';
 import '../../../../data/providers/data_providers.dart';
+import '../../../../data/sync/sync_providers.dart';
 import '../../../../shared/widgets/app_snackbar.dart';
 import '../../../../shared/widgets/confirm_dialog.dart';
 import 'add_photo_sheet.dart';
@@ -18,6 +19,7 @@ import 'add_photo_sheet.dart';
 class PhotoViewer extends ConsumerStatefulWidget {
   final List<AlbumPhoto> photos;
   final int initialIndex;
+
   /// 删除回调（通知父组件更新状态）
   final void Function(AlbumPhoto photo)? onDelete;
 
@@ -77,7 +79,8 @@ class _PhotoViewerState extends ConsumerState<PhotoViewer> {
     // 复制列表，避免修改父组件的不可变列表
     _photos = List.from(widget.photos);
     // 空列表防护：clamp(0, -1) 会抛 ArgumentError
-    _currentIndex = _photos.isEmpty ? 0 : widget.initialIndex.clamp(0, _photos.length - 1);
+    _currentIndex =
+        _photos.isEmpty ? 0 : widget.initialIndex.clamp(0, _photos.length - 1);
     _pageController = PageController(initialPage: _currentIndex);
   }
 
@@ -119,9 +122,24 @@ class _PhotoViewerState extends ConsumerState<PhotoViewer> {
     // 预先捕获仓库实例：撤销回调可能在查看器关闭后才执行，
     // 直接使用 State 的 ref 会因组件已销毁而报错。
     final repo = ref.read(albumRepositoryProvider);
+    final syncEngine = ref.read(syncEngineProvider);
+    final photoSyncService = ref.read(photoSyncServiceProvider);
+    final cloudId = photo.cloudId;
+    final cloudPath = photo.cloudPath;
 
     try {
       await repo.delete(photo.id);
+      // 同步删除云端：先删云文件再删元数据（防对方侧残留文件）
+      if (cloudPath != null) {
+        try {
+          await photoSyncService.deleteRemoteFile(cloudPath);
+        } catch (e) {
+          debugPrint('[PhotoViewer] 删除云文件失败: $e');
+        }
+      }
+      if (cloudId != null) {
+        syncEngine.markDeleted(cloudId);
+      }
     } catch (e) {
       if (mounted) AppSnackbar.show(context, '删除失败，请重试');
       return;
@@ -131,12 +149,18 @@ class _PhotoViewerState extends ConsumerState<PhotoViewer> {
     widget.onDelete?.call(photo);
 
     if (!mounted) return;
-    // 删除仅移除数据库记录；图片文件位于应用缓存（image_picker 写入，
-    // 由系统定期清理），撤销时恢复记录即可还原照片。
+    // 删除仅移除数据库记录；图片文件保存在应用文档目录，撤销时恢复记录
+    // 即可还原照片。后续可在明确不撤销后异步清理孤立文件。
     // 注：撤销只恢复数据库（相册网格经流刷新可见），查看器本地列表
     // 不恢复——删除动作本身已从查看器移除该项，属预期行为。
     AppSnackbar.showUndo(context, '已删除照片', () async {
+      if (cloudId != null) {
+        syncEngine.restoreDeleted(cloudId);
+      }
+      // 云文件可能已删除，清空对象名后由照片同步服务重新上传。
+      if (cloudPath != null) photo.cloudPath = null;
       await repo.add(photo);
+      await photoSyncService.syncPhotos();
     });
 
     // 更新本地列表
@@ -230,13 +254,13 @@ class _PhotoViewerState extends ConsumerState<PhotoViewer> {
                       ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.edit_outlined,
-                          color: Colors.white),
+                      icon:
+                          const Icon(Icons.edit_outlined, color: Colors.white),
                       onPressed: _editCurrent,
                     ),
                     IconButton(
-                      icon: const Icon(Icons.delete_outline,
-                          color: Colors.white),
+                      icon:
+                          const Icon(Icons.delete_outline, color: Colors.white),
                       onPressed: _deleteCurrent,
                     ),
                   ],
@@ -278,6 +302,5 @@ class _PhotoViewerState extends ConsumerState<PhotoViewer> {
     );
   }
 
-  String _formatPhotoDate(DateTime d) =>
-      '${d.year}年${d.month}月${d.day}日';
+  String _formatPhotoDate(DateTime d) => '${d.year}年${d.month}月${d.day}日';
 }

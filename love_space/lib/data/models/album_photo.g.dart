@@ -23,20 +23,40 @@ const AlbumPhotoSchema = CollectionSchema(
       type: IsarType.string,
       enumMap: _AlbumPhotocategoryEnumValueMap,
     ),
-    r'date': PropertySchema(
+    r'cloudId': PropertySchema(
       id: 1,
+      name: r'cloudId',
+      type: IsarType.string,
+    ),
+    r'cloudPath': PropertySchema(
+      id: 2,
+      name: r'cloudPath',
+      type: IsarType.string,
+    ),
+    r'date': PropertySchema(
+      id: 3,
       name: r'date',
       type: IsarType.dateTime,
     ),
     r'filePath': PropertySchema(
-      id: 2,
+      id: 4,
       name: r'filePath',
       type: IsarType.string,
     ),
     r'gradientIndex': PropertySchema(
-      id: 3,
+      id: 5,
       name: r'gradientIndex',
       type: IsarType.long,
+    ),
+    r'ownerId': PropertySchema(
+      id: 6,
+      name: r'ownerId',
+      type: IsarType.string,
+    ),
+    r'updatedAt': PropertySchema(
+      id: 7,
+      name: r'updatedAt',
+      type: IsarType.dateTime,
     )
   },
   estimateSize: _albumPhotoEstimateSize,
@@ -61,7 +81,25 @@ int _albumPhotoEstimateSize(
   var bytesCount = offsets.last;
   bytesCount += 3 + object.category.name.length * 3;
   {
+    final value = object.cloudId;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
+  {
+    final value = object.cloudPath;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
+  {
     final value = object.filePath;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
+  {
+    final value = object.ownerId;
     if (value != null) {
       bytesCount += 3 + value.length * 3;
     }
@@ -76,9 +114,13 @@ void _albumPhotoSerialize(
   Map<Type, List<int>> allOffsets,
 ) {
   writer.writeString(offsets[0], object.category.name);
-  writer.writeDateTime(offsets[1], object.date);
-  writer.writeString(offsets[2], object.filePath);
-  writer.writeLong(offsets[3], object.gradientIndex);
+  writer.writeString(offsets[1], object.cloudId);
+  writer.writeString(offsets[2], object.cloudPath);
+  writer.writeDateTime(offsets[3], object.date);
+  writer.writeString(offsets[4], object.filePath);
+  writer.writeLong(offsets[5], object.gradientIndex);
+  writer.writeString(offsets[6], object.ownerId);
+  writer.writeDateTime(offsets[7], object.updatedAt);
 }
 
 AlbumPhoto _albumPhotoDeserialize(
@@ -91,10 +133,14 @@ AlbumPhoto _albumPhotoDeserialize(
   object.category =
       _AlbumPhotocategoryValueEnumMap[reader.readStringOrNull(offsets[0])] ??
           PhotoCategory.travel;
-  object.date = reader.readDateTime(offsets[1]);
-  object.filePath = reader.readStringOrNull(offsets[2]);
-  object.gradientIndex = reader.readLong(offsets[3]);
+  object.cloudId = reader.readStringOrNull(offsets[1]);
+  object.cloudPath = reader.readStringOrNull(offsets[2]);
+  object.date = reader.readDateTime(offsets[3]);
+  object.filePath = reader.readStringOrNull(offsets[4]);
+  object.gradientIndex = reader.readLong(offsets[5]);
   object.id = id;
+  object.ownerId = reader.readStringOrNull(offsets[6]);
+  object.updatedAt = reader.readDateTimeOrNull(offsets[7]);
   return object;
 }
 
@@ -110,11 +156,19 @@ P _albumPhotoDeserializeProp<P>(
               reader.readStringOrNull(offset)] ??
           PhotoCategory.travel) as P;
     case 1:
-      return (reader.readDateTime(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 2:
       return (reader.readStringOrNull(offset)) as P;
     case 3:
+      return (reader.readDateTime(offset)) as P;
+    case 4:
+      return (reader.readStringOrNull(offset)) as P;
+    case 5:
       return (reader.readLong(offset)) as P;
+    case 6:
+      return (reader.readStringOrNull(offset)) as P;
+    case 7:
+      return (reader.readDateTimeOrNull(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
   }
@@ -351,6 +405,307 @@ extension AlbumPhotoQueryFilter
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.greaterThan(
         property: r'category',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<AlbumPhoto, AlbumPhoto, QAfterFilterCondition> cloudIdIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'cloudId',
+      ));
+    });
+  }
+
+  QueryBuilder<AlbumPhoto, AlbumPhoto, QAfterFilterCondition>
+      cloudIdIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'cloudId',
+      ));
+    });
+  }
+
+  QueryBuilder<AlbumPhoto, AlbumPhoto, QAfterFilterCondition> cloudIdEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'cloudId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<AlbumPhoto, AlbumPhoto, QAfterFilterCondition>
+      cloudIdGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'cloudId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<AlbumPhoto, AlbumPhoto, QAfterFilterCondition> cloudIdLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'cloudId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<AlbumPhoto, AlbumPhoto, QAfterFilterCondition> cloudIdBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'cloudId',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<AlbumPhoto, AlbumPhoto, QAfterFilterCondition> cloudIdStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'cloudId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<AlbumPhoto, AlbumPhoto, QAfterFilterCondition> cloudIdEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'cloudId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<AlbumPhoto, AlbumPhoto, QAfterFilterCondition> cloudIdContains(
+      String value,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'cloudId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<AlbumPhoto, AlbumPhoto, QAfterFilterCondition> cloudIdMatches(
+      String pattern,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'cloudId',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<AlbumPhoto, AlbumPhoto, QAfterFilterCondition> cloudIdIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'cloudId',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<AlbumPhoto, AlbumPhoto, QAfterFilterCondition>
+      cloudIdIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'cloudId',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<AlbumPhoto, AlbumPhoto, QAfterFilterCondition>
+      cloudPathIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'cloudPath',
+      ));
+    });
+  }
+
+  QueryBuilder<AlbumPhoto, AlbumPhoto, QAfterFilterCondition>
+      cloudPathIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'cloudPath',
+      ));
+    });
+  }
+
+  QueryBuilder<AlbumPhoto, AlbumPhoto, QAfterFilterCondition> cloudPathEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'cloudPath',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<AlbumPhoto, AlbumPhoto, QAfterFilterCondition>
+      cloudPathGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'cloudPath',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<AlbumPhoto, AlbumPhoto, QAfterFilterCondition> cloudPathLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'cloudPath',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<AlbumPhoto, AlbumPhoto, QAfterFilterCondition> cloudPathBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'cloudPath',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<AlbumPhoto, AlbumPhoto, QAfterFilterCondition>
+      cloudPathStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'cloudPath',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<AlbumPhoto, AlbumPhoto, QAfterFilterCondition> cloudPathEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'cloudPath',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<AlbumPhoto, AlbumPhoto, QAfterFilterCondition> cloudPathContains(
+      String value,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'cloudPath',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<AlbumPhoto, AlbumPhoto, QAfterFilterCondition> cloudPathMatches(
+      String pattern,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'cloudPath',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<AlbumPhoto, AlbumPhoto, QAfterFilterCondition>
+      cloudPathIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'cloudPath',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<AlbumPhoto, AlbumPhoto, QAfterFilterCondition>
+      cloudPathIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'cloudPath',
         value: '',
       ));
     });
@@ -668,6 +1023,227 @@ extension AlbumPhotoQueryFilter
       ));
     });
   }
+
+  QueryBuilder<AlbumPhoto, AlbumPhoto, QAfterFilterCondition> ownerIdIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'ownerId',
+      ));
+    });
+  }
+
+  QueryBuilder<AlbumPhoto, AlbumPhoto, QAfterFilterCondition>
+      ownerIdIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'ownerId',
+      ));
+    });
+  }
+
+  QueryBuilder<AlbumPhoto, AlbumPhoto, QAfterFilterCondition> ownerIdEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'ownerId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<AlbumPhoto, AlbumPhoto, QAfterFilterCondition>
+      ownerIdGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'ownerId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<AlbumPhoto, AlbumPhoto, QAfterFilterCondition> ownerIdLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'ownerId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<AlbumPhoto, AlbumPhoto, QAfterFilterCondition> ownerIdBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'ownerId',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<AlbumPhoto, AlbumPhoto, QAfterFilterCondition> ownerIdStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'ownerId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<AlbumPhoto, AlbumPhoto, QAfterFilterCondition> ownerIdEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'ownerId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<AlbumPhoto, AlbumPhoto, QAfterFilterCondition> ownerIdContains(
+      String value,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'ownerId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<AlbumPhoto, AlbumPhoto, QAfterFilterCondition> ownerIdMatches(
+      String pattern,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'ownerId',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<AlbumPhoto, AlbumPhoto, QAfterFilterCondition> ownerIdIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'ownerId',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<AlbumPhoto, AlbumPhoto, QAfterFilterCondition>
+      ownerIdIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'ownerId',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<AlbumPhoto, AlbumPhoto, QAfterFilterCondition>
+      updatedAtIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'updatedAt',
+      ));
+    });
+  }
+
+  QueryBuilder<AlbumPhoto, AlbumPhoto, QAfterFilterCondition>
+      updatedAtIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'updatedAt',
+      ));
+    });
+  }
+
+  QueryBuilder<AlbumPhoto, AlbumPhoto, QAfterFilterCondition> updatedAtEqualTo(
+      DateTime? value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'updatedAt',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<AlbumPhoto, AlbumPhoto, QAfterFilterCondition>
+      updatedAtGreaterThan(
+    DateTime? value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'updatedAt',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<AlbumPhoto, AlbumPhoto, QAfterFilterCondition> updatedAtLessThan(
+    DateTime? value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'updatedAt',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<AlbumPhoto, AlbumPhoto, QAfterFilterCondition> updatedAtBetween(
+    DateTime? lower,
+    DateTime? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'updatedAt',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
 }
 
 extension AlbumPhotoQueryObject
@@ -687,6 +1263,30 @@ extension AlbumPhotoQuerySortBy
   QueryBuilder<AlbumPhoto, AlbumPhoto, QAfterSortBy> sortByCategoryDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'category', Sort.desc);
+    });
+  }
+
+  QueryBuilder<AlbumPhoto, AlbumPhoto, QAfterSortBy> sortByCloudId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'cloudId', Sort.asc);
+    });
+  }
+
+  QueryBuilder<AlbumPhoto, AlbumPhoto, QAfterSortBy> sortByCloudIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'cloudId', Sort.desc);
+    });
+  }
+
+  QueryBuilder<AlbumPhoto, AlbumPhoto, QAfterSortBy> sortByCloudPath() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'cloudPath', Sort.asc);
+    });
+  }
+
+  QueryBuilder<AlbumPhoto, AlbumPhoto, QAfterSortBy> sortByCloudPathDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'cloudPath', Sort.desc);
     });
   }
 
@@ -725,6 +1325,30 @@ extension AlbumPhotoQuerySortBy
       return query.addSortBy(r'gradientIndex', Sort.desc);
     });
   }
+
+  QueryBuilder<AlbumPhoto, AlbumPhoto, QAfterSortBy> sortByOwnerId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'ownerId', Sort.asc);
+    });
+  }
+
+  QueryBuilder<AlbumPhoto, AlbumPhoto, QAfterSortBy> sortByOwnerIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'ownerId', Sort.desc);
+    });
+  }
+
+  QueryBuilder<AlbumPhoto, AlbumPhoto, QAfterSortBy> sortByUpdatedAt() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'updatedAt', Sort.asc);
+    });
+  }
+
+  QueryBuilder<AlbumPhoto, AlbumPhoto, QAfterSortBy> sortByUpdatedAtDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'updatedAt', Sort.desc);
+    });
+  }
 }
 
 extension AlbumPhotoQuerySortThenBy
@@ -738,6 +1362,30 @@ extension AlbumPhotoQuerySortThenBy
   QueryBuilder<AlbumPhoto, AlbumPhoto, QAfterSortBy> thenByCategoryDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'category', Sort.desc);
+    });
+  }
+
+  QueryBuilder<AlbumPhoto, AlbumPhoto, QAfterSortBy> thenByCloudId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'cloudId', Sort.asc);
+    });
+  }
+
+  QueryBuilder<AlbumPhoto, AlbumPhoto, QAfterSortBy> thenByCloudIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'cloudId', Sort.desc);
+    });
+  }
+
+  QueryBuilder<AlbumPhoto, AlbumPhoto, QAfterSortBy> thenByCloudPath() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'cloudPath', Sort.asc);
+    });
+  }
+
+  QueryBuilder<AlbumPhoto, AlbumPhoto, QAfterSortBy> thenByCloudPathDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'cloudPath', Sort.desc);
     });
   }
 
@@ -788,6 +1436,30 @@ extension AlbumPhotoQuerySortThenBy
       return query.addSortBy(r'id', Sort.desc);
     });
   }
+
+  QueryBuilder<AlbumPhoto, AlbumPhoto, QAfterSortBy> thenByOwnerId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'ownerId', Sort.asc);
+    });
+  }
+
+  QueryBuilder<AlbumPhoto, AlbumPhoto, QAfterSortBy> thenByOwnerIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'ownerId', Sort.desc);
+    });
+  }
+
+  QueryBuilder<AlbumPhoto, AlbumPhoto, QAfterSortBy> thenByUpdatedAt() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'updatedAt', Sort.asc);
+    });
+  }
+
+  QueryBuilder<AlbumPhoto, AlbumPhoto, QAfterSortBy> thenByUpdatedAtDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'updatedAt', Sort.desc);
+    });
+  }
 }
 
 extension AlbumPhotoQueryWhereDistinct
@@ -796,6 +1468,20 @@ extension AlbumPhotoQueryWhereDistinct
       {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'category', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<AlbumPhoto, AlbumPhoto, QDistinct> distinctByCloudId(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'cloudId', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<AlbumPhoto, AlbumPhoto, QDistinct> distinctByCloudPath(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'cloudPath', caseSensitive: caseSensitive);
     });
   }
 
@@ -817,6 +1503,19 @@ extension AlbumPhotoQueryWhereDistinct
       return query.addDistinctBy(r'gradientIndex');
     });
   }
+
+  QueryBuilder<AlbumPhoto, AlbumPhoto, QDistinct> distinctByOwnerId(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'ownerId', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<AlbumPhoto, AlbumPhoto, QDistinct> distinctByUpdatedAt() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'updatedAt');
+    });
+  }
 }
 
 extension AlbumPhotoQueryProperty
@@ -830,6 +1529,18 @@ extension AlbumPhotoQueryProperty
   QueryBuilder<AlbumPhoto, PhotoCategory, QQueryOperations> categoryProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'category');
+    });
+  }
+
+  QueryBuilder<AlbumPhoto, String?, QQueryOperations> cloudIdProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'cloudId');
+    });
+  }
+
+  QueryBuilder<AlbumPhoto, String?, QQueryOperations> cloudPathProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'cloudPath');
     });
   }
 
@@ -848,6 +1559,18 @@ extension AlbumPhotoQueryProperty
   QueryBuilder<AlbumPhoto, int, QQueryOperations> gradientIndexProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'gradientIndex');
+    });
+  }
+
+  QueryBuilder<AlbumPhoto, String?, QQueryOperations> ownerIdProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'ownerId');
+    });
+  }
+
+  QueryBuilder<AlbumPhoto, DateTime?, QQueryOperations> updatedAtProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'updatedAt');
     });
   }
 }

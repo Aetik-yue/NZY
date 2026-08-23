@@ -11,10 +11,13 @@ abstract class AudioBackend {
 
   /// 当前播放位置流
   Stream<Duration> get positionStream;
+
   /// 是否正在播放流
   Stream<bool> get playingStream;
+
   /// 当前曲目总时长流
   Stream<Duration?> get durationStream;
+
   /// 播放完成流（一首播完）
   Stream<void> get completedStream;
 

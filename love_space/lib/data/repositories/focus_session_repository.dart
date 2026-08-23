@@ -11,8 +11,10 @@ class FocusSessionRepository {
       _isar.focusSessions.where().sortByStartTimeDesc().findAll();
 
   /// 监听所有记录的变化（实时流，按开始时间降序）
-  Stream<List<FocusSession>> watchAll() =>
-      _isar.focusSessions.where().sortByStartTimeDesc().watch(fireImmediately: true);
+  Stream<List<FocusSession>> watchAll() => _isar.focusSessions
+      .where()
+      .sortByStartTimeDesc()
+      .watch(fireImmediately: true);
 
   /// 监听今日（含今天 0 点起）的 focus 类型记录
   ///

@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_text_styles.dart';
@@ -27,7 +27,8 @@ class AddTimelineSheet extends ConsumerStatefulWidget {
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(AppColors.radiusCard)),
+        borderRadius:
+            BorderRadius.vertical(top: Radius.circular(AppColors.radiusCard)),
       ),
       builder: (_) => AddTimelineSheet(initial: initial),
     );
@@ -159,7 +160,8 @@ class _AddTimelineSheetState extends ConsumerState<AddTimelineSheet> {
               GestureDetector(
                 onTap: _pickDate,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                   decoration: BoxDecoration(
                     border: Border.all(color: AppColors.borderSoft),
                     borderRadius: BorderRadius.circular(AppColors.radiusSm),
@@ -233,11 +235,17 @@ class _AddTimelineSheetState extends ConsumerState<AddTimelineSheet> {
                             ? Border.all(color: Colors.white, width: 3)
                             : null,
                         boxShadow: isSelected
-                            ? [BoxShadow(color: _presetColors[i].withValues(alpha: 0.4), blurRadius: 8)]
+                            ? [
+                                BoxShadow(
+                                    color:
+                                        _presetColors[i].withValues(alpha: 0.4),
+                                    blurRadius: 8)
+                              ]
                             : null,
                       ),
                       child: isSelected
-                          ? const Icon(Icons.check, color: Colors.white, size: 18)
+                          ? const Icon(Icons.check,
+                              color: Colors.white, size: 18)
                           : null,
                     ),
                   );

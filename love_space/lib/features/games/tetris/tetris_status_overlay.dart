@@ -25,9 +25,14 @@ class TetrisStatusOverlay extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (title, hint, action, onTap) = switch (status) {
-      TetrisStatus.ready => ('准备好了吗', '点击开始 / 拖动移动 / 点按旋转', '开始', onStart),
+      TetrisStatus.ready => ('准备好了吗', '点击开始 / 拖动或按钮操作', '开始', onStart),
       TetrisStatus.paused => ('已暂停', '继续游戏', '继续', onStart),
-      TetrisStatus.gameOver => ('游戏结束', '得分 $score · L$level · $lines' '行', '重新开始', onRestart),
+      TetrisStatus.gameOver => (
+          '游戏结束',
+          '得分 $score · L$level · $lines' '行',
+          '重新开始',
+          onRestart
+        ),
       TetrisStatus.playing => ('', '', '', null),
     };
     return Container(
@@ -36,14 +41,18 @@ class TetrisStatusOverlay extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(title, style: AppTextStyles.titleLarge.copyWith(color: Colors.white)),
+            Text(title,
+                style: AppTextStyles.titleLarge.copyWith(color: Colors.white)),
             const SizedBox(height: 8),
-            Text(hint, style: AppTextStyles.body.copyWith(color: Colors.white70)),
+            Text(hint,
+                style: AppTextStyles.body.copyWith(color: Colors.white70)),
             const SizedBox(height: 20),
             FilledButton(
               onPressed: onTap,
-              style: FilledButton.styleFrom(backgroundColor: AppColors.accentRose),
-              child: Text(action, style: AppTextStyles.body.copyWith(color: Colors.white)),
+              style:
+                  FilledButton.styleFrom(backgroundColor: AppColors.accentRose),
+              child: Text(action,
+                  style: AppTextStyles.body.copyWith(color: Colors.white)),
             ),
           ],
         ),

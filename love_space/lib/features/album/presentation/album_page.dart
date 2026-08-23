@@ -6,17 +6,37 @@ import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_text_styles.dart';
 import '../../../data/providers/data_providers.dart';
 import '../../../data/models/album_photo.dart';
+import '../../../data/sync/sync_providers.dart';
 import 'photo_timeline_page.dart';
 import 'widgets/add_photo_sheet.dart';
 import 'widgets/photo_viewer.dart';
 
 /// 相册页
 /// 还原设计稿：标题+统计+添加 → 筛选 chip → 九宫格照片
-class AlbumPage extends ConsumerWidget {
+class AlbumPage extends ConsumerStatefulWidget {
   const AlbumPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<AlbumPage> createState() => _AlbumPageState();
+}
+
+class _AlbumPageState extends ConsumerState<AlbumPage> {
+  @override
+  void initState() {
+    super.initState();
+    // 每次进入相册只触发一次；照片流/筛选变化造成的 rebuild 不重复请求云端。
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      try {
+        ref.read(photoSyncServiceProvider).syncPhotos();
+      } catch (e) {
+        debugPrint('[AlbumPage] 照片同步跳过: $e');
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final photoCount = ref.watch(photoCountProvider);
     return CustomScrollView(
       slivers: [
@@ -32,8 +52,7 @@ class AlbumPage extends ConsumerWidget {
                   children: [
                     Text('我们的相册', style: AppTextStyles.titleLarge),
                     const SizedBox(height: 2),
-                    Text('共记录了 $photoCount 张照片',
-                        style: AppTextStyles.label),
+                    Text('共记录了 $photoCount 张照片', style: AppTextStyles.label),
                   ],
                 ),
                 Row(
@@ -210,7 +229,8 @@ class _PhotoGrid extends ConsumerWidget {
           itemBuilder: (context, index) {
             final photo = photos[index];
             // 统一使用设计令牌中的封面渐变（音乐封面同源）
-            final gradient = AppColors.coverGradients[
+            final gradient = AppColors
+                .coverGradients[
                     photo.gradientIndex % AppColors.coverGradients.length]
                 .colors;
             return GestureDetector(

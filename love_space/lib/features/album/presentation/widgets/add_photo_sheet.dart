@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -5,6 +6,7 @@ import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_text_styles.dart';
 import '../../../../data/models/album_photo.dart';
 import '../../../../data/providers/data_providers.dart';
+import '../../../../data/sync/sync_providers.dart';
 import '../../../../shared/utils/image_picker_helper.dart';
 import '../../../../shared/widgets/app_snackbar.dart';
 
@@ -63,8 +65,8 @@ class _AddPhotoSheetState extends ConsumerState<AddPhotoSheet> {
       _gradientIndex = initial.gradientIndex;
     } else {
       // 随机渐变色，让每张照片视觉有区别
-      _gradientIndex =
-          DateTime.now().millisecondsSinceEpoch % AppColors.coverGradients.length;
+      _gradientIndex = DateTime.now().millisecondsSinceEpoch %
+          AppColors.coverGradients.length;
     }
   }
 
@@ -122,6 +124,12 @@ class _AddPhotoSheetState extends ConsumerState<AddPhotoSheet> {
         if (mounted) {
           Navigator.of(context).pop();
           AppSnackbar.show(context, '照片已添加 📷');
+          // 触发照片上传同步（让 TA 尽快看到）
+          try {
+            unawaited(ref.read(photoSyncServiceProvider).syncPhotos());
+          } catch (e) {
+            debugPrint('[AddPhotoSheet] 照片同步跳过: $e');
+          }
         }
       }
     } catch (e) {
@@ -170,16 +178,19 @@ class _AddPhotoSheetState extends ConsumerState<AddPhotoSheet> {
                   decoration: BoxDecoration(
                     color: AppColors.accentPinkSoft.withValues(alpha: 0.3),
                     borderRadius: BorderRadius.circular(AppColors.radiusMd),
-                    border: Border.all(color: AppColors.borderSoft, style: BorderStyle.solid),
+                    border: Border.all(
+                        color: AppColors.borderSoft, style: BorderStyle.solid),
                   ),
                   child: _imagePath != null
                       ? ClipRRect(
-                          borderRadius: BorderRadius.circular(AppColors.radiusMd),
+                          borderRadius:
+                              BorderRadius.circular(AppColors.radiusMd),
                           child: Image.file(
                             File(_imagePath!),
                             fit: BoxFit.cover,
                             errorBuilder: (_, __, ___) => const Center(
-                              child: Icon(Icons.image, size: 48, color: AppColors.textTertiary),
+                              child: Icon(Icons.image,
+                                  size: 48, color: AppColors.textTertiary),
                             ),
                           ),
                         )
@@ -242,15 +253,20 @@ class _AddPhotoSheetState extends ConsumerState<AddPhotoSheet> {
                           color: isSelected
                               ? AppColors.accentRose
                               : AppColors.bgCard,
-                          borderRadius: BorderRadius.circular(AppColors.radiusSm),
+                          borderRadius:
+                              BorderRadius.circular(AppColors.radiusSm),
                           border: Border.all(
-                            color: isSelected ? AppColors.accentRose : AppColors.borderSoft,
+                            color: isSelected
+                                ? AppColors.accentRose
+                                : AppColors.borderSoft,
                           ),
                         ),
                         child: Column(
                           children: [
                             Icon(cat.$3,
-                                color: isSelected ? Colors.white : AppColors.accentRose),
+                                color: isSelected
+                                    ? Colors.white
+                                    : AppColors.accentRose),
                             const SizedBox(height: 4),
                             Text(cat.$2,
                                 style: AppTextStyles.caption.copyWith(
@@ -299,6 +315,5 @@ class _AddPhotoSheetState extends ConsumerState<AddPhotoSheet> {
     );
   }
 
-  String _formatDate(DateTime d) =>
-      '${d.year}年${d.month}月${d.day}日';
+  String _formatDate(DateTime d) => '${d.year}年${d.month}月${d.day}日';
 }

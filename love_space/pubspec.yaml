@@ -2,7 +2,7 @@ name: love_space
 description: "以越之名 · 情侣恋爱空间"
 publish_to: 'none'
 
-version: 1.0.8+9
+version: 1.1.0+110
 
 environment:
   sdk: ^3.5.4
@@ -34,6 +34,9 @@ dependencies:
 
   # 阅读器屏幕常亮
   wakelock_plus: ^1.2.8
+
+  # 双人同步状态持久化（配对房间码/用户 ID）
+  shared_preferences: ^2.3.0
 
   # 本地化（中文日期选择器）
   flutter_localizations:

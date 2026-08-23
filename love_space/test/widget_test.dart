@@ -15,6 +15,7 @@ import 'package:love_space/features/music/providers/audio_backend.dart';
 import 'package:love_space/features/music/providers/music_player_provider.dart';
 import 'package:love_space/features/music/providers/music_library_provider.dart';
 import 'package:love_space/features/pomodoro/presentation/pomodoro_page.dart';
+import 'package:love_space/data/sync/sync_providers.dart';
 import 'package:love_space/shared/layouts/main_shell.dart';
 import 'package:love_space/shared/widgets/pill_nav_bar.dart';
 
@@ -87,6 +88,16 @@ List<Override> _buildOverrides() => [
       // UnimplementedError 与 musicLibraryProvider 触发原生库
       audioBackendProvider.overrideWithValue(FakeAudioBackend()),
       musicLibraryProvider.overrideWith((ref) async => []),
+      // 双人同步状态（我的页同步卡 watch；未配置云环境时保持未启用）
+      syncStatusProvider.overrideWith(
+        (ref) => Stream.value(
+          const SyncStatus(
+            isConfigured: false,
+            isPaired: false,
+            isSyncing: false,
+          ),
+        ),
+      ),
     ];
 
 void main() {
@@ -139,6 +150,8 @@ void main() {
     await tester.pumpAndSettle();
 
     // 小说功能卡的副文案（书架为空时的引导文案），点击应触发切 Tab
+    await tester.ensureVisible(find.text('一起读书吧'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('一起读书吧'));
     await tester.pumpAndSettle();
 

@@ -18,12 +18,16 @@ class MemoRepository {
   Future<Memo?> getById(Id id) => _isar.memos.get(id);
 
   /// 新增待办
-  Future<void> add(Memo memo) =>
-      _isar.writeTxn(() async => _isar.memos.put(memo));
+  Future<void> add(Memo memo) => _isar.writeTxn(() async {
+        memo.updatedAt = DateTime.now();
+        await _isar.memos.put(memo);
+      });
 
   /// 编辑待办
-  Future<void> update(Memo memo) =>
-      _isar.writeTxn(() async => _isar.memos.put(memo));
+  Future<void> update(Memo memo) => _isar.writeTxn(() async {
+        memo.updatedAt = DateTime.now();
+        await _isar.memos.put(memo);
+      });
 
   /// 删除待办
   Future<void> delete(Id id) =>
@@ -34,6 +38,7 @@ class MemoRepository {
         final m = await _isar.memos.get(id);
         if (m == null) return;
         m.isPinned = !m.isPinned;
+        m.updatedAt = DateTime.now();
         await _isar.memos.put(m);
       });
 
@@ -42,6 +47,7 @@ class MemoRepository {
         final m = await _isar.memos.get(id);
         if (m == null) return;
         m.done = !m.done;
+        m.updatedAt = DateTime.now();
         await _isar.memos.put(m);
       });
 }

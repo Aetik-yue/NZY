@@ -8,13 +8,17 @@ class CrawlConfigRepository {
 
   /// 默认配置
   ///
-  /// 请求间隔从 1000ms 降至 500ms：章节预取改为有界并发（每批 5 章并行），
-  /// 整体吞吐提升；minInterval 仍提供整站礼貌限速（批与批之间保持间隔）。
+  /// 请求间隔从 1000ms 降至 500ms；章节正文由阅读器按需加载并自动预取下一章，
+  /// 加入书架阶段只预取首章，避免用户在真正开始阅读前等待 5 章网络请求。
   static const int defaultIntervalMs = 500;
   static const int defaultMaxRetries = 3;
   static const int defaultTimeoutMs = 15000;
   static const bool defaultRotateUserAgent = true;
-  static const int defaultPrefetchChapters = 5;
+  static const int defaultPrefetchChapters = 1;
+
+  /// 旧版本没有爬虫设置 UI，值 5 只能来自历史默认配置，可安全迁移。
+  static const int _legacyDefaultPrefetchChapters = 5;
+
   /// 默认硬广告短语（URL 子串由 ContentCleaner 内部的正则统一处理，不在此列表）
   static const List<String> defaultAdKeywords = [
     '笔趣阁',
@@ -55,7 +59,13 @@ class CrawlConfigRepository {
   Future<CrawlConfig> getOrCreate() async {
     return _isar.writeTxn(() async {
       final existing = await _isar.crawlConfigs.where().findFirst();
-      if (existing != null) return existing;
+      if (existing != null) {
+        if (existing.prefetchChapters == _legacyDefaultPrefetchChapters) {
+          existing.prefetchChapters = defaultPrefetchChapters;
+          await _isar.crawlConfigs.put(existing);
+        }
+        return existing;
+      }
 
       final config = CrawlConfig()
         ..requestIntervalMs = defaultIntervalMs

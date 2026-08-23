@@ -4,6 +4,7 @@ import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_text_styles.dart';
 import '../../../data/models/anniversary.dart';
 import '../../../data/providers/data_providers.dart';
+import '../../../data/sync/sync_providers.dart';
 import '../../../shared/widgets/app_snackbar.dart';
 import '../../../shared/widgets/confirm_dialog.dart';
 import 'widgets/add_anniversary_sheet.dart';
@@ -150,8 +151,8 @@ class _AnniversaryPageState extends ConsumerState<AnniversaryPage>
               onTap: () => Navigator.of(ctx).pop('edit'),
             ),
             ListTile(
-              leading: const Icon(Icons.delete_outline,
-                  color: AppColors.accentRose),
+              leading:
+                  const Icon(Icons.delete_outline, color: AppColors.accentRose),
               title: const Text('删除'),
               onTap: () => Navigator.of(ctx).pop('delete'),
             ),
@@ -181,10 +182,17 @@ class _AnniversaryPageState extends ConsumerState<AnniversaryPage>
     if (!confirmed || !context.mounted) return;
     try {
       final repo = ref.read(anniversaryRepositoryProvider);
+      final cloudId = item.cloudId;
       await repo.delete(item.id);
+      if (cloudId != null) {
+        ref.read(syncEngineProvider).markDeleted(cloudId);
+      }
       if (!context.mounted) return;
       AppSnackbar.showUndo(context, '已删除', () async {
         try {
+          if (cloudId != null) {
+            ref.read(syncEngineProvider).restoreDeleted(cloudId);
+          }
           await repo.add(item);
         } catch (e) {
           debugPrint('[AnniversaryPage] 撤销删除失败: $e');
@@ -212,8 +220,7 @@ class _EmptyState extends StatelessWidget {
           const SizedBox(height: 16),
           Text('还没有纪念日', style: AppTextStyles.titleSmall),
           const SizedBox(height: 6),
-          Text('记录在一起、生日等特别的日子吧',
-              style: AppTextStyles.caption),
+          Text('记录在一起、生日等特别的日子吧', style: AppTextStyles.caption),
           const SizedBox(height: 16),
           FilledButton(
             onPressed: () => AddAnniversarySheet.show(context),

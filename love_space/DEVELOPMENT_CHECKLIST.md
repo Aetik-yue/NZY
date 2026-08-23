@@ -252,3 +252,19 @@
 52. **✅ 首页/时光线惰性渲染 + clockProvider 后台暂停**
     首页时光线全量渲染（配合全量页后首页限条数即可）；clockProvider 常驻每分钟一事件（IndexedStack 永不释放），考虑 App 切后台时暂停计时、回前台恢复。
     `lib/data/providers/data_providers.dart`、`lib/features/home/presentation/home_page.dart`
+
+53. **✅ 双人同步（CloudBase）第一期**（2026-08-19 完成）
+    CloudBase 免备案免费体验版：匿名登录 + 情侣码房间配对 + 5 类数据（愿望/备忘录/时光线/打卡/纪念日）全量对账同步（LWW 冲突解决 + 删除墓碑防复活）+ 60s 轮询。未配置云环境时静默降级保持纯本地。
+    `lib/core/sync/`（sync_config / sync_models / sync_client / cloudbase_sync_client）、`lib/data/sync/`（sync_mapper / sync_engine / sync_providers）、`lib/features/profile/presentation/sync_pairing_page.dart`、docs/SYNC_SETUP.md
+
+54. **✅ 双人同步（第二期）：悄悄话 + 相册照片同步**（2026-08-19 完成）
+    新增悄悄话（SecretMessage 模型 + 聊天页 + 发送即同步 + 未读标记）与相册照片同步（AlbumPhoto 元数据走 pair_data 对账 + 云存储文件上传/下载，打开相册自动同步，删除同步云端文件）。同步类型扩展为 7 种。
+    `lib/data/models/secret_message.dart`、`lib/features/secrets/`、`lib/data/sync/photo_sync_service.dart`、`lib/features/album/presentation/album_page.dart`、`lib/features/album/presentation/widgets/photo_viewer.dart`
+
+55. **✅ 后端切换：CloudBase → LeanCloud 国际版（REST）**（2026-08-19 完成）
+    CloudBase 免费环境误删无法重建，后端切换为 LeanCloud 国际版（免备案、3 万次 API/天免费）：`LeancloudSyncClient` 纯 Dart REST 实现（匿名用户 + Rooms/PairData 类 + 文件服务），移除 cloudbase_flutter 依赖，配置改为 LEAN_APP_ID / LEAN_APP_KEY。
+    `lib/core/sync/leancloud_sync_client.dart`、`lib/core/sync/sync_config.dart`、`lib/data/sync/sync_providers.dart`、docs/SYNC_SETUP.md
+
+56. **✅ 后端定稿：LeanCloud → 腾讯云 SCF + COS 自建云函数**（2026-08-19 完成）
+    LeanCloud 注册不可用，最终后端改为自建云函数（腾讯云 Serverless + COS）：`serverless/index.js` 提供 rooms/pairdata/照片 REST 接口（COS 对象存储 + 签名 URL），Flutter 端 `ScfSyncClient` 纯 http 调用 API 网关；配置改为 SYNC_API_URL / SYNC_SECRET。免备案、公网异地可用、免费额度充足。
+    `serverless/`、`lib/core/sync/scf_sync_client.dart`、`lib/core/sync/sync_config.dart`、`lib/data/sync/sync_providers.dart`、docs/SYNC_SETUP.md

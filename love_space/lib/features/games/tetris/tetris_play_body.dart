@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../app/theme/app_colors.dart';
+import 'tetris_control_pad.dart';
 import 'tetris_model.dart';
 import 'tetris_widgets.dart';
 
@@ -22,14 +23,24 @@ class TetrisPlayBody extends StatelessWidget {
 
   /// 水平拖动回调（左右移动，cellW 由内部按屏宽计算后传入）
   final void Function(DragUpdateDetails d, double cellW) onHorizontalDrag;
+
   /// 垂直拖动回调（软降，cellW 由内部按屏宽计算后传入）
   final void Function(DragUpdateDetails d, double cellW) onVerticalDrag;
+
+  /// 控制区按钮回调（街机式操作，与拖动并存）
+  final VoidCallback onLeft;
+  final VoidCallback onRight;
   final VoidCallback onRotate;
+  final VoidCallback onSoftDrop;
+  final VoidCallback onHardDrop;
+
+  /// 控制区是否可用（非游戏中置灰）
+  final bool enabled;
+
   final VoidCallback onStart;
   final VoidCallback onPause;
   final VoidCallback onRestart;
   final VoidCallback onHoldSwap;
-  final VoidCallback onHardDrop;
 
   /// 返回转场期间停止动画循环
   final VoidCallback onPop;
@@ -48,12 +59,16 @@ class TetrisPlayBody extends StatelessWidget {
     required this.status,
     required this.onHorizontalDrag,
     required this.onVerticalDrag,
+    required this.onLeft,
+    required this.onRight,
     required this.onRotate,
+    required this.onSoftDrop,
+    required this.onHardDrop,
+    required this.enabled,
     required this.onStart,
     required this.onPause,
     required this.onRestart,
     required this.onHoldSwap,
-    required this.onHardDrop,
     required this.onPop,
   });
 
@@ -81,8 +96,8 @@ class TetrisPlayBody extends StatelessWidget {
                 children: [
                   // HUD
                   Padding(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 6),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceAround,
                       children: [
@@ -129,7 +144,6 @@ class TetrisPlayBody extends StatelessWidget {
                                 onHorizontalDrag(d, cellW),
                             onVerticalDragUpdate: (d) =>
                                 onVerticalDrag(d, cellW),
-                            onTap: onRotate,
                             onStart: onStart,
                             onRestart: onRestart,
                           ),
@@ -150,7 +164,15 @@ class TetrisPlayBody extends StatelessWidget {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  // 底部：街机控制区（← / ↻ / → / ↓ / DROP）
+                  TetrisControlPad(
+                    onLeft: onLeft,
+                    onRight: onRight,
+                    onRotate: onRotate,
+                    onSoftDrop: onSoftDrop,
+                    onHardDrop: onHardDrop,
+                    enabled: enabled,
+                  ),
                 ],
               );
             },

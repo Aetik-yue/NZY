@@ -41,8 +41,7 @@ mixin _ReaderInteraction on _ReaderChapterFetcher {
   Future<void> _goToPreviousChapterLastPage() async {
     final chapters = _latestChapters;
     if (chapters.isEmpty) return;
-    final effectiveIndex =
-        _currentChapterIndex.clamp(0, chapters.length - 1);
+    final effectiveIndex = _currentChapterIndex.clamp(0, chapters.length - 1);
     if (effectiveIndex <= 0) {
       if (mounted) AppSnackbar.show(context, '已经是第一章');
       return;

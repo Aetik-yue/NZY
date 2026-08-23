@@ -172,8 +172,7 @@ class _AddAnniversarySheetState extends ConsumerState<AddAnniversarySheet> {
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(AppColors.radiusSm),
-                    borderSide:
-                        const BorderSide(color: AppColors.accentRose),
+                    borderSide: const BorderSide(color: AppColors.accentRose),
                   ),
                 ),
               ),
@@ -183,8 +182,8 @@ class _AddAnniversarySheetState extends ConsumerState<AddAnniversarySheet> {
               GestureDetector(
                 onTap: _pickDate,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 14),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                   decoration: BoxDecoration(
                     border: Border.all(color: AppColors.borderSoft),
                     borderRadius: BorderRadius.circular(AppColors.radiusSm),
@@ -220,8 +219,7 @@ class _AddAnniversarySheetState extends ConsumerState<AddAnniversarySheet> {
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(AppColors.radiusSm),
-                    borderSide:
-                        const BorderSide(color: AppColors.accentRose),
+                    borderSide: const BorderSide(color: AppColors.accentRose),
                   ),
                 ),
               ),
@@ -272,8 +270,7 @@ class _AddAnniversarySheetState extends ConsumerState<AddAnniversarySheet> {
                     value: _remindEnabled,
                     activeThumbColor: AppColors.accentRose,
                     activeTrackColor: AppColors.accentPinkSoft,
-                    onChanged: (v) =>
-                        setState(() => _remindEnabled = v),
+                    onChanged: (v) => setState(() => _remindEnabled = v),
                   ),
                 ],
               ),
@@ -290,8 +287,7 @@ class _AddAnniversarySheetState extends ConsumerState<AddAnniversarySheet> {
                         child: ChoiceChip(
                           label: Text(days == 0 ? '当天' : '$days 天'),
                           selected: _remindDays == days,
-                          onSelected: (_) =>
-                              setState(() => _remindDays = days),
+                          onSelected: (_) => setState(() => _remindDays = days),
                           selectedColor: AppColors.accentRose,
                           labelStyle: AppTextStyles.label.copyWith(
                             color: _remindDays == days

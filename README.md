@@ -26,7 +26,12 @@
 | 🏠 **时光** | 问候区、相伴天数纪念日卡片、每日打卡、快捷入口、恋爱时间轴 |
 | 📷 **相册** | 筛选标签、九宫格照片墙，记录每一个值得珍藏的画面 |
 | ⭐ **愿望清单** | 进度卡片 + 愿望列表，把"一起做的事"一个个打上勾 |
-| 👫 **我的** | 渐变情侣头像头部、相伴统计、音乐卡、小说/备忘录/设置入口 |
+| 📝 **待办与悄悄话** | 标签待办、优先级、双人留言与未读状态 |
+| 📚 **小说阅读** | 多源搜索、书架、章节按需抓取、预取与分页阅读器 |
+| 🎵 **音乐与专注** | 本地音乐播放、番茄钟与专注统计 |
+| 🎮 **小游戏** | 打砖块、俄罗斯方块 |
+| 🔄 **双人同步** | 腾讯云 SCF + COS 房间配对，同步时光、愿望、待办、相册和留言 |
+| 👫 **我的** | 情侣信息、相伴统计、全部功能、同步与设置入口 |
 
 ---
 
@@ -45,11 +50,10 @@
 | --- | --- |
 | 框架 | Flutter 3.x / Dart 3.5+ |
 | 状态管理 | [Riverpod](https://riverpod.dev/) `flutter_riverpod` |
-| 路由 | [go_router](https://pub.dev/packages/go_router) |
-| 本地存储 | shared_preferences |
-| 图片加载 | cached_network_image |
-| 字体 | google_fonts |
-| 工具 | `intl`、`uuid` |
+| 本地存储 | Isar + shared_preferences |
+| 网络与爬虫 | http + html + charset（GBK） |
+| 媒体 | image_picker + just_audio + on_audio_query |
+| 云同步 | 腾讯云 SCF + COS（Node.js 云函数） |
 
 ---
 
@@ -77,8 +81,10 @@ flutter run
 ### 构建发布
 
 ```bash
-# Android APK
-flutter build apk --release
+# Android APK（同步密钥不得写入仓库）
+flutter build apk --release \
+  --dart-define=SYNC_API_URL=你的云函数URL \
+  --dart-define=SYNC_SECRET=你的随机密钥
 
 # Android App Bundle
 flutter build appbundle --release
@@ -102,7 +108,17 @@ love_space/
 │   │   ├── home/                  # 时光
 │   │   ├── album/                 # 相册
 │   │   ├── wishes/                # 愿望清单
-│   │   └── profile/               # 我的
+│   │   ├── memo/                  # 待办 / 备忘录
+│   │   ├── novel/                 # 小说书架 / 阅读器
+│   │   ├── music/                 # 本地音乐
+│   │   ├── games/                 # 小游戏
+│   │   ├── secrets/               # 双人留言
+│   │   └── profile/               # 我的 / 同步配对
+│   ├── data/
+│   │   ├── crawler/               # 多源小说爬虫
+│   │   ├── database/              # Isar 初始化与种子数据
+│   │   ├── repositories/          # 数据仓库
+│   │   └── sync/                  # 双人同步引擎与照片同步
 │   └── shared/
 │       ├── layouts/main_shell.dart  # 主壳层 + 底部导航
 │       └── widgets/               # 通用组件
@@ -111,7 +127,13 @@ love_space/
 ├── test/                          # 测试
 ├── pubspec.yaml
 └── README.md
+serverless/                        # SCF + COS 同步云函数
+version/                           # 各版本更新日志（APK 由 Release 分发）
 ```
+
+双人同步的部署与打包参数见
+[`love_space/docs/SYNC_SETUP.md`](love_space/docs/SYNC_SETUP.md)。正式发布前还需配置
+自己的 Android release keystore；仓库默认不保存签名凭据。
 
 ---
 

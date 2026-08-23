@@ -79,10 +79,8 @@ class SeedService {
   /// 写入爬虫默认数据（幂等）
   Future<void> _seedCrawlDefaults() async {
     // 默认爬取源：笔趣阁
-    final existingSource = await _isar.novelSources
-        .where()
-        .keyEqualTo('biquge')
-        .findFirst();
+    final existingSource =
+        await _isar.novelSources.where().keyEqualTo('biquge').findFirst();
 
     if (existingSource == null) {
       // 新建源
@@ -104,10 +102,8 @@ class SeedService {
     }
 
     // 补充搜索源：bqgbb.cc（搜索有效，作为 biquge2.net 的搜索替代）
-    final bqgbbSource = await _isar.novelSources
-        .where()
-        .keyEqualTo('bqgbb')
-        .findFirst();
+    final bqgbbSource =
+        await _isar.novelSources.where().keyEqualTo('bqgbb').findFirst();
     if (bqgbbSource == null) {
       await _isar.writeTxn(() async {
         await _isar.novelSources.put(NovelSource()
@@ -127,10 +123,8 @@ class SeedService {
     }
 
     // 扩展源：bqge.cc（明文，章节路径 /read/{id}/{chid}.html）
-    final bqgeccSource = await _isar.novelSources
-        .where()
-        .keyEqualTo('bqgecc')
-        .findFirst();
+    final bqgeccSource =
+        await _isar.novelSources.where().keyEqualTo('bqgecc').findFirst();
     if (bqgeccSource == null) {
       await _isar.writeTxn(() async {
         await _isar.novelSources.put(NovelSource()
@@ -144,10 +138,8 @@ class SeedService {
     }
 
     // 扩展源：biqumo.com（base64 加密正文，xacywc.omvymw() 同型加密）
-    final biqumoSource = await _isar.novelSources
-        .where()
-        .keyEqualTo('biqumo')
-        .findFirst();
+    final biqumoSource =
+        await _isar.novelSources.where().keyEqualTo('biqumo').findFirst();
     if (biqumoSource == null) {
       await _isar.writeTxn(() async {
         await _isar.novelSources.put(NovelSource()
@@ -161,10 +153,8 @@ class SeedService {
     }
 
     // 扩展源：bxwxorg.com（明文，正文 .word_read、标题 .info-main h1）
-    final bxwxorgSource = await _isar.novelSources
-        .where()
-        .keyEqualTo('bxwxorg')
-        .findFirst();
+    final bxwxorgSource =
+        await _isar.novelSources.where().keyEqualTo('bxwxorg').findFirst();
     if (bxwxorgSource == null) {
       await _isar.writeTxn(() async {
         await _isar.novelSources.put(NovelSource()

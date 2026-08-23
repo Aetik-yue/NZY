@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_text_styles.dart';
@@ -62,8 +62,8 @@ class NovelDetailPage extends ConsumerWidget {
                 ),
               );
             },
-            loading: () => const Center(
-                child: CircularProgressIndicator(strokeWidth: 2)),
+            loading: () =>
+                const Center(child: CircularProgressIndicator(strokeWidth: 2)),
             error: (_, __) => const Center(child: Text('章节加载失败')),
           );
         },

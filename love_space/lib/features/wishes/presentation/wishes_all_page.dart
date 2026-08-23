@@ -4,9 +4,11 @@ import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_text_styles.dart';
 import '../../../data/models/wish.dart';
 import '../../../data/providers/data_providers.dart';
+import '../../../data/sync/sync_providers.dart';
 import '../../../shared/widgets/app_snackbar.dart';
 import '../../../shared/widgets/confirm_dialog.dart';
 import 'widgets/add_wish_sheet.dart';
+import 'widgets/wish_icons.dart';
 
 /// 全部愿望页（二级页）
 ///
@@ -165,14 +167,14 @@ class _WishesAllPageState extends ConsumerState<WishesAllPage> {
           children: [
             const SizedBox(height: 8),
             ListTile(
-              leading: const Icon(Icons.edit_outlined,
-                  color: AppColors.accentRose),
+              leading:
+                  const Icon(Icons.edit_outlined, color: AppColors.accentRose),
               title: const Text('编辑愿望'),
               onTap: () => Navigator.of(ctx).pop('edit'),
             ),
             ListTile(
-              leading: const Icon(Icons.delete_outline,
-                  color: AppColors.accentRose),
+              leading:
+                  const Icon(Icons.delete_outline, color: AppColors.accentRose),
               title: const Text('删除愿望'),
               onTap: () => Navigator.of(ctx).pop('delete'),
             ),
@@ -197,10 +199,17 @@ class _WishesAllPageState extends ConsumerState<WishesAllPage> {
     );
     if (!confirmed || !context.mounted) return;
     try {
+      final cloudId = wish.cloudId;
       await ref.read(wishRepositoryProvider).delete(wish.id);
+      if (cloudId != null) {
+        ref.read(syncEngineProvider).markDeleted(cloudId);
+      }
       if (!context.mounted) return;
       AppSnackbar.showUndo(context, '愿望已删除', () async {
         try {
+          if (cloudId != null) {
+            ref.read(syncEngineProvider).restoreDeleted(cloudId);
+          }
           await ref.read(wishRepositoryProvider).add(wish);
         } catch (e) {
           debugPrint('[WishesAllPage] 撤销删除失败: $e');
@@ -256,10 +265,8 @@ class _WishRow extends StatelessWidget {
                 borderRadius: BorderRadius.circular(14),
               ),
               child: Icon(
-                // 愿望图标存的是运行时 codePoint；IconData 的 codePoint 带
-                // @mustBeConst（为图标 tree-shaking 设计），此处必须忽略 lint
-                // ignore: non_const_argument_for_const_parameter
-                IconData(wish.iconCodePoint),
+                // 还原为常量图标（预置表内查找），兼容 release 图标 tree-shaking
+                wishIconFor(wish.iconCodePoint),
                 color: wish.done ? AppColors.accentCoral : AppColors.accentRose,
                 size: 22,
               ),
@@ -273,10 +280,8 @@ class _WishRow extends StatelessWidget {
                     wish.title,
                     style: AppTextStyles.titleSmall.copyWith(
                       fontSize: 15,
-                      decoration:
-                          wish.done ? TextDecoration.lineThrough : null,
-                      color:
-                          wish.done ? AppColors.textTertiary : null,
+                      decoration: wish.done ? TextDecoration.lineThrough : null,
+                      color: wish.done ? AppColors.textTertiary : null,
                     ),
                   ),
                   if (wish.description.isNotEmpty) ...[

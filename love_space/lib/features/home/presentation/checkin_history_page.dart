@@ -63,8 +63,7 @@ class _CheckinHistoryPageState extends ConsumerState<CheckinHistoryPage> {
                     const Icon(Icons.local_fire_department_rounded,
                         color: AppColors.accentRose, size: 28),
                     const SizedBox(width: 12),
-                    Text('已连续打卡 $streak 天',
-                        style: AppTextStyles.titleSmall),
+                    Text('已连续打卡 $streak 天', style: AppTextStyles.titleSmall),
                   ],
                 ),
               ),
@@ -99,8 +98,7 @@ class _CheckinHistoryPageState extends ConsumerState<CheckinHistoryPage> {
               ),
               const SizedBox(height: 12),
               Text('每天打卡，让爱有迹可循 💕',
-                  style: AppTextStyles.caption,
-                  textAlign: TextAlign.center),
+                  style: AppTextStyles.caption, textAlign: TextAlign.center),
             ],
           );
         },
@@ -188,9 +186,8 @@ class _CheckinHistoryPageState extends ConsumerState<CheckinHistoryPage> {
             '${date.day}',
             style: AppTextStyles.caption.copyWith(
               color: checked ? Colors.white : AppColors.textPrimary,
-              fontWeight: checked || isToday
-                  ? FontWeight.w700
-                  : FontWeight.w400,
+              fontWeight:
+                  checked || isToday ? FontWeight.w700 : FontWeight.w400,
             ),
           ),
         ),
