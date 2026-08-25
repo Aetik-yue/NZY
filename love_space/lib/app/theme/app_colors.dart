@@ -223,6 +223,49 @@ class AppColors {
   /// 游戏状态遮罩半透明黑 rgba(0,0,0,0.6)
   static const gameScrim = Color(0x99000000);
 
+  /// 公路闪避 · 日间天空
+  static const racingSky = Color(0xFF8FD8EF);
+
+  /// 公路闪避 · 草地
+  static const racingGrass = Color(0xFFA8DDA0);
+
+  /// 公路闪避 · 树冠
+  static const racingTree = Color(0xFF55A96B);
+
+  /// 公路闪避 · 树干
+  static const racingTreeTrunk = Color(0xFF79523E);
+
+  /// 公路闪避 · 沥青路面
+  static const racingRoad = Color(0xFF505A62);
+
+  /// 公路闪避 · 道路远端提亮
+  static const racingRoadFar = Color(0xFF737D82);
+
+  /// 公路闪避 · 黄色车道分隔线
+  static const racingLaneYellow = Color(0xFFF5D64E);
+
+  /// 公路闪避 · 玩家赛车
+  static const racingPlayerCar = Color(0xFFE94F70);
+
+  /// 公路闪避 · 障碍车辆色板
+  static const racingTrafficCars = <Color>[
+    Color(0xFF4A98E3),
+    Color(0xFFF3B44D),
+    Color(0xFF51AD78),
+  ];
+
+  /// 公路闪避 · 施工障碍
+  static const racingConstruction = Color(0xFFF08B45);
+
+  /// 公路闪避 · 车窗
+  static const racingWindshield = Color(0xFFD9F3FA);
+
+  /// 公路闪避 · 轮胎与车辆暗部
+  static const racingTire = Color(0xFF26323A);
+
+  /// 公路闪避 · 碰撞闪光
+  static const racingCrashFlash = Color(0xFFE93F52);
+
   // ──────── 间距（Primitives）────────
   static const spacing2xs = 4.0;
   static const spacingXs = 8.0;

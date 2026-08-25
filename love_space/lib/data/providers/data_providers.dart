@@ -18,6 +18,7 @@ import '../repositories/memo_repository.dart';
 import '../repositories/secret_message_repository.dart';
 import '../repositories/pomodoro_settings_repository.dart';
 import '../repositories/focus_session_repository.dart';
+import '../repositories/racing_score_repository.dart';
 import '../../core/utils/greeting.dart';
 import '../../core/utils/date_utils.dart';
 import '../../core/utils/streak.dart';
@@ -47,6 +48,15 @@ import '../models/focus_session.dart';
 
 /// 当前激活的底部 Tab（驱动 MainShell 的 IndexedStack 切换）
 final currentTabProvider = StateProvider<NavTab>((ref) => NavTab.home);
+
+/// 公路闪避最高距离仓库（SharedPreferences，本机记录）。
+final racingScoreRepositoryProvider =
+    Provider<RacingScoreRepository>((ref) => const RacingScoreRepository());
+
+/// 公路闪避历史最佳距离。
+final racingBestDistanceProvider = FutureProvider<int>(
+  (ref) => ref.watch(racingScoreRepositoryProvider).getBestDistance(),
+);
 
 final wishRepositoryProvider =
     Provider((ref) => WishRepository(ref.watch(isarProvider)));

@@ -84,6 +84,8 @@ List<Override> _buildOverrides() => [
       memosProvider.overrideWith((ref) => Stream.value([])),
       // 待办总数
       memoCountProvider.overrideWithValue(0),
+      // 公路闪避最高纪录（避免小游戏页进入后访问真实偏好）
+      racingBestDistanceProvider.overrideWith((ref) async => 0),
       // 音乐：Fake 后端 + 空歌单，避免 audioBackendProvider 抛
       // UnimplementedError 与 musicLibraryProvider 触发原生库
       audioBackendProvider.overrideWithValue(FakeAudioBackend()),
@@ -158,6 +160,7 @@ void main() {
     expect(find.byType(GamesPage), findsOneWidget);
     expect(find.text('打砖块'), findsOneWidget);
     expect(find.text('俄罗斯方块'), findsOneWidget);
+    expect(find.text('公路闪避'), findsOneWidget);
   });
 
   testWidgets('BreakoutPage renders with ready overlay', (tester) async {

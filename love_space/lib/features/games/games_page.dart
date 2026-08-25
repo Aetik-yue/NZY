@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../app/theme/app_colors.dart';
 import '../../app/theme/app_text_styles.dart';
 import 'breakout/breakout_page.dart';
+import 'racing/racing_page.dart';
 import 'tetris/tetris_page.dart';
 
 /// 小游戏中心：集中承载可以随时开始的双人休闲游戏。
@@ -86,6 +87,17 @@ class GamesPage extends StatelessWidget {
             background: AppColors.bgCream,
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const TetrisPage()),
+            ),
+          ),
+          const SizedBox(height: 12),
+          _GameCard(
+            icon: Icons.directions_car_filled_rounded,
+            title: '公路闪避',
+            subtitle: '拖动赛车 · 挑战最长距离',
+            accent: AppColors.racingPlayerCar,
+            background: AppColors.racingGrass,
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const RacingPage()),
             ),
           ),
         ],

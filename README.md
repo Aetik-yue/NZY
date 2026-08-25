@@ -6,7 +6,7 @@
   <img src="https://img.shields.io/badge/Flutter-3.x-02569B?logo=flutter&logoColor=white" alt="Flutter 3.x" />
   <img src="https://img.shields.io/badge/Dart-%5E3.5.4-0175C2?logo=dart&logoColor=white" alt="Dart ^3.5.4" />
   <img src="https://img.shields.io/badge/version-1.1.0-FF6B9D" alt="Version 1.1.0" />
-  <img src="https://img.shields.io/badge/tests-173%20passed-A8C9A0" alt="173 tests passed" />
+  <img src="https://img.shields.io/badge/tests-200%20passed-A8C9A0" alt="200 tests passed" />
 </p>
 
 **以越之名**是一款使用 Flutter 开发的情侣生活记录 App。它以本地优先为原则：不配置服务器也能使用全部核心功能；需要异地双机共享时，可以选择部署腾讯云 SCF + COS 同步服务。
@@ -37,7 +37,7 @@
 | **本地音乐** | 扫描设备曲库、播放控制、播放列表、循环/随机模式、迷你播放器、App 相册回忆轮播 |
 | **番茄钟** | 专注/休息阶段、自定义时长、标签、会话记录与专注统计 |
 | **情侣互动** | 双人轮答恋爱测试、每日固定缘分签与情侣小行动 |
-| **小游戏与工具** | 打砖块、俄罗斯方块、秒表、随机数 |
+| **小游戏与工具** | 打砖块、俄罗斯方块、公路闪避赛车、秒表、随机数 |
 | **双人同步** | 6 位情侣码配对，同步愿望、待办、时光、打卡、纪念日、悄悄话与相册；照片原图使用 COS |
 
 ### 最近完成
@@ -78,7 +78,7 @@ flutter analyze
 flutter test
 ```
 
-当前测试套件包含 **173 项测试**，覆盖核心日期逻辑、Repository、小说爬虫、同步引擎、音乐播放器、小游戏、番茄钟和主要页面交互。
+当前测试套件包含 **200 项测试**，覆盖核心日期逻辑、Repository、小说爬虫、同步引擎、音乐播放器、小游戏、番茄钟和主要页面交互。
 
 云函数测试单独运行：
 
