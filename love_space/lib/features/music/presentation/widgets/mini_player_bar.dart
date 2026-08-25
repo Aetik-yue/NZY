@@ -15,11 +15,71 @@ import 'music_equalizer_bars.dart';
 /// 底部常驻迷你播放器。
 ///
 /// 显示全屏页最后一张 App 相册照片，但不会在后台持续轮播；整条点击进入全屏页。
-class MiniPlayerBar extends ConsumerWidget {
+/// 左右滑动超过阈值可关闭（同时暂停播放），未达阈值时平滑回弹。
+class MiniPlayerBar extends ConsumerStatefulWidget {
   const MiniPlayerBar({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<MiniPlayerBar> createState() => _MiniPlayerBarState();
+}
+
+class _MiniPlayerBarState extends ConsumerState<MiniPlayerBar>
+    with SingleTickerProviderStateMixin {
+  static const _dismissDistanceRatio = 0.28;
+  static const _dismissVelocity = 700.0;
+
+  double _dragX = 0;
+  double _springFrom = 0;
+  late final AnimationController _springController;
+
+  @override
+  void initState() {
+    super.initState();
+    _springController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 200),
+    )..addListener(() {
+        final progress = Curves.easeOut.transform(_springController.value);
+        setState(() => _dragX = _springFrom * (1 - progress));
+      });
+  }
+
+  @override
+  void dispose() {
+    _springController.dispose();
+    super.dispose();
+  }
+
+  void _onHorizontalDragStart(DragStartDetails _) {
+    _springController.stop();
+  }
+
+  void _onHorizontalDragUpdate(DragUpdateDetails details) {
+    setState(() => _dragX += details.delta.dx);
+  }
+
+  void _onHorizontalDragEnd(DragEndDetails details) {
+    final width = MediaQuery.sizeOf(context).width;
+    final velocity = details.primaryVelocity ?? 0;
+    final crossedDistance = _dragX.abs() >= width * _dismissDistanceRatio;
+    final crossedVelocity = velocity.abs() >= _dismissVelocity;
+    if (crossedDistance || crossedVelocity) {
+      _springController.stop();
+      setState(() => _dragX = 0);
+      ref.read(musicPlayerProvider.notifier).hidePlayer();
+      return;
+    }
+    _springBack();
+  }
+
+  void _springBack() {
+    if (_dragX == 0) return;
+    _springFrom = _dragX;
+    _springController.forward(from: 0);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final state = ref.watch(musicPlayerProvider);
     final song = state.currentSong;
     final memoryPhotoPath = ref.watch(musicMemoryPhotoPathProvider);
@@ -29,88 +89,102 @@ class MiniPlayerBar extends ConsumerWidget {
     final progress = total > 0
         ? (state.position.inMilliseconds / total).clamp(0.0, 1.0)
         : 0.0;
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final opacity = (1 - _dragX.abs() / screenWidth).clamp(0.0, 1.0);
 
     return Semantics(
       button: true,
       label: '打开音乐播放器，当前歌曲${song.title}',
+      hint: '左右滑动可关闭迷你播放器',
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: () => MusicPlayerPage.show(context),
-        child: Container(
-          margin: const EdgeInsets.fromLTRB(
-            AppColors.spacingSm,
-            0,
-            AppColors.spacingSm,
-            AppColors.spacing2xs,
-          ),
-          decoration: BoxDecoration(
-            color: AppColors.bgCard,
-            borderRadius: BorderRadius.circular(AppColors.radiusPill),
-            border: Border.all(color: AppColors.borderSoft),
-            boxShadow: const [
-              BoxShadow(
-                color: AppColors.shadowPink,
-                blurRadius: 18,
-                offset: Offset(0, 5),
-                spreadRadius: -5,
+        onHorizontalDragStart: _onHorizontalDragStart,
+        onHorizontalDragUpdate: _onHorizontalDragUpdate,
+        onHorizontalDragEnd: _onHorizontalDragEnd,
+        onHorizontalDragCancel: _springBack,
+        child: Transform.translate(
+          offset: Offset(_dragX, 0),
+          child: Opacity(
+            opacity: opacity,
+            child: Container(
+              key: const Key('mini_player_surface'),
+              margin: const EdgeInsets.fromLTRB(
+                AppColors.spacingSm,
+                0,
+                AppColors.spacingSm,
+                AppColors.spacing2xs,
               ),
-            ],
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              LinearProgressIndicator(
-                value: progress,
-                minHeight: 2,
-                color: AppColors.accentRose,
-                backgroundColor: AppColors.accentPinkSoft,
+              decoration: BoxDecoration(
+                color: AppColors.bgCard,
+                borderRadius: BorderRadius.circular(AppColors.radiusPill),
+                border: Border.all(color: AppColors.borderSoft),
+                boxShadow: const [
+                  BoxShadow(
+                    color: AppColors.shadowPink,
+                    blurRadius: 18,
+                    offset: Offset(0, 5),
+                    spreadRadius: -5,
+                  ),
+                ],
               ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  AppColors.spacingSm,
-                  AppColors.spacingXs,
-                  AppColors.spacingXs,
-                  AppColors.spacingXs,
-                ),
-                child: Row(
-                  children: [
-                    _Cover(
-                      song: song,
-                      memoryPhotoPath: memoryPhotoPath,
-                      size: 40,
+              clipBehavior: Clip.antiAlias,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  LinearProgressIndicator(
+                    value: progress,
+                    minHeight: 2,
+                    color: AppColors.accentRose,
+                    backgroundColor: AppColors.accentPinkSoft,
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      AppColors.spacingSm,
+                      AppColors.spacingXs,
+                      AppColors.spacingXs,
+                      AppColors.spacingXs,
                     ),
-                    const SizedBox(width: AppColors.spacingSm),
-                    MusicEqualizerBars(playing: state.isPlaying),
-                    const SizedBox(width: AppColors.spacingXs),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            song.title,
-                            style: AppTextStyles.body.copyWith(
-                              fontWeight: FontWeight.w600,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                    child: Row(
+                      children: [
+                        _Cover(
+                          song: song,
+                          memoryPhotoPath: memoryPhotoPath,
+                          size: 40,
+                        ),
+                        const SizedBox(width: AppColors.spacingSm),
+                        MusicEqualizerBars(playing: state.isPlaying),
+                        const SizedBox(width: AppColors.spacingXs),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                song.title,
+                                style: AppTextStyles.body.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                song.artist,
+                                style: AppTextStyles.caption,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
                           ),
-                          const SizedBox(height: 2),
-                          Text(
-                            song.artist,
-                            style: AppTextStyles.caption,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
-                      ),
+                        ),
+                        _MiniPlayButton(state: state),
+                      ],
                     ),
-                    _MiniPlayButton(state: state),
-                  ],
-                ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),

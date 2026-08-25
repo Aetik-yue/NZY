@@ -4,6 +4,8 @@ import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_text_styles.dart';
 import '../../../shared/widgets/app_snackbar.dart';
 import '../../anniversary/presentation/anniversary_page.dart';
+import '../../couple_fun/presentation/daily_fortune_page.dart';
+import '../../couple_fun/presentation/love_quiz_page.dart';
 import '../../games/breakout/breakout_page.dart';
 import '../../games/tetris/tetris_page.dart';
 import '../../home/presentation/checkin_history_page.dart';
@@ -95,17 +97,23 @@ class AllFeaturesPage extends ConsumerWidget {
               MaterialPageRoute(builder: (_) => const TetrisPage()),
             ),
           ),
-          const _FeatureEntry(
+          _FeatureEntry(
             icon: Icons.quiz_rounded,
             title: '恋爱测试',
-            subtitle: '看看你们有多默契',
+            subtitle: '轮流答题，交换彼此的偏好',
             color: AppColors.accentMauve,
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const LoveQuizPage()),
+            ),
           ),
-          const _FeatureEntry(
+          _FeatureEntry(
             icon: Icons.auto_awesome_rounded,
             title: '缘分签',
-            subtitle: '每日一句爱的占卜',
+            subtitle: '每天一签，收下一件爱的行动',
             color: AppColors.accentCoral,
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const DailyFortunePage()),
+            ),
           ),
         ],
       ),

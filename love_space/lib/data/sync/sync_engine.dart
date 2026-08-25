@@ -37,10 +37,13 @@ class SyncEngine {
 
   static const _kUidKey = 'sync_uid';
   static const _kRoomKey = 'sync_room';
+  static const _kRoomTokenKey = 'sync_room_token';
   static const _kPendingDeleteKey = 'sync_pending_deletes';
 
   String? _roomId;
+  String? _roomToken;
   String? _uid;
+  bool _requiresSecureRepair = false;
   Timer? _timer;
   DateTime? _lastSyncAt;
   bool _syncing = false;
@@ -65,7 +68,10 @@ class SyncEngine {
   DateTime? get lastSyncAt => _lastSyncAt;
 
   /// 是否已配对
-  bool get isPaired => _roomId != null;
+  bool get isPaired => _roomId != null && _roomToken != null;
+
+  /// 旧版配对只有全局密钥，没有房间独立令牌，必须重新配对后才能恢复同步。
+  bool get requiresSecureRepair => _requiresSecureRepair;
 
   /// 当前房间码
   String? get roomCode => _roomId;
@@ -84,6 +90,13 @@ class SyncEngine {
     final prefs = await SharedPreferences.getInstance();
     _uid = prefs.getString(_kUidKey);
     _roomId = prefs.getString(_kRoomKey);
+    _roomToken = prefs.getString(_kRoomTokenKey);
+    _requiresSecureRepair = _roomId != null &&
+        _roomId!.isNotEmpty &&
+        (_roomToken == null || _roomToken!.isEmpty);
+    if (_roomToken != null && _roomToken!.isNotEmpty) {
+      _client.useRoomToken(_roomToken);
+    }
     final pending = prefs.getStringList(_kPendingDeleteKey);
     if (pending != null) {
       _pendingDeletes
@@ -108,16 +121,26 @@ class SyncEngine {
     await _client.init();
     _uid = _client.uid;
     String? code;
-    // 客户端先查重，服务端仍会拒绝同码覆盖；极低概率碰撞时自动重试。
+    String? roomToken;
+    // 服务端原子拒绝同码覆盖；极低概率碰撞时只对 409 自动换码重试。
     for (var attempt = 0; attempt < 10; attempt++) {
       final candidate = _generateCode();
-      if (await _client.getRoom(candidate) != null) continue;
-      await _client.createRoom(candidate);
-      code = candidate;
-      break;
+      try {
+        roomToken = await _client.createRoom(candidate);
+        code = candidate;
+        break;
+      } on SyncServiceException catch (e) {
+        if (e.statusCode != 409) rethrow;
+      }
     }
-    if (code == null) throw Exception('生成情侣码失败，请重试');
+    if (code == null || roomToken == null) {
+      throw Exception('生成情侣码失败，请重试');
+    }
+    await _prepareSecureRepairIfNeeded();
     _roomId = code;
+    _roomToken = roomToken;
+    _client.useRoomToken(roomToken);
+    _requiresSecureRepair = false;
     await _saveState();
     start();
     await syncOnce();
@@ -132,10 +155,12 @@ class SyncEngine {
     }
     await _client.init();
     _uid = _client.uid;
-    final room = await _client.getRoom(normalized);
-    if (room == null) throw Exception('房间不存在，请检查情侣码');
-    await _client.addRoomMember(normalized, _uid!);
+    final roomToken = await _client.joinRoom(normalized, _uid!);
+    await _prepareSecureRepairIfNeeded();
     _roomId = normalized;
+    _roomToken = roomToken;
+    _client.useRoomToken(roomToken);
+    _requiresSecureRepair = false;
     await _saveState();
     start();
     await syncOnce();
@@ -146,6 +171,9 @@ class SyncEngine {
     stop();
     await _clearLocalSyncMeta();
     _roomId = null;
+    _roomToken = null;
+    _client.useRoomToken(null);
+    _requiresSecureRepair = false;
     _pendingDeletes.clear();
     await _saveState();
   }
@@ -170,7 +198,7 @@ class SyncEngine {
   /// 手动触发一次同步（删除墓碑 + 拉取对账 + 上传）
   Future<void> syncOnce() async {
     if (_syncing) return;
-    if (_roomId == null || !isConfigured) return;
+    if (!isPaired || !isConfigured) return;
     _syncing = true;
     final syncStartedAt = DateTime.now();
     try {
@@ -186,6 +214,15 @@ class SyncEngine {
     } finally {
       _syncing = false;
     }
+  }
+
+  /// 安全协议升级时，旧云端房间被封存。清除本机旧 cloudId 后，现有本地数据
+  /// 会作为新文档上传到新房间，不会携带旧房间的删除队列或对象关联。
+  Future<void> _prepareSecureRepairIfNeeded() async {
+    if (!_requiresSecureRepair) return;
+    await _clearLocalSyncMeta();
+    _pendingDeletes.clear();
+    await _savePendingDeletes();
   }
 
   // ──────── 上传（本机改动 → 云端） ────────
@@ -451,6 +488,11 @@ class SyncEngine {
       await prefs.setString(_kRoomKey, _roomId!);
     } else {
       await prefs.remove(_kRoomKey);
+    }
+    if (_roomToken != null && _roomToken!.isNotEmpty) {
+      await prefs.setString(_kRoomTokenKey, _roomToken!);
+    } else {
+      await prefs.remove(_kRoomTokenKey);
     }
     await _savePendingDeletes();
   }

@@ -14,7 +14,8 @@ import 'sync_models.dart';
 /// - 匿名 uid（客户端本地生成并持久化，与 SyncEngine 的 sync_uid 一致）
 /// - `/rooms` 房间、`/pairdata` 统一数据文档、`/photos` 照片文件
 ///
-/// 鉴权：请求头 X-Sync-Secret 携带部署时设置的 SYNC_SECRET。
+/// 鉴权分两层：X-Sync-Secret 只用于访问服务；配对后的房间数据还必须携带
+/// 服务端签发、仅保存在本机的 X-Room-Token，避免全局密钥泄露后跨房间访问。
 class ScfSyncClient implements CloudSyncClient {
   ScfSyncClient({
     http.Client? httpClient,
@@ -35,10 +36,11 @@ class ScfSyncClient implements CloudSyncClient {
   final String _syncSecret;
 
   String? _uid;
+  String? _roomToken;
   bool _initialized = false;
 
   @override
-  bool get isConfigured => _apiBaseUrl.isNotEmpty && _syncSecret.isNotEmpty;
+  bool get isConfigured => _apiBaseUrl.isNotEmpty && _syncSecret.length >= 32;
 
   @override
   bool get isInitialized => _initialized;
@@ -51,8 +53,18 @@ class ScfSyncClient implements CloudSyncClient {
     if (_ownsHttpClient) _httpClient.close();
   }
 
-  Map<String, String> _headers({bool json = true, bool b64 = false}) => {
+  @override
+  void useRoomToken(String? token) => _roomToken = token;
+
+  Map<String, String> _headers({
+    bool json = true,
+    bool b64 = false,
+    bool roomAuth = true,
+  }) =>
+      {
         'X-Sync-Secret': _syncSecret,
+        if (roomAuth && _roomToken != null && _roomToken!.isNotEmpty)
+          'X-Room-Token': _roomToken!,
         if (json) 'Content-Type': 'application/json',
         if (b64) 'X-Body-Encoding': 'base64',
       };
@@ -104,8 +116,9 @@ class ScfSyncClient implements CloudSyncClient {
       return decoded;
     }
     final message = decoded is Map ? decoded['error'] : null;
-    throw Exception(
-      '同步服务错误 ${res.statusCode}: ${message ?? '响应格式异常'}',
+    throw SyncServiceException(
+      res.statusCode,
+      (message ?? '响应格式异常').toString(),
     );
   }
 
@@ -132,32 +145,11 @@ class ScfSyncClient implements CloudSyncClient {
   // ──────── 房间 ────────
 
   @override
-  Future<Map<String, dynamic>?> getRoom(String code) async {
-    final res = await _httpClient
-        .get(
-          _uri('/rooms', {'code': code}),
-          headers: _headers(),
-        )
-        .timeout(_requestTimeout);
-    final parsed = _parse(res);
-    if (parsed == null) return null;
-    if (parsed is! Map) throw Exception('房间查询响应格式异常');
-    final data = Map<String, dynamic>.from(parsed);
-    if (data.containsKey('room')) {
-      final room = data['room'];
-      if (room == null) return null;
-      if (room is! Map) throw Exception('房间查询响应格式异常');
-      return Map<String, dynamic>.from(room);
-    }
-    return data;
-  }
-
-  @override
-  Future<void> createRoom(String code) async {
+  Future<String> createRoom(String code) async {
     final res = await _httpClient
         .post(
           _uri('/rooms'),
-          headers: _headers(json: false, b64: true),
+          headers: _headers(json: false, b64: true, roomAuth: false),
           body: _encodeBody({
             'code': code,
             'members': <String>[_uid!],
@@ -165,21 +157,33 @@ class ScfSyncClient implements CloudSyncClient {
           }),
         )
         .timeout(_requestTimeout);
-    _parseMap(res);
+    final token = _readRoomToken(_parseMap(res));
+    _roomToken = token;
+    return token;
   }
 
   @override
-  Future<void> addRoomMember(String code, String memberUid) async {
+  Future<String> joinRoom(String code, String memberUid) async {
     final res = await _httpClient
         .put(
           _uri('/rooms/$code'),
-          headers: _headers(json: false, b64: true),
+          headers: _headers(json: false, b64: true, roomAuth: false),
           body: _encodeBody({
             'members': <String>[memberUid]
           }),
         )
         .timeout(_requestTimeout);
-    _parseMap(res);
+    final token = _readRoomToken(_parseMap(res));
+    _roomToken = token;
+    return token;
+  }
+
+  String _readRoomToken(Map<String, dynamic> data) {
+    final token = data['roomToken'] as String?;
+    if (token == null || token.length < 32) {
+      throw Exception('同步服务未返回有效的房间令牌');
+    }
+    return token;
   }
 
   // ──────── 数据文档 ────────
@@ -257,6 +261,8 @@ class ScfSyncClient implements CloudSyncClient {
           }),
           headers: {
             'X-Sync-Secret': _syncSecret,
+            if (_roomToken != null && _roomToken!.isNotEmpty)
+              'X-Room-Token': _roomToken!,
             'Content-Type': 'text/plain',
           },
           body: base64Encode(bytes),

@@ -2,7 +2,9 @@
 ///
 /// 双人同步后端为自建云函数（腾讯云 Serverless，函数 URL 触发），数据存 COS：
 /// - [apiBaseUrl]：函数 URL（部署后获取）
-/// - [syncSecret]：与云函数环境变量 `SYNC_SECRET` 一致（防陌生人访问）
+/// - [syncSecret]：与云函数环境变量 `SYNC_SECRET` 一致，至少 32 个字符
+///
+/// 全局密钥只负责服务入口防护；每个房间还有服务端签发的独立令牌。
 ///
 /// 运行/打包时注入（覆盖默认值）：
 /// ```bash
@@ -23,9 +25,9 @@ class SyncConfig {
     defaultValue: '',
   );
 
-  /// 是否已配置（未配置时同步功能自动禁用，App 保持纯本地可用）
+  /// 是否已安全配置（过短密钥按未配置处理，App 保持纯本地可用）
   static bool get isConfigured =>
-      apiBaseUrl.isNotEmpty && syncSecret.isNotEmpty;
+      apiBaseUrl.isNotEmpty && syncSecret.length >= 32;
 
   /// 轮询间隔（双端低频互动场景 60s 足够；免费额度内可放宽）
   static const Duration syncInterval = Duration(seconds: 60);

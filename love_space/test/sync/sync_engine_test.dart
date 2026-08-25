@@ -257,6 +257,7 @@ void main() {
     });
     SharedPreferences.setMockInitialValues({
       'sync_room': 'ABC234',
+      'sync_room_token': 'token-ABC234-test-user',
       'sync_uid': 'test-user',
     });
 
@@ -265,6 +266,25 @@ void main() {
 
     expect((await isar.wishs.where().findFirst())!.title, '云端新版');
     expect(client.docs.single.data['title'], '云端新版');
+  });
+
+  test('旧版无房间令牌的配对会暂停同步并要求安全重配', () async {
+    if (!isarOpened) {
+      markTestSkipped('Isar 原生库不可用，跳过同步引擎测试');
+      return;
+    }
+    final client = FakeCloudSyncClient();
+    SharedPreferences.setMockInitialValues({
+      'sync_room': 'ABC234',
+      'sync_uid': 'test-user',
+    });
+
+    final engine = SyncEngine(isar: isar, client: client);
+    await engine.init();
+
+    expect(engine.isPaired, isFalse);
+    expect(engine.requiresSecureRepair, isTrue);
+    expect(client.isInitialized, isFalse);
   });
 
   test('加入房间时匹配双方相同种子数据，不重复新增和上传', () async {

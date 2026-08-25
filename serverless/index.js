@@ -13,7 +13,8 @@
  *  - sync/pairdata/{roomId}/{cloudId}.json
  *  - sync/photos/{roomId}/{name}
  *
- * 鉴权：请求头 X-Sync-Secret 必须等于环境变量 SYNC_SECRET（防陌生人访问）。
+ * 鉴权：X-Sync-Secret 仅作为服务入口密钥；每个房间另有独立随机令牌，
+ * 数据与照片接口必须同时提供 X-Room-Token，令牌明文只返回给配对设备。
  */
 
 const COS = require('cos-nodejs-sdk-v5');
@@ -46,8 +47,13 @@ function unauthorized() {
   };
 }
 
+function roomUnauthorized(message = 'invalid room token', statusCode = 403) {
+  return fail(message, statusCode);
+}
+
 function hasValidSecret(headers) {
-  if (!SECRET) return false; // 未配置时关闭服务，避免意外公开全部数据
+  // 过短的共享密钥等同于未配置；房间令牌之外仍保留这一层入口防护。
+  if (Buffer.byteLength(SECRET, 'utf8') < 32) return false;
   const supplied = headers['x-sync-secret'];
   if (typeof supplied !== 'string') return false;
   const expectedBytes = Buffer.from(SECRET);
@@ -160,32 +166,80 @@ function genId() {
   return crypto.randomUUID();
 }
 
+function genRoomToken() {
+  return crypto.randomBytes(32).toString('base64url');
+}
+
+function hashRoomToken(token) {
+  return crypto.createHash('sha256').update(token, 'utf8').digest('hex');
+}
+
+function hasValidRoomToken(room, supplied) {
+  if (!room || room.authVersion !== 1 ||
+      !room.memberTokenHashes || typeof supplied !== 'string') {
+    return false;
+  }
+  const suppliedHash = Buffer.from(hashRoomToken(supplied), 'hex');
+  return Object.values(room.memberTokenHashes).some((expected) => {
+    if (typeof expected !== 'string') return false;
+    const expectedHash = Buffer.from(expected, 'hex');
+    return expectedHash.length === suppliedHash.length &&
+      crypto.timingSafeEqual(expectedHash, suppliedHash);
+  });
+}
+
+function publicRoom(room) {
+  if (!room) return null;
+  const { memberTokenHashes, ...safe } = room;
+  return safe;
+}
+
 // ──────── 房间 ────────
 
 async function getRoom(code) {
   return readJson(`sync/rooms/${code}.json`);
 }
 
-async function handleRooms(method, query, body) {
+async function requireRoomAccess(roomId, headers) {
+  const room = await getRoom(roomId);
+  if (!room) return { error: fail('room not found', 404) };
+  if (room.authVersion !== 1 || !room.memberTokenHashes) {
+    return { error: fail('legacy room must be recreated', 426) };
+  }
+  if (!hasValidRoomToken(room, headers['x-room-token'])) {
+    return { error: roomUnauthorized() };
+  }
+  return { room };
+}
+
+async function handleRooms(method, query, body, headers) {
   const code = query.code;
   if (method === 'GET') {
     if (!ROOM_CODE_RE.test(code || '')) return fail('invalid room code', 400);
-    const room = await getRoom(code);
-    return okJson({ room: room || null });
+    const access = await requireRoomAccess(code, headers);
+    if (access.error) return access.error;
+    return okJson({ room: publicRoom(access.room) });
   }
   if (method === 'POST') {
     if (!body || !ROOM_CODE_RE.test(body.code || '') ||
         !Array.isArray(body.members) || body.members.length !== 1 ||
-        typeof body.members[0] !== 'string' || !body.members[0]) {
+        typeof body.members[0] !== 'string' ||
+        !SAFE_ID_RE.test(body.members[0])) {
       return fail('invalid room', 400);
     }
     if (await getRoom(body.code)) return fail('room already exists', 409);
-    await writeJson(`sync/rooms/${body.code}.json`, {
+    const roomToken = genRoomToken();
+    const room = {
       code: body.code,
       members: body.members,
       createdAt: new Date().toISOString(),
-    });
-    return okJson({ ok: true });
+      authVersion: 1,
+      memberTokenHashes: {
+        [body.members[0]]: hashRoomToken(roomToken),
+      },
+    };
+    await writeJson(`sync/rooms/${body.code}.json`, room);
+    return okJson({ room: publicRoom(room), roomToken }, 201);
   }
   return fail('method not allowed', 405);
 }
@@ -194,24 +248,40 @@ async function handleRoomUpdate(code, body) {
   if (!ROOM_CODE_RE.test(code || '')) return fail('invalid room code', 400);
   const room = await getRoom(code);
   if (!room) return fail('room not found', 404);
+  if (room.authVersion !== 1 || !room.memberTokenHashes) {
+    return fail('legacy room must be recreated', 426);
+  }
   if (!body || !Array.isArray(body.members) || body.members.length !== 1 ||
-      typeof body.members[0] !== 'string' || !body.members[0]) {
+      typeof body.members[0] !== 'string' ||
+      !SAFE_ID_RE.test(body.members[0])) {
     return fail('invalid member', 400);
   }
-  const members = [...new Set([...(room.members || []), body.members[0]])];
-  if (members.length > 2) return fail('room is full', 409);
+  const memberId = body.members[0];
+  const existingMembers = room.members || [];
+  if (existingMembers.includes(memberId)) {
+    return fail('member already joined; room token cannot be reissued', 409);
+  }
+  if (existingMembers.length >= 2) return fail('room is full', 409);
+  const roomToken = genRoomToken();
+  const members = [...existingMembers, memberId];
   room.members = members;
+  room.memberTokenHashes[memberId] = hashRoomToken(roomToken);
+  room.updatedAt = new Date().toISOString();
   await writeJson(`sync/rooms/${code}.json`, room);
-  return okJson(room);
+  return okJson({ room: publicRoom(room), roomToken });
 }
 
 // ──────── 统一数据文档 ────────
 
-async function handlePairData(method, cloudId, query, body) {
+async function handlePairData(method, cloudId, query, body, headers) {
+  const roomId = method === 'GET' || method === 'DELETE'
+    ? query.roomId
+    : body && body.roomId;
+  if (!ROOM_CODE_RE.test(roomId || '')) return fail('invalid roomId', 400);
+  const access = await requireRoomAccess(roomId, headers);
+  if (access.error) return access.error;
+
   if (method === 'GET') {
-    const roomId = query.roomId;
-    if (!ROOM_CODE_RE.test(roomId || '')) return fail('invalid roomId', 400);
-    if (!await getRoom(roomId)) return fail('room not found', 404);
     const keys = await listObjects(`sync/pairdata/${roomId}/`);
     const docs = [];
     // 避免数百个 COS 读取完全串行，也避免一次发起过多请求。
@@ -229,7 +299,6 @@ async function handlePairData(method, cloudId, query, body) {
         !body.data || typeof body.data !== 'object') {
       return fail('invalid doc', 400);
     }
-    if (!await getRoom(body.roomId)) return fail('room not found', 404);
     const id = genId();
     const doc = { ...body, cloudId: id, deleted: false };
     await writeJson(`sync/pairdata/${body.roomId}/${id}.json`, doc);
@@ -240,7 +309,6 @@ async function handlePairData(method, cloudId, query, body) {
     if (!ROOM_CODE_RE.test(roomId || '') || !SAFE_ID_RE.test(cloudId)) {
       return fail('invalid document key', 400);
     }
-    if (!await getRoom(roomId)) return fail('room not found', 404);
     await writeJson(`sync/pairdata/${roomId}/${cloudId}.json`, {
       ...body,
       cloudId,
@@ -301,14 +369,14 @@ function getSignedUrl(key, expires) {
   });
 }
 
-async function handlePhotos(method, query, body, isBase64) {
+async function handlePhotos(method, query, body, isBase64, headers) {
   const name = query.name;
   if (!SAFE_ID_RE.test(name || '')) return fail('invalid name', 400);
   // 文件名形如 {roomId}-{cloudId}.jpg，前缀即房间码
   const roomId = name.split('-')[0];
-  if (!ROOM_CODE_RE.test(roomId) || !await getRoom(roomId)) {
-    return fail('room not found', 404);
-  }
+  if (!ROOM_CODE_RE.test(roomId)) return fail('room not found', 404);
+  const access = await requireRoomAccess(roomId, headers);
+  if (access.error) return access.error;
   const key = `sync/photos/${roomId}/${name}`;
 
   if (method === 'POST') {
@@ -371,7 +439,7 @@ exports.main_handler = async (event, context) => {
 
     // 路由
     if (path.endsWith('/rooms')) {
-      return await handleRooms(method, query, body);
+      return await handleRooms(method, query, body, headers);
     }
     const roomMatch = path.match(/\/rooms\/([^/]+)$/);
     if (roomMatch) {
@@ -379,10 +447,10 @@ exports.main_handler = async (event, context) => {
     }
     if (path.includes('/pairdata')) {
       const idMatch = path.match(/\/pairdata\/([^/]+)$/);
-      return await handlePairData(method, idMatch ? idMatch[1] : null, query, body);
+      return await handlePairData(method, idMatch ? idMatch[1] : null, query, body, headers);
     }
     if (path.includes('/photos')) {
-      return await handlePhotos(method, query, body, isBase64);
+      return await handlePhotos(method, query, body, isBase64, headers);
     }
     return okJson({ ok: true, service: 'love-space-sync' });
   } catch (e) {

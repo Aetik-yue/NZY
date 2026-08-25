@@ -39,6 +39,7 @@ final syncStatusProvider = StreamProvider<SyncStatus>((ref) {
     return SyncStatus(
       isConfigured: engine.isConfigured,
       isPaired: engine.isPaired,
+      requiresSecureRepair: engine.requiresSecureRepair,
       roomCode: engine.roomCode,
       lastSyncAt: engine.lastSyncAt,
       isSyncing: engine.isSyncing,
@@ -51,6 +52,7 @@ final syncStatusProvider = StreamProvider<SyncStatus>((ref) {
 class SyncStatus {
   final bool isConfigured;
   final bool isPaired;
+  final bool requiresSecureRepair;
   final String? roomCode;
   final DateTime? lastSyncAt;
   final bool isSyncing;
@@ -59,6 +61,7 @@ class SyncStatus {
   const SyncStatus({
     required this.isConfigured,
     required this.isPaired,
+    this.requiresSecureRepair = false,
     this.roomCode,
     this.lastSyncAt,
     required this.isSyncing,
@@ -68,6 +71,7 @@ class SyncStatus {
   SyncStatus copyWith({
     bool? isConfigured,
     bool? isPaired,
+    bool? requiresSecureRepair,
     String? roomCode,
     DateTime? lastSyncAt,
     bool? isSyncing,
@@ -76,6 +80,7 @@ class SyncStatus {
       SyncStatus(
         isConfigured: isConfigured ?? this.isConfigured,
         isPaired: isPaired ?? this.isPaired,
+        requiresSecureRepair: requiresSecureRepair ?? this.requiresSecureRepair,
         roomCode: roomCode ?? this.roomCode,
         lastSyncAt: lastSyncAt ?? this.lastSyncAt,
         isSyncing: isSyncing ?? this.isSyncing,
@@ -87,6 +92,7 @@ class SyncStatus {
       other is SyncStatus &&
       other.isConfigured == isConfigured &&
       other.isPaired == isPaired &&
+      other.requiresSecureRepair == requiresSecureRepair &&
       other.roomCode == roomCode &&
       other.lastSyncAt == lastSyncAt &&
       other.isSyncing == isSyncing &&
@@ -96,6 +102,7 @@ class SyncStatus {
   int get hashCode => Object.hash(
         isConfigured,
         isPaired,
+        requiresSecureRepair,
         roomCode,
         lastSyncAt,
         isSyncing,

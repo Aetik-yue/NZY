@@ -102,6 +102,7 @@ class _SyncPairingPageState extends ConsumerState<SyncPairingPage> {
     final status = ref.watch(syncStatusProvider).valueOrNull;
     final isConfigured = status?.isConfigured ?? false;
     final isPaired = status?.isPaired ?? false;
+    final requiresSecureRepair = status?.requiresSecureRepair ?? false;
     final roomCode = status?.roomCode;
 
     return Scaffold(
@@ -148,7 +149,9 @@ class _SyncPairingPageState extends ConsumerState<SyncPairingPage> {
                 Text(
                   isPaired
                       ? '已绑定：房间 ${roomCode ?? ''}'
-                      : (isConfigured ? '还没有绑定小伙伴' : '双人同步未启用'),
+                      : (requiresSecureRepair
+                          ? '同步安全升级'
+                          : (isConfigured ? '还没有绑定小伙伴' : '双人同步未启用')),
                   style: AppTextStyles.titleMedium.copyWith(
                     color: AppColors.textOnPink,
                   ),
@@ -157,9 +160,11 @@ class _SyncPairingPageState extends ConsumerState<SyncPairingPage> {
                 Text(
                   isPaired
                       ? '你与 TA 的数据将自动同步共享'
-                      : (isConfigured
-                          ? '创建房间或输入 TA 的情侣码'
-                          : '需配置同步服务 URL 与密钥后启用（见项目文档）'),
+                      : (requiresSecureRepair
+                          ? '旧配对已暂停，请双方创建并加入一个新房间'
+                          : (isConfigured
+                              ? '创建房间或输入 TA 的情侣码'
+                              : '需配置同步服务 URL 与密钥后启用（见项目文档）')),
                   style: AppTextStyles.bodySmall.copyWith(
                     color: Colors.white70,
                   ),
