@@ -1,6 +1,6 @@
 {
   "name": "love-space-sync",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "以越之名 · 双人同步云函数（腾讯云 SCF + COS）",
   "main": "index.js",
   "scripts": {
