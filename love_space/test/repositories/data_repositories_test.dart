@@ -29,6 +29,7 @@ import 'package:love_space/data/repositories/memo_repository.dart';
 import 'package:love_space/data/repositories/album_repository.dart';
 import 'package:love_space/data/repositories/crawl_config_repository.dart';
 import 'package:love_space/data/repositories/reader_settings_repository.dart';
+import 'package:love_space/data/repositories/settings_repository.dart';
 import 'package:love_space/data/repositories/anniversary_repository.dart';
 import 'package:love_space/data/repositories/novel_repository.dart';
 import 'package:love_space/data/repositories/novel_chapter_repository.dart';
@@ -259,6 +260,30 @@ void main() {
       await repo.save(updated);
       final after = await repo.watch().first;
       expect(after!.fontSize, 22);
+    });
+  });
+
+  group('SettingsRepository', () {
+    test('主页合照路径保存后仍复用设置单例行', () async {
+      if (!isarOpened) {
+        markTestSkipped('Isar 原生库不可用，跳过数据层测试');
+        return;
+      }
+      final repository = SettingsRepository(isar);
+      final settings = AppSettings()
+        ..partner1Name = '小桃'
+        ..partner2Name = '阿树'
+        ..togetherSince = DateTime(2025, 10, 16)
+        ..profileCoverPath = 'C:/photos/couple.jpg';
+      await repository.save(settings);
+
+      final saved = await repository.get();
+      expect(saved!.profileCoverPath, 'C:/photos/couple.jpg');
+
+      saved.profileCoverPath = null;
+      await repository.save(saved);
+      expect((await isar.appSettings.where().findAll()), hasLength(1));
+      expect((await repository.get())!.profileCoverPath, isNull);
     });
   });
 

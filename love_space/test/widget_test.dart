@@ -11,12 +11,12 @@ import 'package:love_space/data/models/pomodoro_settings.dart';
 import 'package:love_space/data/models/reader_settings.dart';
 import 'package:love_space/core/utils/date_utils.dart';
 import 'package:love_space/features/games/breakout/breakout_page.dart';
+import 'package:love_space/features/games/games_page.dart';
 import 'package:love_space/features/music/providers/audio_backend.dart';
 import 'package:love_space/features/music/providers/music_player_provider.dart';
 import 'package:love_space/features/music/providers/music_library_provider.dart';
 import 'package:love_space/features/pomodoro/presentation/pomodoro_page.dart';
 import 'package:love_space/data/sync/sync_providers.dart';
-import 'package:love_space/shared/layouts/main_shell.dart';
 import 'package:love_space/shared/widgets/pill_nav_bar.dart';
 
 /// 公共 overrides：所有被页面 watch 的 provider 在此统一覆盖，
@@ -131,7 +131,7 @@ void main() {
     expect(find.text('加载失败'), findsNothing);
   });
 
-  testWidgets('我的页点击小说卡应切换到小说 Tab', (WidgetTester tester) async {
+  testWidgets('我的页点击小游戏卡应打开游戏中心', (WidgetTester tester) async {
     await tester.pumpWidget(
       ProviderScope(
         overrides: _buildOverrides(),
@@ -149,19 +149,15 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // 小说功能卡的副文案（书架为空时的引导文案），点击应触发切 Tab
-    await tester.ensureVisible(find.text('一起读书吧'));
+    // 截图指定位置的原小说卡已替换为小游戏入口
+    await tester.ensureVisible(find.text('一起玩一局'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('一起读书吧'));
+    await tester.tap(find.text('一起玩一局'));
     await tester.pumpAndSettle();
 
-    // 验证 currentTabProvider 已切到小说 Tab
-    final container = ProviderScope.containerOf(
-      tester.element(find.byType(MainShell)),
-    );
-    expect(container.read(currentTabProvider), NavTab.novel);
-    // 小说页已可见（书架空态）
-    expect(find.text('书架还空空的'), findsOneWidget);
+    expect(find.byType(GamesPage), findsOneWidget);
+    expect(find.text('打砖块'), findsOneWidget);
+    expect(find.text('俄罗斯方块'), findsOneWidget);
   });
 
   testWidgets('BreakoutPage renders with ready overlay', (tester) async {

@@ -110,6 +110,13 @@ class AppColors {
     colors: [Color(0xFFFF8FB1), Color(0xFFFFB5CC)],
   );
 
+  /// 情侣合照封面的渐暗遮罩，保证任何照片上的白色文字都清晰可读。
+  static const profileCoverOverlay = LinearGradient(
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+    colors: [Color(0x26000000), Color(0xA6000000)],
+  );
+
   /// 音乐迷你播放卡渐变（樱花粉 → 柔玫瑰粉）
   static const musicCardGradient = LinearGradient(
     colors: [Color(0xFFFFD4E0), Color(0xFFFFA1C6)],

@@ -16,4 +16,7 @@ class AppSettings {
 
   /// 隐私开关：隐藏首页/我的页的「在一起天数」
   bool hideDaysTogether = false;
+
+  /// 「我的」页顶部情侣卡背景图；null 时使用默认粉色渐变。
+  String? profileCoverPath;
 }

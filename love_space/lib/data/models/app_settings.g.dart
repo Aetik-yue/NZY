@@ -32,8 +32,13 @@ const AppSettingsSchema = CollectionSchema(
       name: r'partner2Name',
       type: IsarType.string,
     ),
-    r'togetherSince': PropertySchema(
+    r'profileCoverPath': PropertySchema(
       id: 3,
+      name: r'profileCoverPath',
+      type: IsarType.string,
+    ),
+    r'togetherSince': PropertySchema(
+      id: 4,
       name: r'togetherSince',
       type: IsarType.dateTime,
     )
@@ -60,6 +65,12 @@ int _appSettingsEstimateSize(
   var bytesCount = offsets.last;
   bytesCount += 3 + object.partner1Name.length * 3;
   bytesCount += 3 + object.partner2Name.length * 3;
+  {
+    final value = object.profileCoverPath;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
   return bytesCount;
 }
 
@@ -72,7 +83,8 @@ void _appSettingsSerialize(
   writer.writeBool(offsets[0], object.hideDaysTogether);
   writer.writeString(offsets[1], object.partner1Name);
   writer.writeString(offsets[2], object.partner2Name);
-  writer.writeDateTime(offsets[3], object.togetherSince);
+  writer.writeString(offsets[3], object.profileCoverPath);
+  writer.writeDateTime(offsets[4], object.togetherSince);
 }
 
 AppSettings _appSettingsDeserialize(
@@ -86,7 +98,8 @@ AppSettings _appSettingsDeserialize(
   object.id = id;
   object.partner1Name = reader.readString(offsets[1]);
   object.partner2Name = reader.readString(offsets[2]);
-  object.togetherSince = reader.readDateTime(offsets[3]);
+  object.profileCoverPath = reader.readStringOrNull(offsets[3]);
+  object.togetherSince = reader.readDateTime(offsets[4]);
   return object;
 }
 
@@ -104,6 +117,8 @@ P _appSettingsDeserializeProp<P>(
     case 2:
       return (reader.readString(offset)) as P;
     case 3:
+      return (reader.readStringOrNull(offset)) as P;
+    case 4:
       return (reader.readDateTime(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -539,6 +554,160 @@ extension AppSettingsQueryFilter
   }
 
   QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+      profileCoverPathIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'profileCoverPath',
+      ));
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+      profileCoverPathIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'profileCoverPath',
+      ));
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+      profileCoverPathEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'profileCoverPath',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+      profileCoverPathGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'profileCoverPath',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+      profileCoverPathLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'profileCoverPath',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+      profileCoverPathBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'profileCoverPath',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+      profileCoverPathStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'profileCoverPath',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+      profileCoverPathEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'profileCoverPath',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+      profileCoverPathContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'profileCoverPath',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+      profileCoverPathMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'profileCoverPath',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+      profileCoverPathIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'profileCoverPath',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+      profileCoverPathIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'profileCoverPath',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
       togetherSinceEqualTo(DateTime value) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.equalTo(
@@ -643,6 +812,20 @@ extension AppSettingsQuerySortBy
     });
   }
 
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+      sortByProfileCoverPath() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'profileCoverPath', Sort.asc);
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+      sortByProfileCoverPathDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'profileCoverPath', Sort.desc);
+    });
+  }
+
   QueryBuilder<AppSettings, AppSettings, QAfterSortBy> sortByTogetherSince() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'togetherSince', Sort.asc);
@@ -711,6 +894,20 @@ extension AppSettingsQuerySortThenBy
     });
   }
 
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+      thenByProfileCoverPath() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'profileCoverPath', Sort.asc);
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+      thenByProfileCoverPathDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'profileCoverPath', Sort.desc);
+    });
+  }
+
   QueryBuilder<AppSettings, AppSettings, QAfterSortBy> thenByTogetherSince() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'togetherSince', Sort.asc);
@@ -748,6 +945,14 @@ extension AppSettingsQueryWhereDistinct
     });
   }
 
+  QueryBuilder<AppSettings, AppSettings, QDistinct> distinctByProfileCoverPath(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'profileCoverPath',
+          caseSensitive: caseSensitive);
+    });
+  }
+
   QueryBuilder<AppSettings, AppSettings, QDistinct> distinctByTogetherSince() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'togetherSince');
@@ -778,6 +983,13 @@ extension AppSettingsQueryProperty
   QueryBuilder<AppSettings, String, QQueryOperations> partner2NameProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'partner2Name');
+    });
+  }
+
+  QueryBuilder<AppSettings, String?, QQueryOperations>
+      profileCoverPathProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'profileCoverPath');
     });
   }
 

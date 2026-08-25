@@ -374,9 +374,9 @@ final memoAuthorFilterProvider = StateProvider<int?>((ref) => null);
 /// 待办筛选（全部/待办/已完成）
 enum TodoFilter { all, active, done }
 
-/// 当前待办筛选状态（默认全部）
+/// 当前待办筛选状态（默认只看待完成，进入页面即可聚焦下一件事）
 final memoDoneFilterProvider =
-    StateProvider<TodoFilter>((ref) => TodoFilter.all);
+    StateProvider<TodoFilter>((ref) => TodoFilter.active);
 
 /// 过滤后的待办（搜索 + 标签 + 作者 + 完成状态 + 排序）
 ///

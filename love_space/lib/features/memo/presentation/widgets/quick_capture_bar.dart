@@ -1,15 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_text_styles.dart';
 import '../../../../data/models/memo.dart';
 import '../../../../data/providers/data_providers.dart';
 import '../../../../shared/widgets/app_snackbar.dart';
 
-/// 顶部快速输入栏
-///
-/// 输入文字后按回车或点击发送按钮直接保存，无需手动保存。
-/// 支持切换当前作者（1 或 2）。
+/// 一行完成待办录入：输入内容，按回车或点击加号保存。
 class QuickCaptureBar extends ConsumerStatefulWidget {
   const QuickCaptureBar({super.key});
 
@@ -20,9 +18,6 @@ class QuickCaptureBar extends ConsumerStatefulWidget {
 class _QuickCaptureBarState extends ConsumerState<QuickCaptureBar> {
   final TextEditingController _controller = TextEditingController();
   final FocusNode _focusNode = FocusNode();
-  int _author = 1;
-
-  /// 防重：提交进行中禁止再次提交（快速连按回车）
   bool _submitting = false;
 
   @override
@@ -35,26 +30,23 @@ class _QuickCaptureBarState extends ConsumerState<QuickCaptureBar> {
   Future<void> _submit() async {
     final content = _controller.text.trim();
     if (content.isEmpty || _submitting) return;
-
     setState(() => _submitting = true);
     try {
-      final repo = ref.read(memoRepositoryProvider);
-      await repo.add(Memo()
+      await ref.read(memoRepositoryProvider).add(Memo()
         ..content = content
-        ..author = _author
+        ..author = 1
         ..isPinned = false
-        ..colorValue = _author == 1
-            ? AppColors.accentPink.toARGB32()
-            : AppColors.accentPeach.toARGB32()
-        ..createdAt = DateTime.now());
-
+        ..colorValue = AppColors.accentPink.toARGB32()
+        ..createdAt = DateTime.now()
+        ..done = false
+        ..priority = TodoPriority.none);
       if (!mounted) return;
       _controller.clear();
-      // 保持焦点，方便连续输入
       _focusNode.requestFocus();
-    } catch (e) {
-      debugPrint('[QuickCaptureBar] 保存失败: $e');
-      if (mounted) AppSnackbar.show(context, '保存失败，请重试');
+      ref.read(memoDoneFilterProvider.notifier).state = TodoFilter.active;
+    } catch (error) {
+      debugPrint('[QuickCaptureBar] 保存失败: $error');
+      if (mounted) AppSnackbar.show(context, '添加失败，请重试');
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
@@ -63,48 +55,31 @@ class _QuickCaptureBarState extends ConsumerState<QuickCaptureBar> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.fromLTRB(14, 8, 8, 8),
       decoration: BoxDecoration(
         color: AppColors.bgCard,
         borderRadius: BorderRadius.circular(AppColors.radiusMd),
         border: Border.all(color: AppColors.borderSoft),
+        boxShadow: const [
+          BoxShadow(color: AppColors.shadowCard, blurRadius: 14),
+        ],
       ),
       child: Row(
         children: [
-          // 作者头像（可点击切换）
-          GestureDetector(
-            onTap: () => setState(() => _author = _author == 1 ? 2 : 1),
-            child: Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                color:
-                    _author == 1 ? AppColors.accentRose : AppColors.accentPeach,
-                shape: BoxShape.circle,
-              ),
-              child: Center(
-                child: Text(
-                  _author == 1 ? '越' : '名',
-                  style: AppTextStyles.onPink.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ),
-          ),
+          const Icon(Icons.radio_button_unchecked_rounded,
+              color: AppColors.accentPinkSoft, size: 22),
           const SizedBox(width: 10),
-          // 输入框
           Expanded(
             child: TextField(
+              key: const Key('quick_todo_input'),
               controller: _controller,
               focusNode: _focusNode,
               textInputAction: TextInputAction.send,
               onSubmitted: (_) => _submit(),
               decoration: InputDecoration(
-                hintText: '记录点什么...',
-                hintStyle: AppTextStyles.body.copyWith(
-                  color: AppColors.textTertiary,
-                ),
+                hintText: '写下要做的事…',
+                hintStyle:
+                    AppTextStyles.body.copyWith(color: AppColors.textTertiary),
                 border: InputBorder.none,
                 contentPadding: EdgeInsets.zero,
                 isDense: true,
@@ -112,11 +87,24 @@ class _QuickCaptureBarState extends ConsumerState<QuickCaptureBar> {
               style: AppTextStyles.body,
             ),
           ),
-          // 发送按钮
-          IconButton(
-            icon: const Icon(Icons.send_rounded, size: 20),
-            color: AppColors.accentRose,
-            onPressed: _submit,
+          IconButton.filled(
+            key: const Key('quick_todo_add'),
+            tooltip: '添加待办',
+            onPressed: _submitting ? null : _submit,
+            icon: _submitting
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: AppColors.textOnPink,
+                    ),
+                  )
+                : const Icon(Icons.add_rounded, size: 22),
+            style: IconButton.styleFrom(
+              backgroundColor: AppColors.accentRose,
+              foregroundColor: AppColors.textOnPink,
+            ),
           ),
         ],
       ),
