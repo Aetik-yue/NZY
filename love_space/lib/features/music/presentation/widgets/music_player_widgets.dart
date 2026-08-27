@@ -202,7 +202,7 @@ class MusicControls extends ConsumerWidget {
               TextButton.icon(
                 onPressed: () => PlaylistSheet.show(context),
                 icon: const Icon(Icons.queue_music_rounded, size: 22),
-                label: const Text('播放列表'),
+                label: const Text('我们的歌'),
                 style: TextButton.styleFrom(
                   foregroundColor: AppColors.textSecondary,
                   minimumSize: const Size(48, 48),

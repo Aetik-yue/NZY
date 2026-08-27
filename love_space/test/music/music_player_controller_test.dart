@@ -31,6 +31,7 @@ class ControllableBackend extends FakeAudioBackend {
   final List<Completer<void>> setUrlCompleters = [];
   final List<String> setUrlCalls = [];
   final List<String> playedUrls = [];
+  int stopCalls = 0;
   String? _activeUrl;
 
   /// 标记某 URI 播放必定失败
@@ -59,6 +60,13 @@ class ControllableBackend extends FakeAudioBackend {
   Future<void> play() async {
     if (_activeUrl != null) playedUrls.add(_activeUrl!);
     await super.play();
+  }
+
+  @override
+  Future<void> stop() async {
+    stopCalls++;
+    _activeUrl = null;
+    await super.stop();
   }
 }
 
@@ -383,6 +391,104 @@ void main() {
     expect(state.isPlaying, true);
     expect(state.position, const Duration(seconds: 5)); // 续播位置，未被重置为 0
     expect(backend.setUrlCalls, ['file:///song3.mp3']); // 恢复未重复 setUrl
+  });
+
+  test('reconcilePlaylist 当前歌曲仍存在：保留播放、进度和加载身份', () async {
+    final backend = ControllableBackend();
+    final container = _containerWith(backend);
+    addTearDown(container.dispose);
+    addTearDown(backend.dispose);
+
+    final ctrl = container.read(musicPlayerProvider.notifier);
+    ctrl.setPlaylist([_song(1), _song(2)]);
+    await ctrl.selectSong(1);
+    await ctrl.seekTo(const Duration(seconds: 5));
+
+    await ctrl.reconcilePlaylist([_song(3), _song(2), _song(1)]);
+
+    final state = container.read(musicPlayerProvider);
+    expect(state.currentIndex, 1);
+    expect(state.currentSong!.id, 2);
+    expect(state.isPlaying, isTrue);
+    expect(state.position, const Duration(seconds: 5));
+    expect(backend.stopCalls, 0);
+    expect(backend.setUrlCalls, ['file:///song2.mp3']);
+  });
+
+  test('reconcilePlaylist 当前歌曲消失：停止旧音源并选中第一首但不播放', () async {
+    final backend = ControllableBackend();
+    final container = _containerWith(backend);
+    addTearDown(container.dispose);
+    addTearDown(backend.dispose);
+
+    final ctrl = container.read(musicPlayerProvider.notifier);
+    ctrl.setPlaylist([_song(1), _song(2)]);
+    await ctrl.selectSong(1);
+    backend.setDuration(const Duration(seconds: 10));
+    await ctrl.seekTo(const Duration(seconds: 5));
+
+    await ctrl.reconcilePlaylist([_song(3), _song(1)]);
+
+    final state = container.read(musicPlayerProvider);
+    expect(backend.stopCalls, 1);
+    expect(state.currentIndex, 0);
+    expect(state.currentSong!.id, 3);
+    expect(state.isPlaying, isFalse);
+    expect(state.isLoading, isFalse);
+    expect(state.position, Duration.zero);
+    expect(state.duration, isNull);
+    expect(backend.setUrlCalls, ['file:///song2.mp3']);
+    expect(state.isHidden, isFalse);
+  });
+
+  test('reconcilePlaylist 成功空歌单：停止音源、清空状态并隐藏迷你条', () async {
+    final backend = ControllableBackend();
+    final container = _containerWith(backend);
+    addTearDown(container.dispose);
+    addTearDown(backend.dispose);
+
+    final ctrl = container.read(musicPlayerProvider.notifier);
+    ctrl.setPlaylist([_song(1)]);
+    await ctrl.selectSong(0);
+    backend.setDuration(const Duration(seconds: 10));
+    await ctrl.seekTo(const Duration(seconds: 5));
+
+    await ctrl.reconcilePlaylist(const []);
+
+    final state = container.read(musicPlayerProvider);
+    expect(backend.stopCalls, 1);
+    expect(state.playlist, isEmpty);
+    expect(state.currentIndex, -1);
+    expect(state.currentSong, isNull);
+    expect(state.isPlaying, isFalse);
+    expect(state.position, Duration.zero);
+    expect(state.duration, isNull);
+    expect(state.isHidden, isTrue);
+  });
+
+  test('reconcilePlaylist 使旧在途加载失效，完成后不能覆盖新歌单', () async {
+    final backend = ControllableBackend(manualSetUrl: true);
+    final container = _containerWith(backend);
+    addTearDown(container.dispose);
+    addTearDown(backend.dispose);
+
+    final ctrl = container.read(musicPlayerProvider.notifier);
+    ctrl.setPlaylist([_song(1)]);
+    final oldLoad = ctrl.selectSong(0);
+    expect(container.read(musicPlayerProvider).isLoading, isTrue);
+
+    await ctrl.reconcilePlaylist([_song(2)]);
+    expect(backend.stopCalls, 1);
+    expect(container.read(musicPlayerProvider).currentSong!.id, 2);
+    expect(container.read(musicPlayerProvider).isLoading, isFalse);
+
+    backend.setUrlCompleters.single.complete();
+    await oldLoad;
+
+    final state = container.read(musicPlayerProvider);
+    expect(state.currentSong!.id, 2);
+    expect(state.isPlaying, isFalse);
+    expect(backend.playedUrls, isEmpty);
   });
 
   test('setPlaylist 自动选中首个可播曲目（首首无 URI 时跳过）', () {

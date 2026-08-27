@@ -28,6 +28,8 @@ class MusicPlaybackException implements Exception {
 /// 播放模式
 enum PlayMode { sequence, shuffle, repeatOne }
 
+const Object _keepDuration = Object();
+
 /// 播放器状态
 class MusicPlayerState {
   final List<MusicSong> playlist;
@@ -55,7 +57,7 @@ class MusicPlayerState {
     int? currentIndex,
     bool? isPlaying,
     Duration? position,
-    Duration? duration,
+    Object? duration = _keepDuration,
     bool? isLoading,
     PlayMode? playMode,
     bool? isHidden,
@@ -65,7 +67,9 @@ class MusicPlayerState {
         currentIndex: currentIndex ?? this.currentIndex,
         isPlaying: isPlaying ?? this.isPlaying,
         position: position ?? this.position,
-        duration: duration ?? this.duration,
+        duration: identical(duration, _keepDuration)
+            ? this.duration
+            : duration as Duration?,
         isLoading: isLoading ?? this.isLoading,
         playMode: playMode ?? this.playMode,
         isHidden: isHidden ?? this.isHidden,
@@ -103,6 +107,7 @@ class MusicPlayerController extends Notifier<MusicPlayerState> {
   // 按 index 合并（复用同一个 Future、不重复 setUrl），保证用户的点击始终拥有该曲目，
   // 避免 auto-advance 的第二次 ++_requestSeq 把用户请求标记为 stale 后静默丢弃。
   int? _pendingIndex;
+  int? _pendingSongId;
   Future<void>? _pendingLoad;
 
   // 已实际 setUrl 加载成功的曲目 ID（按歌曲身份记忆：索引会随歌单重注入漂移）。
@@ -127,6 +132,70 @@ class MusicPlayerController extends Notifier<MusicPlayerState> {
     _playingSub?.cancel();
     _durationSub?.cancel();
     _completedSub?.cancel();
+  }
+
+  /// 用一次成功扫描的完整结果协调播放器歌单。
+  ///
+  /// 当前已加载歌曲仍存在时只重定位索引，保留音源、播放状态与进度；已经消失
+  /// 时真正停止旧音源，清空播放态，并只选中剩余第一首歌曲而不自动播放。
+  /// 成功空列表会隐藏迷你播放器。调用本方法也会使旧的在途切歌请求失效。
+  Future<void> reconcilePlaylist(List<MusicSong> songs) async {
+    final loadedSongId = _loadedSongId;
+    final selectedSongId = state.currentSong?.id;
+    final pendingSongId = _pendingSongId;
+
+    _requestSeq++;
+    _pendingIndex = null;
+    _pendingSongId = null;
+    _pendingLoad = null;
+
+    if (loadedSongId != null) {
+      final newIndex = songs.indexWhere((song) => song.id == loadedSongId);
+      if (newIndex >= 0) {
+        state = state.copyWith(
+          playlist: songs,
+          currentIndex: newIndex,
+          isLoading: false,
+        );
+        return;
+      }
+    } else if (pendingSongId == null && selectedSongId != null) {
+      final newIndex = songs.indexWhere((song) => song.id == selectedSongId);
+      if (newIndex >= 0) {
+        state = state.copyWith(
+          playlist: songs,
+          currentIndex: newIndex,
+          isLoading: false,
+        );
+        return;
+      }
+    }
+
+    if (loadedSongId != null || pendingSongId != null) {
+      try {
+        await _backend.stop();
+      } catch (error) {
+        debugPrint('停止已移除音乐失败: ${error.runtimeType}');
+      }
+    }
+    _loadedSongId = null;
+
+    final firstPlayable = songs.indexWhere((song) => song.isPlayable);
+    final currentIndex = songs.isEmpty
+        ? -1
+        : firstPlayable < 0
+            ? 0
+            : firstPlayable;
+    state = MusicPlayerState(
+      playlist: songs,
+      currentIndex: currentIndex,
+      isPlaying: false,
+      position: Duration.zero,
+      duration: null,
+      isLoading: false,
+      playMode: state.playMode,
+      isHidden: songs.isEmpty,
+    );
   }
 
   /// 注入扫描到的歌单
@@ -199,9 +268,11 @@ class MusicPlayerController extends Notifier<MusicPlayerState> {
       return _pendingLoad!;
     }
     _pendingIndex = index;
+    _pendingSongId = song.id;
     final future = _doLoadAndPlay(index, song).whenComplete(() {
-      if (_pendingIndex == index) {
+      if (_pendingIndex == index && _pendingSongId == song.id) {
         _pendingIndex = null;
+        _pendingSongId = null;
         _pendingLoad = null;
       }
     });

@@ -55,12 +55,19 @@ class PlaylistSheet extends ConsumerWidget {
         ),
         Padding(
           padding: const EdgeInsets.all(16),
-          child:
-              Text('播放列表（${songs.length} 首）', style: AppTextStyles.titleMedium),
+          child: Text(
+            '我们的歌（${songs.length} 首）',
+            style: AppTextStyles.titleMedium,
+          ),
         ),
         Expanded(
           child: songs.isEmpty
-              ? Center(child: Text('没有找到本地音乐', style: AppTextStyles.caption))
+              ? Center(
+                  child: Text(
+                    '还没有找到专属录音',
+                    style: AppTextStyles.caption,
+                  ),
+                )
               : ListView.builder(
                   controller: scrollController,
                   itemCount: songs.length,

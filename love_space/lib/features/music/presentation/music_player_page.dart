@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -51,10 +53,9 @@ class _MusicPlayerPageState extends ConsumerState<MusicPlayerPage>
       musicLibraryProvider,
       (_, next) {
         final songs = next.valueOrNull;
-        if (songs == null || songs.isEmpty) return;
+        if (songs == null) return;
         final controller = ref.read(musicPlayerProvider.notifier);
-        if (_sameSongs(ref.read(musicPlayerProvider).playlist, songs)) return;
-        controller.setPlaylist(songs);
+        unawaited(controller.reconcilePlaylist(songs));
       },
       fireImmediately: true,
     );
@@ -66,14 +67,6 @@ class _MusicPlayerPageState extends ConsumerState<MusicPlayerPage>
     _librarySub.close();
     _slideCtrl.dispose();
     super.dispose();
-  }
-
-  bool _sameSongs(List<MusicSong> a, List<MusicSong> b) {
-    if (a.length != b.length) return false;
-    for (var i = 0; i < a.length; i++) {
-      if (a[i].id != b[i].id) return false;
-    }
-    return true;
   }
 
   void _onVerticalDragUpdate(DragUpdateDetails details) {

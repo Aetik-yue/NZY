@@ -136,5 +136,14 @@ void main() {
     expect(libraryCalls, 1, reason: '只有打开播放页才应触发一次音乐扫描');
     final state = container.read(musicPlayerProvider);
     expect(state.playlist.length, 2, reason: '扫描结果应注入播放器歌单');
+
+    // 4. 关闭后再次打开：autoDispose 释放上次结果，新页面必须重新扫描。
+    await tester.tap(find.byTooltip('收起播放器'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('回忆唱片'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect(libraryCalls, 2, reason: '每次重新打开音乐页都应执行新的扫描');
   });
 }

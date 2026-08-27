@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_text_styles.dart';
 
-/// 空状态：设备音乐库中没有可播放歌曲。
+/// 空状态：设备音乐库中没有符合命名规则的专属录音。
 class MusicEmptyState extends StatelessWidget {
   const MusicEmptyState({super.key, this.onRetry});
 
@@ -13,9 +13,11 @@ class MusicEmptyState extends StatelessWidget {
   Widget build(BuildContext context) {
     return _MusicStateCard(
       icon: Icons.music_off_rounded,
-      title: '没有找到本地音乐',
-      description: '请将音乐文件放入设备后重新扫描',
-      actionLabel: onRetry == null ? null : '重新扫描',
+      title: '还没有找到我们的歌',
+      description: '请将录音文件名改为以 yyzm 开头，\n'
+          '例如 yyzm_小幸运.m4a，\n'
+          '然后重新打开音乐页面。',
+      actionLabel: onRetry == null ? null : '重新识别',
       onAction: onRetry,
     );
   }
@@ -31,9 +33,10 @@ class MusicPermissionState extends StatelessWidget {
   Widget build(BuildContext context) {
     return _MusicStateCard(
       icon: Icons.lock_outline_rounded,
-      title: '需要音乐权限',
-      description: '授权后才能扫描设备中的音乐文件',
-      actionLabel: '重新授权',
+      title: '需要音乐和音频权限',
+      description: '授权后，App 才能自动识别以 yyzm 开头的专属录音。\n'
+          '其他歌曲不会加入“我们的歌”。',
+      actionLabel: '允许访问',
       onAction: onRetry,
     );
   }
@@ -49,9 +52,9 @@ class MusicLoadErrorState extends StatelessWidget {
   Widget build(BuildContext context) {
     return _MusicStateCard(
       icon: Icons.sync_problem_rounded,
-      title: '音乐库加载失败',
-      description: '请检查音乐文件后重试',
-      actionLabel: '重新加载',
+      title: '识别歌曲失败，请重试',
+      description: '暂时无法读取专属录音，请稍后再试',
+      actionLabel: '重新识别',
       onAction: onRetry,
     );
   }

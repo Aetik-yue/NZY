@@ -7,6 +7,7 @@ abstract class AudioBackend {
   Future<void> setUrl(String url);
   Future<void> play();
   Future<void> pause();
+  Future<void> stop();
   Future<void> seek(Duration position);
 
   /// 当前播放位置流
@@ -76,6 +77,14 @@ class FakeAudioBackend implements AudioBackend {
   Future<void> pause() async {
     _playing.add(false);
     _timer?.cancel();
+  }
+
+  @override
+  Future<void> stop() async {
+    _timer?.cancel();
+    _pos = Duration.zero;
+    _playing.add(false);
+    _position.add(_pos);
   }
 
   @override

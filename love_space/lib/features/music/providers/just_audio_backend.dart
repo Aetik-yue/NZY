@@ -27,6 +27,9 @@ class JustAudioBackend implements AudioBackend {
   Future<void> pause() => _player.pause();
 
   @override
+  Future<void> stop() => _player.stop();
+
+  @override
   Future<void> seek(Duration position) => _player.seek(position);
 
   @override
