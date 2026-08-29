@@ -5,7 +5,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/Flutter-3.x-02569B?logo=flutter&logoColor=white" alt="Flutter 3.x" />
   <img src="https://img.shields.io/badge/Dart-%5E3.5.4-0175C2?logo=dart&logoColor=white" alt="Dart ^3.5.4" />
-  <img src="https://img.shields.io/badge/version-1.3.0-FF6B9D" alt="Version 1.3.0" />
+  <img src="https://img.shields.io/badge/version-1.3.1-FF6B9D" alt="Version 1.3.1" />
   <img src="https://img.shields.io/badge/tests-224%20passed-A8C9A0" alt="224 tests passed" />
 </p>
 
@@ -43,6 +43,7 @@
 
 ### 最新开发进展
 
+- 应用名称：Android 安装后在桌面和系统应用列表中统一显示为「以越之名」，iOS 显示名称同步统一；应用包名保持不变，可延续已有数据并覆盖升级。
 - 专属录音：音乐页只自动识别真实文件名以 `yyzm` 开头的本地音频，大小写不敏感；界面隐藏前缀和分隔符，手机中的其他歌曲不会加入“我们的歌”。
 - 自动刷新：每次打开音乐页都会重新识别；录音删除或取消 `yyzm` 前缀后自动从歌单消失，当前歌曲仍存在时保留播放状态与进度。
 - 公路闪避：新增竖屏俯视角赛车游戏，通过屏幕下方大范围左右拖动控制赛车，在清晰的三车道上躲避车辆、路锥和护栏；一次碰撞结束本局，按行驶距离计分并保存本机最高纪录。
@@ -54,7 +55,7 @@
 - 每日缘分签：按日期和情侣昵称稳定生成当天签文、缘分温度、幸运时刻与一件可执行的小行动。
 - 同步安全加固：全局入口密钥之外增加每个房间的独立令牌，旧版弱鉴权房间安全停用。
 
-当前 README 对应 v1.3.0；完整版本内容见 [v1.3.0 更新日志](version/1.3.0/更新日志.md)。
+当前 README 对应 v1.3.1；完整版本内容见 [v1.3.1 更新日志](version/1.3.1/更新日志.md)。
 
 ## 公路闪避玩法
 
@@ -215,7 +216,7 @@ Isar 本地数据库
 - [Flutter 端系统设计](love_space/docs/system_design.md)
 - [双人同步部署指南](love_space/docs/SYNC_SETUP.md)
 - [开发完成清单](love_space/DEVELOPMENT_CHECKLIST.md)
-- [v1.3.0 更新日志](version/1.3.0/更新日志.md)
+- [v1.3.1 更新日志](version/1.3.1/更新日志.md)
 
 ## 参与开发
 
