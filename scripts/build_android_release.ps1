@@ -156,7 +156,9 @@ if ($Publish) {
     if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
         throw '未找到 gh CLI，请先安装并登录，或手动在 GitHub 创建 Release'
     }
-    & gh release view $tagName --repo $GitHubRepo *> $null
+    # “release not found” 是 gh 的 stderr 正常输出；交给 cmd 吞掉，
+    # 避免 PowerShell 5.1 在 $ErrorActionPreference=Stop 下把它包装成错误中止脚本。
+    $null = cmd /c "gh release view $tagName --repo $GitHubRepo 2>nul"
     if ($LASTEXITCODE -eq 0) {
         throw "GitHub Release $tagName 已存在，请先处理旧发布，避免覆盖已下载版本"
     }
