@@ -1,5 +1,8 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_text_styles.dart';
@@ -7,6 +10,8 @@ import '../../../data/models/app_settings.dart';
 import '../../../data/providers/data_providers.dart';
 import '../../../shared/utils/image_picker_helper.dart';
 import '../../../shared/widgets/app_snackbar.dart';
+import '../../update/application/app_update_controller.dart';
+import '../../update/presentation/update_dialog.dart';
 import 'widgets/settings_widgets.dart';
 
 /// 情侣信息、纪念起始日、主页封面和隐私显示设置。
@@ -25,6 +30,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   bool _hideDays = false;
   bool _loaded = false;
   bool _saving = false;
+  bool _checkingUpdate = false;
+  String _installedVersion = '';
 
   @override
   void initState() {
@@ -33,6 +40,13 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   }
 
   Future<void> _load() async {
+    if (Platform.isAndroid) {
+      try {
+        _installedVersion = (await PackageInfo.fromPlatform()).version;
+      } catch (error) {
+        debugPrint('[SettingsPage] 读取当前版本失败: $error');
+      }
+    }
     final settings = await ref.read(settingsRepositoryProvider).get();
     if (!mounted) return;
     if (settings != null) {
@@ -67,6 +81,30 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   Future<void> _pickCover() async {
     final path = await ImagePickerHelper.pickFromGallery();
     if (path != null && mounted) setState(() => _profileCoverPath = path);
+  }
+
+  Future<void> _checkUpdate() async {
+    if (_checkingUpdate) return;
+    setState(() => _checkingUpdate = true);
+    try {
+      final release =
+          await ref.read(appUpdateControllerProvider.notifier).checkForUpdate();
+      if (!mounted) return;
+      setState(() => _checkingUpdate = false);
+      if (release != null) {
+        await showAppUpdateDialog(context, release);
+      } else {
+        AppSnackbar.show(
+          context,
+          _updateMessage(ref.read(appUpdateControllerProvider)),
+        );
+      }
+    } catch (error) {
+      debugPrint('[SettingsPage] 检查更新失败: $error');
+      if (!mounted) return;
+      setState(() => _checkingUpdate = false);
+      AppSnackbar.show(context, '检查更新失败，请稍后重试');
+    }
   }
 
   Future<void> _save() async {
@@ -176,6 +214,27 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                     ),
                   ],
                 ),
+                if (Platform.isAndroid) ...[
+                  const SizedBox(height: 14),
+                  SettingsSection(
+                    icon: Icons.system_update_alt_rounded,
+                    title: '应用更新',
+                    subtitle: '新版本会在打开应用时自动检测',
+                    children: [
+                      SettingsValueRow(
+                        icon: Icons.refresh_rounded,
+                        title: '检查更新',
+                        subtitle: '下载完成后会打开系统安装页',
+                        value: _checkingUpdate
+                            ? '检查中…'
+                            : _installedVersion.isEmpty
+                                ? '—'
+                                : 'v$_installedVersion',
+                        onTap: _checkingUpdate ? () {} : _checkUpdate,
+                      ),
+                    ],
+                  ),
+                ],
                 const SizedBox(height: 20),
                 SizedBox(
                   height: 52,
@@ -194,6 +253,15 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             )
           : const Center(child: CircularProgressIndicator(strokeWidth: 2)),
     );
+  }
+
+  String _updateMessage(AppUpdateState state) {
+    if (state.message != null) return state.message!;
+    return switch (state.status) {
+      AppUpdateStatus.checking => '正在检查更新…',
+      AppUpdateStatus.downloading || AppUpdateStatus.installing => '更新正在处理中…',
+      _ => '当前已是最新版本',
+    };
   }
 
   String _formatDate(DateTime? date) {
