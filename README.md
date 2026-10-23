@@ -5,8 +5,8 @@
 <p align="center">
   <img src="https://img.shields.io/badge/Flutter-3.x-02569B?logo=flutter&logoColor=white" alt="Flutter 3.x" />
   <img src="https://img.shields.io/badge/Dart-%5E3.5.4-0175C2?logo=dart&logoColor=white" alt="Dart ^3.5.4" />
-  <img src="https://img.shields.io/badge/version-1.3.1-FF6B9D" alt="Version 1.3.1" />
-  <img src="https://img.shields.io/badge/tests-224%20passed-A8C9A0" alt="224 tests passed" />
+  <img src="https://img.shields.io/badge/version-1.4.0-FF6B9D" alt="Version 1.4.0" />
+  <img src="https://img.shields.io/badge/tests-245%20passed-A8C9A0" alt="245 tests passed" />
 </p>
 
 **以越之名**是一款使用 Flutter 开发的情侣生活记录 App。它以本地优先为原则：不配置服务器也能使用全部核心功能；需要异地双机共享时，可以选择部署腾讯云 SCF + COS 同步服务。
@@ -39,10 +39,12 @@
 | **情侣互动** | 双人轮答恋爱测试、每日固定缘分签与情侣小行动 |
 | **小游戏与工具** | 打砖块、俄罗斯方块、公路闪避、秒表与随机数；游戏均为 Flutter 原生绘制与逻辑实现 |
 | **我的与设置** | 自定义情侣合照封面、相伴/照片/愿望/待办统计、小游戏快捷入口、情侣昵称、起始日期与隐私显示设置 |
+| **应用内更新** | 启动自动检查 GitHub 最新正式版，弹窗展示更新内容，下载 APK、校验 SHA-256 后调起系统安装器 |
 | **双人同步** | 6 位情侣码配对，同步愿望、待办、时光、打卡、纪念日、悄悄话与相册；照片原图使用 COS |
 
 ### 最新开发进展
 
+- 应用内更新：打开应用时每天最多检查一次公开 GitHub Release；发现新版本后弹窗展示更新日志，点击即可下载并校验安装包，随后打开 Android 系统安装页。设置页提供手动检查入口，并支持可选的静态镜像回退。
 - 应用名称：Android 安装后在桌面和系统应用列表中统一显示为「以越之名」，iOS 显示名称同步统一；应用包名保持不变，可延续已有数据并覆盖升级。
 - 专属录音：音乐页只自动识别真实文件名以 `yyzm` 开头的本地音频，大小写不敏感；界面隐藏前缀和分隔符，手机中的其他歌曲不会加入“我们的歌”。
 - 自动刷新：每次打开音乐页都会重新识别；录音删除或取消 `yyzm` 前缀后自动从歌单消失，当前歌曲仍存在时保留播放状态与进度。
@@ -55,7 +57,7 @@
 - 每日缘分签：按日期和情侣昵称稳定生成当天签文、缘分温度、幸运时刻与一件可执行的小行动。
 - 同步安全加固：全局入口密钥之外增加每个房间的独立令牌，旧版弱鉴权房间安全停用。
 
-当前 README 对应 v1.3.1；完整版本内容见 [v1.3.1 更新日志](version/1.3.1/更新日志.md)。
+当前 README 对应 v1.4.0；完整版本内容见 [v1.4.0 更新日志](version/1.4.0/更新日志.md)。
 
 ## 公路闪避玩法
 
@@ -101,7 +103,7 @@ flutter analyze
 flutter test
 ```
 
-当前测试套件包含 **224 项测试**，覆盖核心日期逻辑、Repository、小说爬虫、同步引擎、专属录音扫描与音乐播放器、小游戏、番茄钟和主要页面交互。
+当前测试套件包含 **245 项测试**，覆盖核心日期逻辑、Repository、小说爬虫、同步引擎、专属录音扫描与音乐播放器、应用内更新、小游戏、番茄钟和主要页面交互。
 
 云函数测试单独运行：
 
@@ -150,6 +152,17 @@ flutter build ios --release
 ```
 
 如果发布包需要双人同步，请在对应构建命令后加入 `SYNC_API_URL` 和 `SYNC_SECRET` 两个 `--dart-define` 参数。仓库不保存 Android release keystore；正式发布前还需要配置自己的签名方案。历史已安装版本能否直接覆盖升级，取决于新包是否继续使用相同签名。
+
+应用内更新使用公开 GitHub Release 作为更新源。推送新版本后，运行发布脚本会构建 APK、生成 SHA-256 校验文件并创建 Release：
+
+```powershell
+powershell -File scripts/build_android_release.ps1 `
+  -SyncApiUrl "你的云函数URL" `
+  -SyncSecret "至少32位随机密钥" `
+  -Publish
+```
+
+完整说明见 [应用内更新配置与发布](love_space/docs/APP_UPDATE_SETUP.md)。
 
 ## 技术架构
 
@@ -204,8 +217,9 @@ Isar 本地数据库
 │   ├── ios/                       # iOS 工程
 │   └── pubspec.yaml
 ├── serverless/                    # SCF + COS 同步云函数及测试
+├── scripts/                       # Android 发布与更新包脚本
 ├── docs/                          # 功能设计与实施记录
-├── version/                       # 各版本更新日志
+├── version/                       # 各版本更新日志与 APK
 ├── CLAUDE.md                      # 项目架构与编码规范
 └── README.md
 ```
@@ -215,8 +229,9 @@ Isar 本地数据库
 - [编码与架构规范](CLAUDE.md)
 - [Flutter 端系统设计](love_space/docs/system_design.md)
 - [双人同步部署指南](love_space/docs/SYNC_SETUP.md)
+- [应用内更新配置与发布](love_space/docs/APP_UPDATE_SETUP.md)
 - [开发完成清单](love_space/DEVELOPMENT_CHECKLIST.md)
-- [v1.3.1 更新日志](version/1.3.1/更新日志.md)
+- [v1.4.0 更新日志](version/1.4.0/更新日志.md)
 
 ## 参与开发
 
